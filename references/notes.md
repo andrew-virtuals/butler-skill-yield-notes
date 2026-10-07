@@ -65,10 +65,9 @@ premium has been told half of it.
 
 ## The wheel
 
-After a put is assigned, a covered call on the same asset is the natural next note -
-but Derive settled in cash, so the owner holds ETH only if the buy after settlement
-ran, and a call needs that ETH inside the Derive account, which `acp options deposit`
-cannot put there. Until it can, the next note is another put. Offer it as a choice,
-not a sequence: an owner who has just taken a loss may want to stop.
+After a put is assigned, the classic next note is a covered call on the asset. Not
+here yet: v1 offers puts only, Derive settles in cash, and a call needs the asset
+inside the Derive account. The next note is another put. Offer it as a choice, not a
+sequence: an owner who has just taken a loss may want to stop.
 
 Never auto-roll without a fresh yes.

@@ -23,9 +23,12 @@ those move by the hour.
 - Deposits and withdrawals happen on **Ethereum L1**, in USDC. Butler's money is on
   Base, so a note is funded by bridging Base to Ethereum, then depositing.
 - A deposit is credited about **two minutes** after it is mined. The minimum deposit
-  is $5; a smaller one is lost to Derive's security module.
+  is $5; Derive gives a smaller one to its security module, so Butler's server refuses
+  it.
 - A withdrawal pays to the owner's wallet on Ethereum once Derive's batch is proven:
-  about **17 minutes** on testnet, quoted to owners as about 20.
+  about **20 minutes** (17 measured on testnet), less a fee of up to $1.
+- Ethereum gas for a deposit is paid by Butler's server wallet path, not asked of the
+  owner.
 - Login and signing are Butler's server's job: it builds every Derive action, checks
   it against what the owner approved on the card, signs with the owner's wallet and
   submits it. The skill never signs anything, and there is no session key.

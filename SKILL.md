@@ -1,8 +1,8 @@
 ---
 name: yield-notes
-description: Get paid to wait - sell a fully collateralised option on Derive so idle USDC earns while it waits to buy a dip, or a long ETH bag earns while it waits to sell a rally.
-version: 1.0.0
-metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","covered call","cash secured put","sell options","premium","get paid to wait","buy the dip","yield note","options income"],"requires":{"bins":["python3","bevo-read","acp"]}}}
+description: Get paid to wait - sell a fully collateralised put on Derive so idle USDC earns while it waits to buy ETH or BTC on a dip.
+version: 1.1.0
+metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","cash secured put","sell options","premium","get paid to wait","buy the dip","yield note","options income"],"requires":{"bins":["python3","bevo-read","acp"]}}}
 ---
 
 ## When to use
@@ -10,24 +10,21 @@ metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","m
 Your owner has money sitting still and wants it to earn: "earn yield on my USDC",
 "make my money work", "get paid to buy the dip", "what can I earn on this".
 
-A note is one option, sold short, **fully collateralised**:
-
-| Note | What your owner is agreeing to | Collateral |
-| --- | --- | --- |
-| Earn on USDC (cash-secured put) | Buy the asset at a lower price if it falls there. Keep the premium either way. | USDC, strike x size |
-| Earn on ETH (covered call) | Sell the asset at a higher price if it rises there. Keep the premium either way. | The asset, in the Derive account |
+A note is one **cash-secured put**, sold short and **fully collateralised** in USDC
+(strike x size): your owner agrees to buy the asset at a lower price if it falls
+there, and keeps the premium either way.
 
 This is not lending and not a vault. Your owner is **selling someone else insurance**
 and keeping the fee. The premium is certain. What they own at expiry is not.
 
-Not this skill: buying options, spreads, anything on leverage, or a note on an asset
-the screen does not clear. It never picks a note *for* them.
+Not this skill: covered calls, buying options, spreads, anything on leverage, or a
+note on an asset the screen does not clear. It never picks a note *for* them.
 
 ## Before you start
 
-1. **Which way.** Idle USDC that would happily buy a dip is a put. `acp options
-   deposit` moves USDC only, so a covered call opens only when the asset is already in
-   the Derive account; otherwise say a call is not available here and stop.
+1. **Would they buy the dip?** A note fits idle USDC whose owner would happily buy
+   the asset lower. If not - or they want to earn on an asset they hold - there is no
+   note here: say so and stop.
 2. **How much, in one asset.** The collateral is locked until expiry. No early exit.
 3. **The bad outcome first, in their words, before any yield number.** Not "if
    assigned" - *"ETH drops to $2,000, and you have bought it at $2,300 anyway. You are
@@ -88,8 +85,9 @@ vague, do not quote:
 
 6. [FIXED] Fund only when `freeForNewPutsUsd` is below `collateral.amount`. Deposit
    the shortfall rounded up to the cent, never under $5 (Derive keeps a smaller
-   deposit). If `ethereum.usdc` is short of that, bridge the difference from Base
-   first; each command files an approval card for the owner:
+   deposit; the server refuses one). If `ethereum.usdc` is short of that, bridge the
+   difference from Base first; each command files an approval card for the owner.
+   Butler's server covers the Ethereum gas - never ask the owner about gas:
 
    ```sh
    acp trade --token-in usdc --chain-in 8453 --amount-in <BRIDGE_USDC> --token-out usdc --chain-out 1 --idempotency-key <NOTE>:bridge
@@ -113,18 +111,20 @@ vague, do not quote:
    approval card, not a fill: tell the owner to approve it in the app. Nothing is sold
    yet.
 
-8. [FIXED] Wait for the outcome. Butler's server posts it as a note in this chat
-   ("Sold 2.17 ETH-20261030-2300-P for $55.76 after fees…"), or look it up:
+8. [FIXED] Wait for the outcome; never re-run the open to find it. When the card
+   lands, Butler's server posts a note in this chat ("Sold 2.17 ETH-20261030-2300-P for
+   $55.76 after fees…") and you are nudged. Then read it:
 
    ```sh
    bevo-read request <NOTE>:open --route options
    ```
 
-   `approvalStatus: confirmed` is executed. `failed`, `rejected` or a no-fill: nothing
-   was sold and nothing is locked - say so. `pending` or `signed`: still waiting.
+   `approvalStatus: confirmed` is executed, and `approvalOutcome` holds the fill.
+   `failed` or `rejected`: nothing was sold and nothing is locked - give
+   `approvalFailureReason` as written. `pending` or `signed`: still waiting.
 
-9. [FIXED] Only for a confirmed open, file the lifecycle duty with `duty_create`,
-   settings copied from the **fill**, never the quote:
+9. [FIXED] Only when `approvalStatus` is `confirmed`, file the lifecycle duty with
+   `duty_create`, settings copied from `approvalOutcome`, never the quote:
 
    ```json
    {"recipe": "options-lifecycle@2",
@@ -134,15 +134,15 @@ vague, do not quote:
     "triggers": [{"kind": "timer", "intervalSeconds": 900}]}
    ```
 
-   Those are the example's numbers; yours come from the outcome note. A fill can be
-   partial ("of 2.17 approved"): SIZE is what was sold, PREMIUM_USD what was received
-   after fees, `COLLATERAL_USD` is STRIKE x SIZE for a put and `0` for a call. Turn
-   `DELIVER_ASSET` on only if the owner asked in step 5. Never file for an unknown,
-   refused or pending open; a fill number you cannot read means no duty, and say so.
+   Those are the example's numbers. Yours: INSTRUMENT `instrument`, STRIKE `strike`,
+   SIZE `filledSize` (a fill can be partial), PREMIUM_USD `netPremiumUsd`,
+   COLLATERAL_USD `collateral`; PRODUCT `cash_secured_put`, UNDERLYING the
+   instrument's prefix. Turn `DELIVER_ASSET` on only if the owner asked in step 5.
+   Never file for an unknown, refused or pending open.
 
 10. [FIXED] Withdraw only when asked, only free USDC (`freeForNewPutsUsd`; collateral
     behind an open note cannot leave). It pays to the owner's wallet on Ethereum in
-    about 20 minutes, less up to $1; bringing it back to Base is a second card:
+    about 20 minutes, less a fee of up to $1; bringing it back to Base is a second card:
 
     ```sh
     acp options withdraw --amount <USDC> --idempotency-key <NOTE>:withdraw
@@ -182,12 +182,17 @@ failure that matters; the server refuses an open that free USDC does not cover.
 | `OPTIONS_BOUNDS_MISMATCH` | `--max-collateral` is below what the note locks. Re-quote; never raise it past what the owner agreed. |
 | Open failed: no fill | Nothing was sold and nothing is locked. The price moved under `min_premium_usd`; re-quote and re-offer, never lower the floor quietly. |
 | Open failed: not enough free USDC | Fund (step 6) or re-quote smaller. |
+| Bridge, deposit or withdraw card failed | Give its failure reason as written, and stop. Do not re-run it. |
+| `OPTIONS_BAD_COMMAND` on a deposit | Under the $5 minimum, or malformed. Nothing was filed. |
 | Card swept after 30 minutes | It failed unsigned. Re-quote before offering again. |
 | Derive or the account unreachable | Say Butler cannot see the options market or the account right now. Quote nothing; guess nothing. |
 
 ## Limits
 
-- One leg, sold, fully collateralised. No spreads, no leverage, no buying.
+- One cash-secured put, sold, fully collateralised. No spreads, no leverage, no
+  buying.
+- Covered calls come later: the rail accepts one only when the asset is already in
+  the Derive account, and `acp options deposit` moves USDC only.
 - **Monthly by default.** Weeklies lose far more of the premium to fees and the
   spread; the fee gate refuses them on small notes.
 - Smallest note is Derive's minimum size x the strike: about $230 on ETH at today's
