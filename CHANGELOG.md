@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.1.0
+
+- Cash-secured puts only, as the rail offers in v1. The covered-call offer is gone
+  from the procedure; Limits says calls come later. The helper still quotes them.
+- The fill is read from `bevo-read request <key> --route options`:
+  `approvalOutcome` (`filledSize`, `netPremiumUsd`, `collateral`, `instrument`,
+  `strike`) once `approvalStatus` is `confirmed`, `approvalFailureReason` when it
+  failed. The lifecycle duty is filed from those fields.
+- The skill waits for the server's outcome note or checks the request; it never
+  re-runs a command to find out. A failed bridge, deposit or withdrawal card is
+  reported with its reason as given.
+- Never asks the owner about Ethereum gas (Butler's server covers it). Deposits under
+  $5 are refused by the server as well as by the skill.
+- Withdrawals: about 20 minutes, a fee of up to $1.
+
 ## 1.0.0
 
 - Derive v3. The helper reads `api.derive.xyz/v3`: one `public/get_tickers` call per

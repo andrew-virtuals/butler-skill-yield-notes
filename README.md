@@ -10,8 +10,9 @@ the hub accepts the `acp options` group (see "Validating a change").
 ## What it does
 
 Sells one fully collateralised option on [Derive](https://derive.xyz) so idle money
-earns while it waits - a cash-secured put on USDC, or a covered call on an asset
-already in the owner's Derive account. The model never picks an instrument, a strike
+earns while it waits - a cash-secured put on USDC. v1 offers puts only: the rail
+accepts a covered call only when the asset is already in the Derive account, and
+deposits move USDC only. The helper still quotes calls, for screening. The model never picks an instrument, a strike
 or a premium: it passes an intent to the helper and gets back a quote object with
 every number fixed, including the bounds `acp options open` takes.
 
@@ -22,9 +23,10 @@ every number fixed, including the bounds `acp options open` takes.
 | Screen and quote | `references/helper.md`, run in the container with `python3` | Reads Derive v3's public, keyless API (`public/get_all_instruments`, `public/get_tickers`). Read-only. |
 | Account read | `acp options account` | The owner's Derive account: free USDC, open positions, USDC on Ethereum, signer readiness. |
 | Funding | `acp trade` (Base to Ethereum), then `acp options deposit` | Each files an approval card. |
-| Opening | `acp options open` | Files an approval card; bevo-server executes an IOC limit sell after approval and posts the outcome. |
+| Opening | `acp options open` | Files an approval card; bevo-server executes an IOC limit sell after approval, posts the outcome note and nudges the butler. |
+| Outcome | `bevo-read request <key> --route options` | `approvalStatus`, plus `approvalOutcome` (`filledSize`, `netPremiumUsd`, `collateral`, …) or `approvalFailureReason`. |
 | Withdrawing | `acp options withdraw`, then `acp trade` back to Base | Approval cards. |
-| Watching to expiry | the `options-lifecycle@2` duty template | Filed by the skill only after a confirmed fill, with the fill's numbers. |
+| Watching to expiry | the `options-lifecycle@2` duty template | Filed by the skill only when `approvalStatus` is `confirmed`, with the numbers from `approvalOutcome`. |
 
 The rail contract is bevo-server's `docs/derive-options.md`. bevo-server is the only
 thing that signs: there is no session key and nothing in this repo touches a key.
