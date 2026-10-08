@@ -1,7 +1,7 @@
 ---
 name: yield-notes
 description: Get paid to wait - sell a fully collateralised put on Derive so idle USDC earns while it waits to buy ETH or BTC on a dip.
-version: 1.1.0
+version: 1.2.0
 metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","cash secured put","sell options","premium","get paid to wait","buy the dip","yield note","options income"],"requires":{"bins":["python3","bevo-read","acp"]}}}
 ---
 
@@ -83,21 +83,21 @@ vague, do not quote:
    to this. Derive settles in cash; the asset is bought for them after settlement only
    if they ask for that now.
 
-6. [FIXED] Fund only when `freeForNewPutsUsd` is below `collateral.amount`. Deposit
-   the shortfall rounded up to the cent, never under $5 (Derive keeps a smaller
-   deposit; the server refuses one). If `ethereum.usdc` is short of that, bridge the
-   difference from Base first; each command files an approval card for the owner.
-   Butler's server covers the Ethereum gas - never ask the owner about gas:
+6. [FIXED] Fund only when `freeForNewPutsUsd` is below `collateral.amount`. One
+   command moves the owner's Base USDC into their own Derive account, as one approval
+   card. Deposit the shortfall plus a small margin for the bridge fee (about 1%, at
+   least $1), rounded up to the cent and never under $5 - and tell the owner plainly
+   that the bridge fee comes out of the amount:
 
    ```sh
-   acp trade --token-in usdc --chain-in 8453 --amount-in <BRIDGE_USDC> --token-out usdc --chain-out 1 --idempotency-key <NOTE>:bridge
    acp options deposit --amount <DEPOSIT_USDC> --idempotency-key <NOTE>:deposit
    ```
 
-   Run the deposit only after the bridge is confirmed, for what `acp options account`
-   then shows as `ethereum.usdc`, up to the shortfall. Credit lands about two minutes
-   after the deposit is mined: re-read the account until `freeForNewPutsUsd` covers
-   the note. If it ends up short, re-quote with `--collateral` at what is free and
+   Only when the account read shows the owner already holds enough USDC on Ethereum
+   (`ethereum.usdc`), add `--from 1` to deposit from there instead. Never ask about
+   gas or an address: Butler's server handles both. The credit lands a few minutes
+   after the bridge: re-read `acp options account` until `freeForNewPutsUsd` covers
+   the note. If it ends short, re-quote with `--collateral` at what is free and
    re-offer.
 
 7. [FIXED] Quote again if `valid_until` has passed, then open with the quote's own
@@ -157,16 +157,17 @@ Screening and quoting are free reads: re-run them rather than reason from a quot
 past `valid_until` (60 seconds).
 
 Every money command carries a key derived once per note, such as
-`yn:eth:20261030:2300p:1`, with `:bridge`, `:deposit`, `:open`, `:withdraw`, `:home`.
-On an error, a timeout or an unclear answer, **do not re-run it** - a retried open can
-sell the note twice. Look it up instead:
+`yn:eth:20261030:2300p:1`, with `:deposit`, `:open`, `:withdraw`, `:home`. On an
+error, a timeout or an unclear answer, **do not re-run it** - a retried open can sell
+the note twice, and a retried deposit can bridge twice. Look it up instead:
 
 ```sh
 bevo-read request <KEY> --route options
 ```
 
-The bridge legs are `acp trade`: look them up with `--route trade`. `not_found` means
-nothing was filed under that key. Two notes funded from one pot of collateral is the
+A deposit still crediting is not a failed one: re-read `acp options account` and wait
+rather than deposit again. The `:home` leg is `acp trade`: look it up with
+`--route trade`. `not_found` means nothing was filed under that key. Two notes funded from one pot of collateral is the
 failure that matters; the server refuses an open that free USDC does not cover.
 
 ## Failure handling
@@ -182,7 +183,8 @@ failure that matters; the server refuses an open that free USDC does not cover.
 | `OPTIONS_BOUNDS_MISMATCH` | `--max-collateral` is below what the note locks. Re-quote; never raise it past what the owner agreed. |
 | Open failed: no fill | Nothing was sold and nothing is locked. The price moved under `min_premium_usd`; re-quote and re-offer, never lower the floor quietly. |
 | Open failed: not enough free USDC | Fund (step 6) or re-quote smaller. |
-| Bridge, deposit or withdraw card failed | Give its failure reason as written, and stop. Do not re-run it. |
+| Deposit card failed or only partly went through | Give its failure reason as written. Part of the bridge may still be in flight: re-read `acp options account` before any new deposit, and never re-run this one. |
+| Withdraw or `:home` card failed | Give its failure reason as written, and stop. Do not re-run it. |
 | `OPTIONS_BAD_COMMAND` on a deposit | Under the $5 minimum, or malformed. Nothing was filed. |
 | Card swept after 30 minutes | It failed unsigned. Re-quote before offering again. |
 | Derive or the account unreachable | Say Butler cannot see the options market or the account right now. Quote nothing; guess nothing. |
