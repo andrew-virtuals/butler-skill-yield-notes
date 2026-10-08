@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.2.0
+
+- Funding is one command: `acp options deposit` bridges the owner's Base USDC
+  straight into their own Derive account (Butler's server picks the deposit address;
+  the bridge fee comes out of the amount). The separate `acp trade` Base-to-Ethereum
+  leg and the "deposit what arrived" step are gone.
+- The skill deposits the shortfall plus a small margin for the bridge fee (about 1%,
+  at least $1), says so to the owner, and waits on `acp options account` until the
+  credit covers the note. `--from 1` only when the owner already holds USDC on
+  Ethereum.
+- A failed or partial deposit is reported with its reason as given, and the account
+  is re-read before any new deposit - never a re-run. Withdrawing is unchanged.
+
 ## 1.1.0
 
 - Cash-secured puts only, as the rail offers in v1. The covered-call offer is gone

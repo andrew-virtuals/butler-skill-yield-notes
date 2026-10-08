@@ -4,8 +4,8 @@ The `yield-notes` skill for [Butler](https://github.com/Virtual-Protocol/butler-
 For the humans maintaining this repo - never published to a butler. Only `SKILL.md`
 and `references/**/*.md` reach one.
 
-**Status: v1.0.0, built for Derive v3 and the `acp options` rail.** Not listable until
-the hub accepts the `acp options` group (see "Validating a change").
+**Status: v1.2.0, built for Derive v3 and the `acp options` rail.** Not listable until
+the hub's `acp options` support merges (see "Validating a change").
 
 ## What it does
 
@@ -22,7 +22,7 @@ every number fixed, including the bounds `acp options open` takes.
 | --- | --- | --- |
 | Screen and quote | `references/helper.md`, run in the container with `python3` | Reads Derive v3's public, keyless API (`public/get_all_instruments`, `public/get_tickers`). Read-only. |
 | Account read | `acp options account` | The owner's Derive account: free USDC, open positions, USDC on Ethereum, signer readiness. |
-| Funding | `acp trade` (Base to Ethereum), then `acp options deposit` | Each files an approval card. |
+| Funding | `acp options deposit` | One approval card: bevo-server bridges Base USDC straight to the owner's own Derive deposit address (`--from 1` deposits USDC already on Ethereum). |
 | Opening | `acp options open` | Files an approval card; bevo-server executes an IOC limit sell after approval, posts the outcome note and nudges the butler. |
 | Outcome | `bevo-read request <key> --route options` | `approvalStatus`, plus `approvalOutcome` (`filledSize`, `netPremiumUsd`, `collateral`, …) or `approvalFailureReason`. |
 | Withdrawing | `acp options withdraw`, then `acp trade` back to Base | Approval cards. |
@@ -72,9 +72,9 @@ curl -sSLO https://virtual-protocol.github.io/butler-skills/tools/validate.py
 python3 validate.py --standalone .
 ```
 
-Until the hub adds `options` to `ACP_GROUPS` and to the skill money-command list, the
-validator reports each `acp options` line as an unknown group. Everything else must
-pass.
+This needs a hub validator that knows the `acp options` group (butler-skills branch
+`feat/acp-options-group` until it merges); an older one reports each `acp options`
+line as an unknown group.
 
 ## Releasing
 

@@ -20,15 +20,19 @@ those move by the hour.
 
 - **The owner's wallet is the account.** No smart-contract wallet, no account to
   create: the first deposit creates it, with a subaccount.
-- Deposits and withdrawals happen on **Ethereum L1**, in USDC. Butler's money is on
-  Base, so a note is funded by bridging Base to Ethereum, then depositing.
-- A deposit is credited about **two minutes** after it is mined. The minimum deposit
-  is $5; Derive gives a smaller one to its security module, so Butler's server refuses
-  it.
+- Deposits and withdrawals happen on **Ethereum L1**, in USDC. Derive gives each
+  account its own deposit address there (`public/register_deposit_address`), and a
+  keeper sweeps what lands in it.
+- Butler's money is on Base, so `acp options deposit` has Butler's server bridge Base
+  USDC straight to that address: the bridge fee comes out of the amount, and the
+  credit lands a few minutes after the bridge. USDC already on Ethereum deposits
+  directly (`--from 1`) and is credited about **two minutes** after it is mined.
+- The minimum deposit is $5; Derive gives a smaller one to its security module, so
+  Butler's server refuses it.
 - A withdrawal pays to the owner's wallet on Ethereum once Derive's batch is proven:
   about **20 minutes** (17 measured on testnet), less a fee of up to $1.
-- Ethereum gas for a deposit is paid by Butler's server wallet path, not asked of the
-  owner.
+- Ethereum gas for a direct deposit is paid by Butler's server wallet path, not asked
+  of the owner.
 - Login and signing are Butler's server's job: it builds every Derive action, checks
   it against what the owner approved on the card, signs with the owner's wallet and
   submits it. The skill never signs anything, and there is no session key.
