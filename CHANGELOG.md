@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.1
+
+- The lifecycle duty is filed with `TOKEN_ID`, the underlying pinned to one token
+  (`native:8453` for ETH; the verified Base row from `bevo-read token-search` for
+  BTC), which options-lifecycle@2 prices with `/token-stats` and delivers.
+
 ## 1.2.0
 
 - Funding is one command: `acp options deposit` bridges the owner's Base USDC
