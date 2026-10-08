@@ -1,7 +1,7 @@
 ---
 name: yield-notes
 description: Get paid to wait - sell a fully collateralised put on Derive so idle USDC earns while it waits to buy ETH or BTC on a dip.
-version: 1.2.0
+version: 1.2.1
 metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","cash secured put","sell options","premium","get paid to wait","buy the dip","yield note","options income"],"requires":{"bins":["python3","bevo-read","acp"]}}}
 ---
 
@@ -129,7 +129,7 @@ vague, do not quote:
    ```json
    {"recipe": "options-lifecycle@2",
     "params": {"INSTRUMENT": "ETH-20261030-2300-P", "PRODUCT": "cash_secured_put",
-               "UNDERLYING": "ETH", "STRIKE": 2300, "SIZE": 2.17,
+               "UNDERLYING": "ETH", "TOKEN_ID": "native:8453", "STRIKE": 2300, "SIZE": 2.17,
                "PREMIUM_USD": 55.76, "COLLATERAL_USD": 4991},
     "triggers": [{"kind": "timer", "intervalSeconds": 900}]}
    ```
@@ -137,7 +137,12 @@ vague, do not quote:
    Those are the example's numbers. Yours: INSTRUMENT `instrument`, STRIKE `strike`,
    SIZE `filledSize` (a fill can be partial), PREMIUM_USD `netPremiumUsd`,
    COLLATERAL_USD `collateral`; PRODUCT `cash_secured_put`, UNDERLYING the
-   instrument's prefix. Turn `DELIVER_ASSET` on only if the owner asked in step 5.
+   instrument's prefix. TOKEN_ID pins that underlying to one token, never a ticker:
+   ETH is the coin itself on Base, `native:8453`; for BTC, run
+   `bevo-read token-search BTC` and take the verified, non-stock row on Base as
+   `<address>:8453` (say which one you took; ask if more than one fits). The duty
+   prices that pin for the heads-up and, with `DELIVER_ASSET`, buys exactly it.
+   Turn `DELIVER_ASSET` on only if the owner asked in step 5.
    Never file for an unknown, refused or pending open.
 
 10. [FIXED] Withdraw only when asked, only free USDC (`freeForNewPutsUsd`; collateral
