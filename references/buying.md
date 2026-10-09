@@ -106,7 +106,7 @@ the money pays automatically into the Derive account: (settle - strike) x size f
 call, (strike - settle) x size for a put. Nothing has to be done to collect it. It
 stays in the account until withdrawn. One that ends out of the money pays nothing.
 
-The `options-lifecycle@3` duty, filed after a confirmed buy, tells the owner the day
+The `options-lifecycle@4` duty, filed after a confirmed buy, tells the owner the day
 before and again with the outcome. It is filed with:
 
 | Param | From |
@@ -114,7 +114,6 @@ before and again with the outcome. It is filed with:
 | `INSTRUMENT` | `approvalOutcome.instrument` |
 | `PRODUCT` | `long_call` or `long_put` |
 | `UNDERLYING` | the instrument's prefix |
-| `TOKEN_ID` | `native:8453` for ETH; the verified Base row from `bevo-read token-search` for BTC |
 | `STRIKE` | `approvalOutcome.strike` |
 | `SIZE` | `approvalOutcome.filledSize` (a fill can be partial) |
 | `PREMIUM_USD` | `approvalOutcome.totalCostUsd` |

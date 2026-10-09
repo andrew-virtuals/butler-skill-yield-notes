@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.2.0
+
+- Every asset Derive lists options on, not only ETH and BTC. The lifecycle duty is
+  `options-lifecycle@4`, which reads Derive's own index for the heads-up, so a trade
+  files it with no `TOKEN_ID`. The token pin is filed only with `DELIVER_ASSET`, when
+  the owner asked to own the asset after an assigned put.
+
 ## 2.1.1
 
 - Funding no longer says "from Base". Butler's trade bot takes deposit USDC from

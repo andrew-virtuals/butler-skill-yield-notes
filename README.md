@@ -43,7 +43,7 @@ helper and gets back a quote object with every number fixed, including the bound
 | Closing | `acp options close --min-proceeds` or `--max-cost` | Approval card; an IOC `reduce_only` limit sell of a bought position, or limit buy of a sold one. |
 | Outcome | `bevo-read request <key> --route options` | `approvalStatus`, plus `approvalOutcome` (`filledSize`, `netPremiumUsd` / `totalCostUsd` / `netProceedsUsd`, …) or `approvalFailureReason`. |
 | Withdrawing | `acp options withdraw`, then `acp trade` back to Base | Approval cards. |
-| Watching to expiry | the `options-lifecycle@3` duty template | Filed only when `approvalStatus` is `confirmed`, from `approvalOutcome`: `cash_secured_put`, `long_call` or `long_put`. Deleted after a confirmed close. |
+| Watching to expiry | the `options-lifecycle@4` duty template | Filed only when `approvalStatus` is `confirmed`, from `approvalOutcome`: `cash_secured_put`, `long_call` or `long_put`. Deleted after a confirmed close. |
 
 The rail contract is bevo-server's `docs/derive-options.md`. bevo-server is the only
 thing that signs: there is no session key and nothing in this repo touches a key.
