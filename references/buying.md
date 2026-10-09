@@ -86,7 +86,8 @@ the fall.
 ## Closing early
 
 An option the owner **bought** shows in `acp options account` positions with a
-positive `size`; a sold note shows negative and cannot be closed - it runs to expiry.
+positive `size`; a sold note shows negative, and closing that one is a buy-back
+(`references/selling.md`).
 
 Quote the close with `quote --side close --instrument <name> --size <size>`. Say
 `net_proceeds_usd` against what they paid (the lifecycle duty's `PREMIUM_USD`), plainly

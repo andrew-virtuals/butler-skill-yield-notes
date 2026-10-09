@@ -24,8 +24,8 @@ Three intents on [Derive](https://derive.xyz)'s options market:
   in the Derive account, and deposits move USDC only.
 - **Buy**: buy one call or put outright. Not yield - the owner pays premium plus fee
   and can lose all of it; the skill gets an explicit yes to that number.
-- **Close**: sell back an option the owner bought, before expiry. A sold note is not
-  closable in v1.
+- **Close**: before expiry, sell back an option the owner bought, or buy back a note
+  they sold. Buying back frees the collateral and can cost more than the premium.
 
 The model never picks an instrument, a strike or a price: it passes an intent to the
 helper and gets back a quote object with every number fixed, including the bound the
@@ -40,7 +40,7 @@ helper and gets back a quote object with every number fixed, including the bound
 | Funding | `acp options deposit` | One approval card: bevo-server bridges Base USDC straight to the owner's own Derive deposit address (`--from 1` deposits USDC already on Ethereum). |
 | Selling | `acp options open` | Approval card; an IOC limit sell after approval. |
 | Buying | `acp options buy --max-cost` | Approval card; an IOC limit buy whose premium plus fee stays within `--max-cost`. |
-| Closing | `acp options close --min-proceeds` | Approval card; an IOC `reduce_only` limit sell of a bought position. |
+| Closing | `acp options close --min-proceeds` or `--max-cost` | Approval card; an IOC `reduce_only` limit sell of a bought position, or limit buy of a sold one. |
 | Outcome | `bevo-read request <key> --route options` | `approvalStatus`, plus `approvalOutcome` (`filledSize`, `netPremiumUsd` / `totalCostUsd` / `netProceedsUsd`, …) or `approvalFailureReason`. |
 | Withdrawing | `acp options withdraw`, then `acp trade` back to Base | Approval cards. |
 | Watching to expiry | the `options-lifecycle@3` duty template | Filed only when `approvalStatus` is `confirmed`, from `approvalOutcome`: `cash_secured_put`, `long_call` or `long_put`. Deleted after a confirmed close. |
@@ -64,8 +64,8 @@ The sell gates are the same constants as bevo-server's reference quote engine
 | `MAX_COST_HEADROOM` | 1.05 | buy | `max_cost_usd` is the total cost plus 5%, and a budget buy is sized so that ceiling fits inside the budget. |
 
 A close is refused only with no bid, a bid thinner than the size, or a fee larger
-than the proceeds; a wide market is a warning, since an owner cutting a loss may
-accept it.
+than the proceeds; a buy-back only with no ask or an ask thinner than the size. A wide
+market is a warning, since an owner cutting a loss may accept it.
 
 Live checks, mainnet:
 
@@ -89,6 +89,7 @@ python3 derive_helper.py quote --product cash_secured_put --underlying ETH --col
 python3 derive_helper.py quote --side buy --product call --underlying ETH --budget 200
 python3 derive_helper.py quote --side buy --product put --underlying BTC --budget 200 --delta 0.3
 python3 derive_helper.py quote --side close --instrument ETH-20261030-2600-C --size 1
+python3 derive_helper.py quote --side buyback --instrument ETH-20261030-2300-P --size 0.1 --premium-received 3
 ```
 
 Against the reference fixture (`ETH-20261030-2300-P`, bid 26.7, mark 28.6, index

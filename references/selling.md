@@ -12,8 +12,8 @@ and keeping the fee. The premium is certain. What they own at expiry is not.
 - **Would they buy the dip?** A note fits idle USDC whose owner would happily buy the
   asset lower. If not - or they want to earn on an asset they hold - there is no note
   here: say so and stop.
-- **How much, in one asset.** The collateral is locked until expiry. There is no early
-  exit: a sold note cannot be closed in v1, it runs to expiry.
+- **How much, in one asset.** The collateral is locked until expiry. Getting out
+  early means buying the note back, which can cost more than it brought in.
 
 ## The first-time check
 
@@ -21,7 +21,8 @@ Before an owner's first note ever, get three plain yes answers. If any is no or
 vague, do not quote:
 
 - "If ETH falls hard, you end up paying the strike for it, at a loss. Clear?"
-- "Your money is locked until the expiry date. No early exit. Clear?"
+- "Your money is locked until the expiry date. Getting out early means buying the
+  note back, and that can cost more than you were paid. Clear?"
 - "The premium is yours whatever happens. The collateral is not. Clear?"
 
 ## Saying a note out loud
@@ -99,6 +100,25 @@ a separate spot buy has filled. The lifecycle duty does that buy only when it is
 with `DELIVER_ASSET` on, which is only when the owner asked for it before the open.
 
 The premium and the freed collateral stay in the Derive account until withdrawn.
+
+## Buying back early
+
+A sold note shows in `acp options account` positions with a **negative** `size`.
+Buying it back ends it before expiry and frees its collateral. Quote it with
+`quote --side buyback --instrument <name> --size <size as a positive number>
+--premium-received <USD>`, where the premium is the open's `netPremiumUsd` (or the
+duty's `PREMIUM_USD`) scaled to the size being bought back.
+
+Say `total_cost_usd`, then `result_usd`, plainly when it is negative: "Buying it back
+now costs about $4.46 with fees. You were paid $3.00 for it, so you would take a $1.46
+loss now." Give any `warnings` as written. Then say what waiting does: holding to
+expiry costs nothing to do, and the note may still expire worthless. The ceiling is
+theirs to agree: `max_cost_usd` unless they name one; never raise it without asking.
+
+The usual reasons: most of the premium is already earned and they want the collateral
+back, the asset is falling toward the strike and they would rather pay than buy it
+there, or they need the USDC. Buying back after a sharp fall usually locks in a loss
+that expiry might not have; say so, and let them choose.
 
 ## The wheel
 

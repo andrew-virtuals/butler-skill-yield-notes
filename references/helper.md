@@ -12,6 +12,7 @@ python3 /tmp/derive_helper.py quote --product cash_secured_put --underlying ETH 
 python3 /tmp/derive_helper.py quote --side buy --product call --underlying ETH --budget 200 --tenor monthly --otm-pct 5
 python3 /tmp/derive_helper.py quote --side buy --product put --underlying ETH --size 1 --tenor monthly --delta 0.30
 python3 /tmp/derive_helper.py quote --side close --instrument ETH-20261030-2600-C --size 2.95
+python3 /tmp/derive_helper.py quote --side buyback --instrument ETH-20261030-2300-P --size 2 --premium-received 61.40
 python3 /tmp/derive_helper.py chain --underlying ETH --tenor monthly --type C
 ```
 
@@ -25,7 +26,8 @@ command line was wrong (usage on stderr).
 (`python3 /tmp/derive_helper.py --testnet quote …`) so the quote is for the venue the
 trade will run on.
 
-`quote` is the sell side unless `--side buy` or `--side close` says otherwise. Every
+`quote` is the sell side unless `--side buy`, `--side close` or `--side buyback` says
+otherwise. Every
 quote carries `tradeable` and, when false, `reasons` in plain English. **Never offer a
 trade whose quote is not `tradeable`**, and never rewrite a reason into something
 softer - they are already written for an owner.
@@ -102,16 +104,41 @@ A close is refused (`tradeable: false`) only when there is no bid, the bid is th
 than the size, or the fee is more than the bid pays. An owner cutting a loss may accept
 a wide market; tell them it is wide.
 
+## The buy-back quote, field by field
+
+Prices buying back `--size` contracts of `--instrument`, a note the owner **sold** (a
+negative `size` in `acp options account`), on the ask now. `--premium-received` is
+what they got for it: `netPremiumUsd` from the open's outcome, or the lifecycle duty's
+`PREMIUM_USD`, scaled to the size being bought back.
+
+| Field | Means |
+| --- | --- |
+| `ask_price`, `ask_depth` | the best offer per contract, and its size |
+| `cost_usd` | the ask times the size, before fees |
+| `fee_usd` | Derive's fee for the buy-back |
+| `total_cost_usd` | `cost_usd` plus `fee_usd`: what ending the note costs at today's ask |
+| `max_cost_usd` | about 5% over `total_cost_usd`, rounded up to the cent; the suggested `--max-cost` |
+| `premium_received_usd` | as given (absent without `--premium-received`) |
+| `result_usd` | `premium_received_usd` less `total_cost_usd`: what the note made, or lost if negative, once bought back |
+| `frees` | the collateral it releases: USDC for a put, units of the asset for a call |
+| `fair_value_usd` | Derive's mark times the size |
+| `overpay_vs_fair_vol_pts` | how far the ask sits over mark; positive is the spread |
+| `warnings` | the market is wide, or the buy-back costs more than the note brought in |
+
+A buy-back is refused only when there is no ask or the ask is thinner than the size. An
+owner getting out of a falling put may accept a wide market; tell them it is wide.
+
 ```python
 """Screen and quote options on Derive v3, from its public API.
 
-Three sides:
+Four sides:
 
   sell    one option sold short, fully collateralised, for income:
             cash_secured_put   sell a put, hold strike x size in USDC
             covered_call       sell a call, hold size of the underlying
   buy     one call or put bought outright: the most it can lose is what it costs
   close   sell back an option the owner bought, before expiry
+  buyback buy back a note the owner sold, before expiry
 
 Read-only and keyless. Trading is `acp options`, never this file.
 
@@ -128,6 +155,8 @@ Usage:
         --budget 200 [--tenor monthly] [--otm-pct 5 | --delta 0.30]
     derive_helper.py quote --side buy --product put --underlying ETH --size 1
     derive_helper.py quote --side close --instrument ETH-20261030-2750-C --size 0.5
+    derive_helper.py quote --side buyback --instrument ETH-20261030-2300-P --size 2 \
+        [--premium-received 61.40]
     derive_helper.py chain --underlying ETH [--tenor monthly] [--type P]
 
 Add --testnet before the command to read Derive's testnet instead.
@@ -156,7 +185,7 @@ QUOTE_TTL_SEC = 60
 # --min-premium is set this far under the quoted net, so ordinary movement
 # between quote and approval does not fail the fill.
 MIN_PREMIUM_SHARE = 0.95
-# --max-cost is set this far over the quoted total for a buy, and a buy is
+# --max-cost is set this far over the quoted total for a buy or a buy-back, and a buy is
 # sized so that ceiling still fits the owner's budget.
 MAX_COST_HEADROOM = 1.05
 
@@ -529,10 +558,8 @@ def build_buy_quote(product, underlying, budget_usd=None, tenor="monthly",
     return q
 
 
-def build_close_quote(instrument, size):
-    """What selling back `size` of a bought option fetches on the book now.
-    Only a missing or thin bid, or nothing left after fees, stops a close: an
-    owner cutting a loss may accept a wide market, so width is a warning."""
+def held_option(instrument):
+    """One named option and its ticker, for pricing a position already held."""
     name = instrument.strip().upper()
     parts = name.split("-")
     if len(parts) != 4 or parts[3] not in ("C", "P"):
@@ -549,7 +576,14 @@ def build_close_quote(instrument, size):
         raise VenueError("could not read Derive's %s options: %s" % (parts[0], exc))
     if not t:
         raise VenueError("no price published for %s" % name)
+    return name, inst, t
 
+
+def build_close_quote(instrument, size):
+    """What selling back `size` of a bought option fetches on the book now.
+    Only a missing or thin bid, or nothing left after fees, stops a close: an
+    owner cutting a loss may accept a wide market, so width is a warning."""
+    name, inst, t = held_option(instrument)
     now = time.time()
     op = t.get("option_pricing") or {}
     bid, bid_sz, mark = num(t.get("b")), num(t.get("B")), num(t.get("M"))
@@ -608,6 +642,73 @@ def build_close_quote(instrument, size):
     return q
 
 
+def build_buyback_quote(instrument, size, premium_received=None):
+    """What buying back `size` of a sold note costs on the book now. Only a
+    missing or thin ask stops it: an owner getting out of a falling put may
+    accept a wide market, so width - and a loss on the note - are warnings."""
+    name, inst, t = held_option(instrument)
+    now = time.time()
+    op = t.get("option_pricing") or {}
+    ask, ask_sz, mark = num(t.get("a")), num(t.get("A")), num(t.get("M"))
+    ask_iv, mark_iv = num(op.get("ai")), num(op.get("i"))
+    spot = num(t.get("I"))
+    strike = num(inst["option_details"]["strike"])
+    put = inst["option_details"]["option_type"] == "P"
+    expiry = inst["option_details"]["expiry"]
+    q = {
+        "side": "buyback",
+        "venue": "derive",
+        "instrument": name,
+        "strike": strike,
+        "expiry": iso(expiry),
+        "expiry_sec": expiry,
+        "days_to_expiry": rnd((expiry - now) / 86400.0, 2),
+        "size": size,
+        "spot": rnd(spot, 6),
+        "frees": {"asset": "USDC", "amount": rnd(strike * size, 2)} if put
+                 else {"asset": name.split("-")[0], "amount": size},
+        "fair_value_usd": rnd(mark * size, 2),
+        "tradeable": False,
+        "reasons": [],
+        "warnings": [],
+    }
+    if ask <= 0:
+        q["reasons"].append("no live ask on %s - nobody is selling this option right now" % name)
+        return q
+
+    gross = ask * size
+    fee = taker_fee(inst, spot, size, mark)
+    total = rnd(gross + fee, 2)
+    gap = (ask_iv - mark_iv) * 100 if mark_iv > 0 and ask_iv > 0 else 0.0
+    q.update({
+        "ask_price": ask,
+        "ask_depth": ask_sz,
+        "cost_usd": rnd(gross, 2),
+        "fee_usd": rnd(fee, 2),
+        "total_cost_usd": total,
+        "max_cost_usd": math.ceil(total * MAX_COST_HEADROOM * 100 - 1e-6) / 100,
+        "overpay_vs_fair_vol_pts": rnd(gap, 2),
+        "valid_until": iso(now + QUOTE_TTL_SEC),
+    })
+    if premium_received is not None:
+        q["premium_received_usd"] = rnd(premium_received, 2)
+        q["result_usd"] = rnd(premium_received - total, 2)
+        if total > premium_received:
+            q["warnings"].append(
+                "buying back costs $%.2f, more than the $%.2f the note brought in: a $%.2f loss taken now"
+                % (total, premium_received, total - premium_received))
+    if ask_sz < size:
+        q["reasons"].append(
+            "the ask is only %s contracts and this buy-back is %s - buy back %s or less"
+            % (plain(ask_sz), plain(size), plain(ask_sz)))
+    if gap > MAX_VOL_GAP_PTS:
+        q["warnings"].append(
+            "the market is %.1f vol points wide: buying back here pays %d%% over fair value"
+            % (gap, int(math.floor((ask / mark - 1) * 100 + 0.5)) if mark else 0))
+    q["tradeable"] = not q["reasons"]
+    return q
+
+
 def screen(tenor="monthly", collateral_usd=5000.0, otm_pct=10.0):
     """Which underlyings can carry a note right now. The offerable set is an
     output of the gates, not an allowlist; one bad asset never stops the screen."""
@@ -661,6 +762,9 @@ def run_quote(p, a):
     if a.side == "close":
         need("instrument", "size")
         return build_close_quote(a.instrument, a.size)
+    if a.side == "buyback":
+        need("instrument", "size")
+        return build_buyback_quote(a.instrument, a.size, a.premium_received)
     need("product", "underlying")
     if a.side == "buy":
         if (a.budget is None) == (a.size is None):
@@ -689,15 +793,17 @@ def main():
     s.add_argument("--collateral", type=float, default=5000.0)
     s.add_argument("--otm-pct", type=float, default=10.0)
 
-    q = sub.add_parser("quote", help="price one sell, buy or close")
-    q.add_argument("--side", default="sell", choices=["sell", "buy", "close"])
+    q = sub.add_parser("quote", help="price one sell, buy, close or buy-back")
+    q.add_argument("--side", default="sell", choices=["sell", "buy", "close", "buyback"])
     q.add_argument("--product", choices=["cash_secured_put", "covered_call", "call", "put"])
     q.add_argument("--underlying")
     q.add_argument("--collateral", type=float, help="sell: USD to lock")
     q.add_argument("--budget", type=float, help="buy: the most to spend, fees included")
-    q.add_argument("--instrument", help="close: the option to sell back")
+    q.add_argument("--instrument", help="close, buyback: the option held")
     q.add_argument("--size", type=float,
-                   help="close: contracts to sell back; buy: exact contracts instead of --budget")
+                   help="close, buyback: contracts; buy: exact contracts instead of --budget")
+    q.add_argument("--premium-received", type=float,
+                   help="buyback: what the note brought in, for the result")
     q.add_argument("--tenor", default="monthly", choices=sorted(TENOR_DAYS))
     rule = q.add_mutually_exclusive_group()
     rule.add_argument("--otm-pct", type=float, default=None,
