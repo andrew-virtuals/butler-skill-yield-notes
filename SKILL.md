@@ -79,9 +79,9 @@ Money commands need Butler's server signer and run from chat only, never a duty.
      PREMIUM_USD); they agree the floor (`min_proceeds_usd` unless they name one).
 
 4. [FIXED] Fund a sell or a buy only when `freeForNewPutsUsd` is below
-   `collateral.amount` (sell) or `max_cost_usd` (buy). Deposit the shortfall plus about
-   1% (at least $1) for the bridge fee, rounded up to the cent, and **never under $10
-   from Base** (the server refuses a bridge that could land under $6). Say the bridge
+   `collateral.amount` (sell) or `max_cost_usd` (buy). Deposit the shortfall plus 2% for
+   the bridge fee and its 1% slippage bound, rounded up to the cent, and **never under $6
+   from Base** (the server refuses a bridge that could land under $5.05). Say the bridge
    fee comes out of the amount:
 
    ```sh
