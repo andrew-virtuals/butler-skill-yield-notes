@@ -7,6 +7,8 @@
   covers alone, so the skill tells the agent never to judge a deposit by one chain's
   balance and how to answer "can I fund this?". Ethereum USDC stays the `--from 1`
   exception. New failure row for a wallet that cannot cover the deposit.
+- Mainnet only: the helper's network flag and every mention of a test venue are gone.
+  Butler's server trades Derive mainnet.
 
 ## 2.1.0
 
@@ -44,8 +46,6 @@
 - The lifecycle duty is `options-lifecycle@3` for every trade: `cash_secured_put` as
   before, `long_call` / `long_put` after a confirmed buy (`PREMIUM_USD` =
   `totalCostUsd`, `COLLATERAL_USD` 0). After a confirmed close the skill deletes it.
-- Network: when `acp options account` reports `testnet`, every helper call carries
-  `--testnet`.
 - Funding: never under about $10 from Base, since the server refuses a bridge whose
   worst-case arrival is under $6.
 - `SKILL.md` is restructured around the three intents; the explanation moved to

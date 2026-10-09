@@ -35,7 +35,7 @@ helper and gets back a quote object with every number fixed, including the bound
 
 | Piece | Where | Does |
 | --- | --- | --- |
-| Screen and quote | `references/helper.md`, run in the container with `python3` | Reads Derive v3's public, keyless API (`public/get_all_instruments`, `public/get_tickers`). Sell, buy and close quotes. Read-only. `--testnet` when the account reports `network: testnet`. |
+| Screen and quote | `references/helper.md`, run in the container with `python3` | Reads Derive v3's public, keyless API (`public/get_all_instruments`, `public/get_tickers`). Sell, buy and close quotes. Read-only. |
 | Account read | `acp options account` | The owner's Derive account: network, free USDC, positions (positive size = bought), USDC on Ethereum, signer readiness. |
 | Funding | `acp options deposit` | One approval card: bevo-server bridges Base USDC straight to the owner's own Derive deposit address (`--from 1` deposits USDC already on Ethereum). |
 | Selling | `acp options open` | Approval card; an IOC limit sell after approval. |
@@ -80,8 +80,7 @@ Live checks, mainnet:
 
 ## Testing the helper
 
-Extract the script from `references/helper.md` and run it against mainnet (or
-`--testnet`):
+Extract the script from `references/helper.md` and run it against mainnet:
 
 ```sh
 python3 derive_helper.py screen --tenor monthly --collateral 5000

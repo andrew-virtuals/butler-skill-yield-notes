@@ -21,11 +21,6 @@ read succeeded. Exit `1`: it did not, with a one-line `error: …` on stderr - D
 unreachable, does not list that asset, or the option named is not active. Exit `2`: the
 command line was wrong (usage on stderr).
 
-**Network.** The helper reads mainnet. When `acp options account` reports
-`"network": "testnet"`, put `--testnet` before the command
-(`python3 /tmp/derive_helper.py --testnet quote …`) so the quote is for the venue the
-trade will run on.
-
 `quote` is the sell side unless `--side buy`, `--side close` or `--side buyback` says
 otherwise. Every
 quote carries `tradeable` and, when false, `reasons` in plain English. **Never offer a
@@ -158,8 +153,6 @@ Usage:
     derive_helper.py quote --side buyback --instrument ETH-20261030-2300-P --size 2 \
         [--premium-received 61.40]
     derive_helper.py chain --underlying ETH [--tenor monthly] [--type P]
-
-Add --testnet before the command to read Derive's testnet instead.
 """
 
 import argparse
@@ -171,8 +164,7 @@ import time
 import urllib.error
 import urllib.request
 
-MAINNET = "https://api.derive.xyz/v3"
-TESTNET = "https://testnet.api.derive.xyz/v3"
+BASE = "https://api.derive.xyz/v3"
 UA = "butler-options-trading/2.0"
 
 # Calibrated against measured spreads and fees; see references/venue.md.
@@ -193,8 +185,6 @@ CURRENCIES = ["ETH", "BTC", "SOL", "XRP", "ADA", "HYPE",
               "ZEC", "XAUT", "LIT", "VVV", "PUMP", "CC"]
 
 TENOR_DAYS = {"weekly": 9, "monthly": 24, "quarterly": 80}
-
-BASE = MAINNET
 
 
 class VenueError(Exception):
@@ -292,7 +282,7 @@ def tickers_for(currency, expiry):
 
 
 def taker_fee(inst, index, size, mark):
-    """base + min(taker rate x index notional, cap x premium). Matched a testnet fill to the cent."""
+    """base + min(taker rate x index notional, cap x premium). Matched a live fill to the cent."""
     return num(inst.get("base_fee")) + min(
         num(inst.get("taker_fee_rate")) * index * size,
         num(inst.get("mark_price_fee_rate_cap")) * mark * size)
@@ -781,10 +771,8 @@ def run_quote(p, a):
 
 
 def main():
-    global BASE
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--testnet", action="store_true", help="read Derive's testnet")
     sub = p.add_subparsers(dest="cmd")
     sub.required = True
 
@@ -816,8 +804,6 @@ def main():
     c.add_argument("--type", default="P", choices=["P", "C"])
 
     a = p.parse_args()
-    if a.testnet:
-        BASE = TESTNET
 
     if a.cmd == "screen":
         out = screen(a.tenor, a.collateral, a.otm_pct)
