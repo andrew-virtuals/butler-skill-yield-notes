@@ -1,19 +1,44 @@
-# Saying a note out loud
+# Selling a put for income
 
-Every number below is a **field on the quote object**. Nothing here is computed by
-the model. If a sentence needs a number the quote does not carry, the sentence is
-wrong.
+A note is one **cash-secured put**, sold short and **fully collateralised** in USDC
+(strike x size): the owner agrees to buy the asset at a lower price if it falls
+there, and keeps the premium either way.
+
+This is not lending and not a vault. The owner is **selling someone else insurance**
+and keeping the fee. The premium is certain. What they own at expiry is not.
+
+## Does it fit?
+
+- **Would they buy the dip?** A note fits idle USDC whose owner would happily buy the
+  asset lower. If not - or they want to earn on an asset they hold - there is no note
+  here: say so and stop.
+- **How much, in one asset.** The collateral is locked until expiry. There is no early
+  exit: a sold note cannot be closed in v1, it runs to expiry.
+
+## The first-time check
+
+Before an owner's first note ever, get three plain yes answers. If any is no or
+vague, do not quote:
+
+- "If ETH falls hard, you end up paying the strike for it, at a loss. Clear?"
+- "Your money is locked until the expiry date. No early exit. Clear?"
+- "The premium is yours whatever happens. The collateral is not. Clear?"
+
+## Saying a note out loud
+
+Every number below is a **field on the sell quote**. Nothing here is computed by the
+model. If a sentence needs a number the quote does not carry, the sentence is wrong.
 
 | In the sentence | Field |
 | --- | --- |
 | what they earn | `net_premium_usd` (never `premium_usd` - that is before fees) |
 | the floor on the open | `min_premium_usd` |
 | "a year, if you kept rolling" | `apr_pct` |
-| the price they might buy or sell at | `strike` |
+| the price they might buy at | `strike` |
 | the date | `expiry` |
 | how much of the asset | `size` |
 | what is locked | `collateral.amount` (`collateral.usd` in dollars) |
-| fees | `fee_usd` |
+| fees | `fee_usd`, always its own line |
 | how good the price is | `edge_vs_fair_vol_pts` |
 
 ## The shape
@@ -27,6 +52,9 @@ language than the second.
    pay $2,300 each for 2.17 ETH - and if ETH is at $2,000 by then, that is about $650
    more than they are worth, which the $56 does not cover."
 4. **What is locked.** "Your $4,991 cannot be touched until 30 October."
+
+Then the separate ownership question, in the asset's terms: "Happy to own 2.17 ETH at
+$2,300 on 30 October?" A yes to the yield is not a yes to this.
 
 ## Words
 
@@ -63,6 +91,15 @@ negative for a seller - that is the spread, and it is what a market maker keeps.
 An owner who hears "18% a year" without hearing that the spread took part of the
 premium has been told half of it.
 
+## Settlement and delivery
+
+**Derive settles in cash.** An in-the-money put reduces USDC by (strike - settlement
+price) x size; it does not deliver ETH. "You now own ETH at $2,300" is true only after
+a separate spot buy has filled. The lifecycle duty does that buy only when it is filed
+with `DELIVER_ASSET` on, which is only when the owner asked for it before the open.
+
+The premium and the freed collateral stay in the Derive account until withdrawn.
+
 ## The wheel
 
 After a put is assigned, the classic next note is a covered call on the asset. Not
@@ -71,3 +108,10 @@ inside the Derive account. The next note is another put. Offer it as a choice, n
 sequence: an owner who has just taken a loss may want to stop.
 
 Never auto-roll without a fresh yes.
+
+## Sizes
+
+The smallest note is Derive's minimum size x the strike: about $230 on ETH at
+today's strikes, about $750 on BTC. Fees make anything near that poor value.
+Monthly by default: weeklies lose far more of the premium to fees and the spread,
+and the fee gate refuses them on small notes.

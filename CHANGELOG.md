@@ -1,5 +1,32 @@
 # Changelog
 
+## 2.0.0
+
+- Renamed from `yield-notes` to `options-trading` (a new skill name, so a major
+  version). Keywords cover buying calls and puts and hedging as well as income.
+- **Buying**: `acp options buy --instrument --size --max-cost`. The helper's new
+  `quote --side buy --product call|put --budget <usd>` (or `--size` for a hedge) sizes
+  what the budget buys at the ask plus Derive's fee with 5% room, and returns
+  `total_cost_usd`, `max_loss_usd`, `breakeven` and `max_cost_usd` (the `--max-cost`
+  bound, never over the budget). Buyer gates: no live ask, ask thinner than the size,
+  ask more than 5 vol points over mark ("paying N% over fair value"), fees over 15% of
+  the premium, budget under Derive's minimum. The skill says plainly it is not yield
+  and gets an explicit yes to losing the whole cost.
+- **Closing**: `acp options close --instrument --size --min-proceeds` sells back a
+  bought option before expiry. The helper's `quote --side close` prices it on the
+  bid (`net_proceeds_usd`, `min_proceeds_usd`, `warnings`). A sold note still cannot
+  be closed.
+- The lifecycle duty is `options-lifecycle@3` for every trade: `cash_secured_put` as
+  before, `long_call` / `long_put` after a confirmed buy (`PREMIUM_USD` =
+  `totalCostUsd`, `COLLATERAL_USD` 0). After a confirmed close the skill deletes it.
+- Network: when `acp options account` reports `testnet`, every helper call carries
+  `--testnet`.
+- Funding: never under about $10 from Base, since the server refuses a bridge whose
+  worst-case arrival is under $6.
+- `SKILL.md` is restructured around the three intents; the explanation moved to
+  `references/selling.md` (formerly `notes.md`) and the new `references/buying.md`.
+  Selling behaves as in 1.2.1, and the sell quote is unchanged.
+
 ## 1.2.1
 
 - The lifecycle duty is filed with `TOKEN_ID`, the underlying pinned to one token
