@@ -37,8 +37,8 @@ Base bridge: only `deposit --from 1`.
   directly (`--from 1`) and is credited about **two minutes** after it is mined.
 - The minimum deposit is $5; Derive gives a smaller one to its security module, so
   Butler's server refuses it. A deposit from Base is priced first: if the bridge's
-  worst-case arrival is under $6, it is refused with nothing moved. In practice that
-  means never under about $10 from Base.
+  guaranteed arrival (bounded at 1% slippage) is under $5.05, it is refused with nothing
+  moved. The bridge itself costs about $0.10; in practice, never send under $6 from Base.
 - A withdrawal pays to the owner's wallet on Ethereum once Derive's batch is proven:
   about **20 minutes** (17 measured on testnet), less a fee of up to $1.
 - Ethereum gas for a direct deposit is paid by Butler's server wallet path, not asked
