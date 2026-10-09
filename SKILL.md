@@ -46,13 +46,12 @@ Money commands need Butler's server signer and run from chat only, never from a 
    ```
 
    `signerReady: false` - stop: the owner must enable Butler's signer first. Note
-   `network`, `account.freeForNewPutsUsd` (`exists: false` is no account yet),
+   `account.freeForNewPutsUsd` (`exists: false` is no account yet),
    `account.positions` (positive `size` = bought, negative = sold) and `ethereum.usdc`.
    An unreadable account is not an empty one.
 
 2. [FIXED] Write the script in `references/helper.md` to `/tmp/derive_helper.py`.
-   If `network` is `testnet`, put `--testnet` straight after the script name in every
-   call. Quote with the line for the intent; the strike is a rule, never your number:
+   Quote with the line for the intent; the strike is a rule, never your number:
 
    ```sh
    python3 /tmp/derive_helper.py screen --tenor monthly --collateral <USD>
@@ -99,8 +98,8 @@ Money commands need Butler's server signer and run from chat only, never from a 
    gathering from several when none covers alone (`references/venue.md`): never judge a
    deposit by one chain's balance, and if asked, USDC on any supported chain counts. A
    wallet that cannot cover it is refused with the per-chain balances. Add `--from 1` only
-   when `ethereum.usdc` already covers it: the bot does not gather from Ethereum, and it
-   is the only source on testnet ($5 minimum). Never ask about gas or an address. Re-read
+   when `ethereum.usdc` already covers it: the bot does not gather from Ethereum ($5
+   minimum). Never ask about gas or an address. Re-read
    `acp options account` until free USDC covers the trade; if it ends short, re-quote
    smaller and re-offer.
 

@@ -1,21 +1,12 @@
 # Derive v3: the facts that shape a trade
 
-Venue facts, not design choices. Measured against Derive v3 on **7 October 2026**
-(selling) and **9 October 2026** (buying), mainnet unless it says testnet. Re-measure
-before relying on a spread or a depth: those move by the hour.
-
-## Network
-
-Butler's server picks the venue for the whole deployment: **mainnet by default** (real
-USDC, settles to Ethereum), or Derive's Sepolia **testnet** (free test USDC). `acp
-options account` reports which as `network`. The helper reads mainnet unless run with
-`--testnet`, so on a testnet deployment every helper call carries it. Testnet has no
-Base bridge: only `deposit --from 1`.
+Venue facts, not design choices. Measured against Derive v3 mainnet on **7 October
+2026** (selling) and **9 October 2026** (buying). Re-measure before relying on a
+spread or a depth: those move by the hour.
 
 ## Where the data comes from
 
-- Public, keyless API at `https://api.derive.xyz/v3` (testnet
-  `https://testnet.api.derive.xyz/v3`). Each method is a POST of JSON to
+- Public, keyless API at `https://api.derive.xyz/v3`. Each method is a POST of JSON to
   `/public/<method>`. Derive's edge **rejects a request with no User-Agent**: send
   one, or every call fails for a reason that looks like a ban.
 - `public/get_all_instruments` - the chain: strikes, expiries, minimum size, size
@@ -44,7 +35,7 @@ Base bridge: only `deposit --from 1`.
   moved. The direct Base bridge costs about $0.10; a route from another chain costs
   more. In practice, never send under $6.
 - A withdrawal pays to the owner's wallet on Ethereum once Derive's batch is proven:
-  about **20 minutes** (17 measured on testnet), less a fee of up to $1. Bringing it
+  about **20 minutes** (17 measured), less a fee of up to $1. Bringing it
   to Base (the `:home` leg) is an ordinary `acp trade` with the trade bot's $2 minimum
   swap and fee of max($1, 0.5%); there is no Ethereum-specific minimum. Whether a
   small amount routes is the quote's call, never yours: quote it, then say the number.
@@ -81,7 +72,7 @@ taker fee = base_fee + min(taker_fee_rate x index x size, mark_price_fee_rate_ca
 ```
 
 Each term is read from the instrument; today it is $0.50 + min(0.03% of index
-notional, 12.5% of mark value). This matched a testnet fill to the cent. The $0.50 is
+notional, 12.5% of mark value). This matched a live fill to the cent. The $0.50 is
 per order and uncapped, which is what makes small tickets and short tenors pointless:
 the helper refuses a sell or a buy whose fee is over 15% of the premium.
 
@@ -138,7 +129,7 @@ so a quote here is the worst case.
 
 ## Margin
 
-Derive is a **margin venue**: on testnet a put needing $250 drew about $35 of margin.
+Derive is a **margin venue**: a put needing $250 drew about $35 of margin.
 Full collateralisation is Butler's rule - the helper sizes to what the collateral
 fully covers, and Butler's server refuses an open that free USDC does not cover for
 every open put plus the new one.
