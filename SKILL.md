@@ -1,7 +1,7 @@
 ---
 name: options-trading
 description: Trade options on Derive - earn on idle USDC by selling cash-secured puts, or buy a call or a put for upside or a hedge, and close either before expiry.
-version: 2.1.1
+version: 2.2.0
 metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back"],"requires":{"bins":["python3","bevo-read","acp"]}}}
 ---
 
@@ -133,17 +133,18 @@ Money commands need Butler's server signer and run from chat only, never from a 
    `approvalOutcome`, never the quote. After an open or a buy, `duty_create`:
 
    ```json
-   {"recipe": "options-lifecycle@3", "triggers": [{"kind": "timer", "intervalSeconds": 900}],
-    "params": {"INSTRUMENT": "ETH-20261030-2600-C", "PRODUCT": "long_call", "UNDERLYING": "ETH",
-               "TOKEN_ID": "native:8453", "STRIKE": 2600, "SIZE": 2.95, "PREMIUM_USD": 190.03, "COLLATERAL_USD": 0}}
+   {"recipe": "options-lifecycle@4", "triggers": [{"kind": "timer", "intervalSeconds": 900}],
+    "params": {"INSTRUMENT": "SOL-20261030-160-C", "PRODUCT": "long_call", "UNDERLYING": "SOL",
+               "STRIKE": 160, "SIZE": 2, "PREMIUM_USD": 19.03, "COLLATERAL_USD": 0}}
    ```
 
    Sold put: PRODUCT `cash_secured_put`, PREMIUM_USD `netPremiumUsd`, COLLATERAL_USD
-   `collateral`, `DELIVER_ASSET` only if they asked in step 3. Bought: PRODUCT
-   `long_call` or `long_put`, PREMIUM_USD `totalCostUsd`, COLLATERAL_USD 0. Always
-   SIZE `filledSize`, STRIKE `strike`, UNDERLYING the instrument's prefix. TOKEN_ID:
-   ETH is `native:8453`; BTC is the verified, non-stock Base row of `bevo-read
-   token-search BTC` as `<address>:8453` (say which; ask if two fit). After a close,
+   `collateral`. Bought: PRODUCT `long_call` or `long_put`, PREMIUM_USD `totalCostUsd`,
+   COLLATERAL_USD 0. Always SIZE `filledSize`, STRIKE `strike`, UNDERLYING the
+   instrument's prefix; any asset Derive lists works, no token needed. Only if they
+   asked in step 3 to own the asset after an assigned put: `DELIVER_ASSET: true` with
+   TOKEN_ID, the token to buy: ETH is `native:8453`; BTC is the verified, non-stock Base
+   row of `bevo-read token-search BTC` as `<address>:8453` (ask if two fit). After a close,
    `duty_delete` that instrument's duty; if part is still open, file it again with SIZE
    from `positions` (positive) and PREMIUM_USD and COLLATERAL_USD scaled to it. Never
    file for an unknown or failed trade.
