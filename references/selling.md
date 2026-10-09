@@ -135,3 +135,12 @@ The smallest note is Derive's minimum size x the strike: about $230 on ETH at
 today's strikes, about $750 on BTC. Fees make anything near that poor value.
 Monthly by default: weeklies lose far more of the premium to fees and the spread,
 and the fee gate refuses them on small notes.
+
+## Say to the owner
+
+"If ETH is below $2,300 on 30 October, you pay $2,300 each for 2.17 ETH - at $2,000
+that is about $650 more than they are worth, and the $56 does not cover it. If it is
+above, your $4,991 earns **$55.76** over 23 days. The money is locked until then."
+
+Nothing clears: "Nothing worth doing today - the market is wide; you would give away
+too much to get filled."

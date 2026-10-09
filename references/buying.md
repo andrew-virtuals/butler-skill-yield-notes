@@ -121,3 +121,9 @@ before and again with the outcome. It is filed with:
 | `COLLATERAL_USD` | 0 |
 
 No `DELIVER_ASSET`: a bought option pays cash and buys nothing.
+
+## Say to the owner
+
+"This is a bet, not yield. You pay at most **$199.54** for 2.95 ETH calls at $2,600;
+if ETH is not above about $2,664 on 30 October you lose all of it, and it is worth a
+little less each day ETH stands still. You can lose the whole $199.54 - yes?"
