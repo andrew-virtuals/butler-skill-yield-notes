@@ -122,10 +122,12 @@ so a quote here is the worst case.
 - **buy**: refused unless free USDC (what is not backing a sold note) covers
   `--max-cost`; priced at (max cost - fee) / size per contract, rounded down to the
   tick. After the fill, premium plus fee must be within the max cost.
-- **close**: only a position the account **bought**, never more than it holds, sent
-  `reduce_only` so the venue itself refuses to turn a close into a new short; priced
-  from the minimum net proceeds plus the fee, rounded up. A sold note cannot be
-  closed in v1.
+- **close**: never more than the account holds, always `reduce_only`, so the venue
+  itself refuses to turn a close into a new position. With `--min-proceeds` it sells
+  back a **bought** option, priced from the minimum net proceeds plus the fee, rounded
+  up. With `--max-cost` it buys back a **sold** note, priced as a buy; it may be paid
+  from free USDC plus, for a put, the USDC that put itself locks, never another note's
+  collateral. The bound must match the position, or nothing is done.
 
 ## Margin
 

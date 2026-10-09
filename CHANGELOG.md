@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.1.0
+
+- **Buying back a sold note** before expiry: `acp options close --instrument --size
+  --max-cost`. A close now takes one bound, which names the direction:
+  `--min-proceeds` sells back a bought option, `--max-cost` buys back a sold one. The
+  helper's new `quote --side buyback --instrument --size [--premium-received <usd>]`
+  prices it on the ask and returns `total_cost_usd`, `max_cost_usd` (5% room),
+  `frees`, and `result_usd` (premium received less the buy-back cost), with a warning
+  when that is a loss. Refused only with no ask or an ask thinner than the size.
+- The first-time check for selling no longer says "no early exit": getting out early
+  means buying the note back, which can cost more than it brought in.
+- After a close either way, the lifecycle duty is deleted, or re-filed for what is
+  still open.
+- Funding: never under $6 from Base. The server bridges at a fixed 1% slippage and
+  refuses a bridge whose guaranteed arrival is under $5.05; the bridge itself costs
+  about $0.10.
+
 ## 2.0.0
 
 - Renamed from `yield-notes` to `options-trading` (a new skill name, so a major
