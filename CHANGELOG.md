@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.1
+
+- Funding no longer says "from Base". Butler's trade bot takes deposit USDC from
+  whichever chains the owner's wallet holds it on, gathering from several when none
+  covers alone, so the skill tells the agent never to judge a deposit by one chain's
+  balance and how to answer "can I fund this?". Ethereum USDC stays the `--from 1`
+  exception. New failure row for a wallet that cannot cover the deposit.
+
 ## 2.1.0
 
 - **Buying back a sold note** before expiry: `acp options close --instrument --size

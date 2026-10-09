@@ -31,16 +31,23 @@ Base bridge: only `deposit --from 1`.
 - Deposits and withdrawals happen on **Ethereum L1**, in USDC. Derive gives each
   account its own deposit address there (`public/register_deposit_address`), and a
   keeper sweeps what lands in it.
-- Butler's money is on Base, so `acp options deposit` has Butler's server bridge Base
-  USDC straight to that address: the bridge fee comes out of the amount, and the
-  credit lands a few minutes after the bridge. USDC already on Ethereum deposits
-  directly (`--from 1`) and is credited about **two minutes** after it is mined.
+- `acp options deposit` has Butler's trade bot bridge USDC from the owner's wallet
+  straight to that address. It sources from whichever chains hold the money: Base when
+  it covers, otherwise any other supported chain, gathering from several when none
+  covers alone. The bridge fee comes out of the amount, and the credit lands a few
+  minutes after the bridge. Ethereum USDC is the exception: the bot does not gather from
+  it, so it deposits directly with `--from 1` and is credited about **two minutes**
+  after it is mined.
 - The minimum deposit is $5; Derive gives a smaller one to its security module, so
-  Butler's server refuses it. A deposit from Base is priced first: if the bridge's
+  Butler's server refuses it. A bridged deposit is priced first: if the bridge's
   guaranteed arrival (bounded at 1% slippage) is under $5.05, it is refused with nothing
-  moved. The bridge itself costs about $0.10; in practice, never send under $6 from Base.
+  moved. The direct Base bridge costs about $0.10; a route from another chain costs
+  more. In practice, never send under $6.
 - A withdrawal pays to the owner's wallet on Ethereum once Derive's batch is proven:
-  about **20 minutes** (17 measured on testnet), less a fee of up to $1.
+  about **20 minutes** (17 measured on testnet), less a fee of up to $1. Bringing it
+  to Base (the `:home` leg) is an ordinary `acp trade` with the trade bot's $2 minimum
+  swap and fee of max($1, 0.5%); there is no Ethereum-specific minimum. Whether a
+  small amount routes is the quote's call, never yours: quote it, then say the number.
 - Ethereum gas for a direct deposit is paid by Butler's server wallet path, not asked
   of the owner.
 - Login and signing are Butler's server's job: it builds every Derive action, checks
