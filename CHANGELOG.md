@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.2.1
+
+- A fourth case, **Look or withdraw**: "what's my free USDC in Derive", "list my
+  positions", "withdraw my free USDC" are answered from `acp options account` and
+  step 8. Derive money is never in `bevo-read assets`, and a withdrawal is `acp
+  options withdraw`, never an `acp trade`. Seen live: asked to withdraw, an agent
+  without this skill loaded traded Base USDC for Base USDC and called it done, then
+  read Hyperliquid's $0 as the Derive balance. Keywords gain `withdraw`, `derive`,
+  `options account`, `options positions`, `free usdc`.
+
 ## 2.2.0
 
 - Every asset Derive lists options on, not only ETH and BTC. The lifecycle duty is
