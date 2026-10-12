@@ -1,13 +1,13 @@
 ---
 name: options-trading
 description: Trade options on Derive - earn on idle USDC by selling cash-secured puts, or buy a call or a put for upside or a hedge, and close either before expiry.
-version: 2.2.0
-metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back"],"requires":{"bins":["python3","bevo-read","acp"]}}}
+version: 2.2.1
+metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","withdraw","withdraw my usdc","derive","my options","options account","options positions","free usdc"],"requires":{"bins":["python3","bevo-read","acp"]}}}
 ---
 
 ## When to use
 
-Your owner wants one of three things on Derive's options market:
+Your owner wants one of four things on Derive's options market:
 
 - **Earn** - "earn on my USDC", "get paid to buy the dip": **sell** one cash-secured
   put, fully collateralised in USDC. They keep the premium and may end up buying the
@@ -17,9 +17,13 @@ Your owner wants one of three things on Derive's options market:
 - **Close** - before expiry: "sell my call back" **sells back** an option they
   **bought**; "get out of my put", "free my collateral" **buys back** a note they
   **sold**. Buying back can cost more than the note brought in.
+- **Look or withdraw** - "what's my free USDC in Derive", "list my positions",
+  "withdraw my free USDC": the answer is `acp options account` (step 1), and a
+  withdrawal is step 8. Derive money is never in `bevo-read assets` (`perps` there is
+  Hyperliquid), and taking it out is `acp options withdraw`, never an `acp trade`.
 
-Not this skill: covered calls, spreads, leverage, or any trade the helper refuses. It
-never picks a trade *for* them.
+Not this skill: covered calls, spreads, leverage, or a trade the helper refuses. It never
+picks a trade *for* them.
 
 ## Before you start
 
@@ -32,9 +36,9 @@ never picks a trade *for* them.
    drops to $2,000 and you have bought it at $2,300 anyway."* Buying: *"If ETH is not
    above $2,664 on 30 October, the $190 is gone."*
 4. **First time for that kind of trade:** the plain yes answers in
-   `references/selling.md` or `references/buying.md`. A no or a vague answer stops it.
+   `references/selling.md` or `references/buying.md`. A no or a vague yes stops it.
 
-Money commands need Butler's server signer and run from chat only, never from a duty.
+Money commands need Butler's server signer and run from chat only, never a duty.
 
 ## Procedure
 
@@ -160,9 +164,8 @@ Money commands need Butler's server signer and run from chat only, never from a 
 
 ## Idempotency and retries
 
-Quotes are free reads: re-run one past `valid_until` (60 s) rather than act on it.
-
-Derive one key per trade, such as `ot:eth:20261030:2600c:1`, with `:deposit`,
+A quote past `valid_until` (60 s) is re-run, never acted on. Derive one key per trade,
+such as `ot:eth:20261030:2600c:1`, with `:deposit`,
 `:open`, `:buy`, `:close`, `:withdraw`, `:home`. On an error, a timeout or an unclear
 answer, **do not re-run** the command - a retried buy can buy twice, a retried
 deposit can bridge twice. Look it up as in step 6: `not_found` means nothing was filed
@@ -174,36 +177,33 @@ account` and wait. The `:home` leg is `acp trade`: look it up with `--route trad
 | Outcome | What to do |
 | --- | --- |
 | Nothing `tradeable` | Say nothing is worth doing today and why. Never loosen a gate. |
-| `no live bid` / `no live ask` | Nobody is trading that option now. Another strike, expiry or asset, or stop. |
-| `vol points wide`, `paying N% over fair value` | The price is poor; say so. Never trade it anyway. |
-| `fees are N% of the premium` | Ticket too small or tenor too short. Offer monthly or bigger. |
+| `no live bid` / `no live ask` | Nobody is trading it now. Another strike, expiry or asset, or stop. |
+| `vol points wide`, `paying N% over fair value` | A poor price; say so, never trade it. |
+| `fees are N% of the premium` | Too small or too short. Offer monthly or bigger. |
 | `collateral too small`, `budget too small` | Under Derive's minimum. Give the figure from the reason. |
-| `OPTIONS_SIGNER_NOT_READY` | The signer must be enabled first. Nothing was filed. |
-| `OPTIONS_CHAT_ONLY` | A duty tried a money command. Only chat trades. |
+| `OPTIONS_SIGNER_NOT_READY` | The signer must be enabled first; nothing filed. |
+| `OPTIONS_CHAT_ONLY` | A duty tried a money command; only chat trades. |
 | `OPTIONS_BOUNDS_MISMATCH` | Re-quote; never raise a bound past what the owner agreed. |
 | No fill (open, buy or close) | Nothing traded, spent or locked: the price moved past the bound. Re-quote and re-offer; never move the bound quietly. |
-| Buy failed over `--max-cost` | Give the reason as written, then read `positions`: an option shown there was bought. Never buy again to fix it. |
+| Buy failed over `--max-cost` | Give the reason as written, then read `positions`: anything shown there was bought. Never buy again. |
 | Not enough free USDC | Fund (step 4) or re-quote smaller. |
-| Close larger than held, or the wrong bound | Refused, nothing done. Re-read `positions`: positive size sells back with `--min-proceeds`, negative buys back with `--max-cost`. |
-| Deposit refused, failed or partial | Give the reason as written (a wallet that cannot cover it lists its USDC per chain); re-read the account before any new deposit. Never move funds between chains to fix it. |
+| Close larger than held, or the wrong bound | Refused, nothing done. Re-read `positions`: positive sells back (`--min-proceeds`), negative buys back (`--max-cost`). |
+| Deposit refused, failed or partial | Give the reason as written (a short wallet lists its USDC per chain); re-read the account before any new deposit. Never move funds between chains to fix it. |
 | Withdraw or `:home` failed | Give the reason as written, and stop. |
-| `OPTIONS_BAD_COMMAND` | Malformed or under a minimum. Nothing was filed. |
-| Card swept after 30 minutes | It failed unsigned. Re-quote before offering again. |
-| Derive or the account unreachable | Say Butler cannot see it now. Quote nothing; guess nothing. |
+| `OPTIONS_BAD_COMMAND` | Malformed or under a minimum; nothing filed. |
+| Card swept after 30 minutes | Failed unsigned; re-quote before offering again. |
+| Derive or the account unreachable | Say Butler cannot see it now; guess nothing. |
 
 ## Limits
 
 - Selling: cash-secured puts only, fully collateralised, locked until expiry or
   bought back. Buying: one call or put, paid in full, nothing borrowed; close any time
   the book bids. No spreads, leverage or covered calls; no rolling without a fresh yes.
-- **Monthly by default**; weeklies lose too much to fees and the spread.
+- **Monthly by default**; weeklies lose too much to fees and spread.
 - **Cash settled.** A sold put ending in the money reduces USDC; a bought option pays
-  USDC into the Derive account. Nobody is handed ETH; money stays on Derive until
-  withdrawn.
-- Prices are the public book; a quote is the worst case. Not advice: never rank,
-  never recommend.
+  USDC into the Derive account. Nobody is handed ETH; money stays there until withdrawn.
+- Prices are the public book; a quote is the worst case. Never rank or recommend.
 
 ## Say to the owner
 
-Worked sentences for each case end `references/selling.md` and `references/buying.md`.
-Close: "Selling back now gets about $178.73 after fees, against $190.03 you paid."
+Worked sentences end `references/selling.md` and `references/buying.md`.
