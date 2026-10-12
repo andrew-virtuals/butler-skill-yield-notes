@@ -1,13 +1,13 @@
 ---
 name: options-trading
-description: Trade options on Derive - earn on idle USDC by selling cash-secured puts, or buy a call or a put for upside or a hedge, and close either before expiry.
-version: 2.2.0
-metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back"],"requires":{"bins":["python3","bevo-read","acp"]}}}
+description: Trade options on Derive - earn on idle USDC by selling cash-secured puts, buy a call or a put, close before expiry, and check or withdraw Derive USDC and positions.
+version: 2.3.0
+metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","derive","derive positions","my option positions","withdraw from derive","withdraw my free usdc"],"requires":{"bins":["python3","bevo-read","acp"]}}}
 ---
 
 ## When to use
 
-Your owner wants one of three things on Derive's options market:
+Your owner wants one of four things on Derive's options market:
 
 - **Earn** - "earn on my USDC", "get paid to buy the dip": **sell** one cash-secured
   put, fully collateralised in USDC. They keep the premium and may end up buying the
@@ -17,13 +17,16 @@ Your owner wants one of three things on Derive's options market:
 - **Close** - before expiry: "sell my call back" **sells back** an option they
   **bought**; "get out of my put", "free my collateral" **buys back** a note they
   **sold**. Buying back can cost more than the note brought in.
+- **Check or withdraw** - "my Derive positions", "my free USDC" (Derive's
+  `freeForNewPutsUsd`, not wallet cash): step 1, then stop. "Withdraw my free USDC":
+  step 8, never an `acp trade` to their own wallet (`references/account.md`).
 
 Not this skill: covered calls, spreads, leverage, or any trade the helper refuses. It
 never picks a trade *for* them.
 
 ## Before you start
 
-1. **Which of the three.** Earning and buying are different promises; never blur them.
+1. **Which of the four.** Earning and buying are different promises; never blur them.
    Selling fits only USDC whose owner would happily buy the asset lower; if not, there
    is no note here.
 2. **One asset, one amount.** Selling locks collateral to expiry; buying spends the
@@ -33,22 +36,25 @@ never picks a trade *for* them.
    above $2,664 on 30 October, the $190 is gone."*
 4. **First time for that kind of trade:** the plain yes answers in
    `references/selling.md` or `references/buying.md`. A no or a vague answer stops it.
+5. **Derive figures come only from `acp options account`.** `bevo-read assets` has
+   none: its `perps` is Hyperliquid, its `cashUsd` the wallet. Its $0 is not Derive's.
 
 Money commands need Butler's server signer and run from chat only, never from a duty.
 
 ## Procedure
 
-1. [ADAPT] Read what they hold and their Derive account:
+1. [ADAPT] Read the Derive account before answering or filing anything, and the
+   wallet only to fund (step 4):
 
    ```sh
-   bevo-read assets
    acp options account
+   bevo-read assets
    ```
 
    `signerReady: false` - stop: the owner must enable Butler's signer first. Note
    `account.freeForNewPutsUsd` (`exists: false` is no account yet),
-   `account.positions` (positive `size` = bought, negative = sold) and `ethereum.usdc`.
-   An unreadable account is not an empty one.
+   `account.positions` (positive `size` = bought, negative = sold) and `ethereum.usdc`
+   (`references/account.md`). An unreadable account is not an empty one.
 
 2. [FIXED] Write the script in `references/helper.md` to `/tmp/derive_helper.py`.
    Quote with the line for the intent; the strike is a rule, never your number:
@@ -81,29 +87,25 @@ Money commands need Butler's server signer and run from chat only, never from a 
      PREMIUM_USD); they agree the floor (`min_proceeds_usd` unless they name one).
    - **Close (buy back):** `total_cost_usd` now, then `result_usd`: what the note made
      or lost once bought back; `warnings` as written; it frees `frees`. They agree the
-     ceiling (`max_cost_usd` unless they name one). Waiting for expiry costs nothing
-     to do; say so when `result_usd` is negative.
+     ceiling (`max_cost_usd` unless they name one). Waiting for expiry costs nothing;
+     say so when `result_usd` is negative.
 
 4. [FIXED] Fund a sell or a buy only when `freeForNewPutsUsd` is below
    `collateral.amount` (sell) or `max_cost_usd` (buy). Deposit the shortfall plus 2% for
-   the bridge fee and its 1% slippage bound, rounded up, and **never under $6** (the
-   server refuses a bridge that could land under $5.05). Say the bridge fee comes out
-   of the amount:
+   the bridge fee and its 1% slippage bound, rounded up, and **never under $6**. Say
+   the bridge fee comes out of the amount:
 
    ```sh
    acp options deposit --amount <DEPOSIT_USDC> --idempotency-key <KEY>:deposit
    ```
 
-   The trade bot takes USDC from the owner's wallet on **whichever chains hold it**,
-   gathering from several when none covers alone (`references/venue.md`): never judge a
-   deposit by one chain's balance, and if asked, USDC on any supported chain counts. A
-   wallet that cannot cover it is refused with the per-chain balances. Add `--from 1` only
-   when `ethereum.usdc` already covers it: the bot does not gather from Ethereum ($5
-   minimum). Never ask about gas or an address. Re-read
-   `acp options account` until free USDC covers the trade; if it ends short, re-quote
-   smaller and re-offer.
+   The trade bot gathers USDC from **whichever chains hold it** (`references/venue.md`):
+   never judge a deposit by one chain's balance. Add `--from 1` only when
+   `ethereum.usdc` already covers it: the bot does not gather from Ethereum ($5
+   minimum). Never ask about gas or an address. Re-read `acp options account` until
+   free USDC covers the trade; if it ends short, re-quote smaller and re-offer.
 
-5. [FIXED] Quote again if `valid_until` has passed, then file the one command for the
+5. [FIXED] Quote again if `valid_until` (60 s) has passed, then file the one command for the
    intent, with the quote's own fields:
 
    ```sh
@@ -117,7 +119,7 @@ Money commands need Butler's server signer and run from chat only, never from a 
    reply is an approval card, not a fill: tell the owner to approve it in the app.
 
 6. [FIXED] Wait for the outcome; never re-run the command to find it. Butler's server
-   posts a note in this chat when the card lands and nudges you. Then:
+   nudges you in this chat when the card lands. Then:
 
    ```sh
    bevo-read request <KEY>:<OP> --route options
@@ -135,13 +137,13 @@ Money commands need Butler's server signer and run from chat only, never from a 
    ```json
    {"recipe": "options-lifecycle@4", "triggers": [{"kind": "timer", "intervalSeconds": 900}],
     "params": {"INSTRUMENT": "SOL-20261030-160-C", "PRODUCT": "long_call", "UNDERLYING": "SOL",
-               "STRIKE": 160, "SIZE": 2, "PREMIUM_USD": 19.03, "COLLATERAL_USD": 0}}
+    "STRIKE": 160, "SIZE": 2, "PREMIUM_USD": 19.03, "COLLATERAL_USD": 0}}
    ```
 
    Sold put: PRODUCT `cash_secured_put`, PREMIUM_USD `netPremiumUsd`, COLLATERAL_USD
    `collateral`. Bought: PRODUCT `long_call` or `long_put`, PREMIUM_USD `totalCostUsd`,
    COLLATERAL_USD 0. Always SIZE `filledSize`, STRIKE `strike`, UNDERLYING the
-   instrument's prefix; any asset Derive lists works, no token needed. Only if they
+   instrument's prefix. Only if they
    asked in step 3 to own the asset after an assigned put: `DELIVER_ASSET: true` with
    TOKEN_ID, the token to buy: ETH is `native:8453`; BTC is the verified, non-stock Base
    row of `bevo-read token-search BTC` as `<address>:8453` (ask if two fit). After a close,
@@ -149,9 +151,10 @@ Money commands need Butler's server signer and run from chat only, never from a 
    from `positions` (positive) and PREMIUM_USD and COLLATERAL_USD scaled to it. Never
    file for an unknown or failed trade.
 
-8. [FIXED] Withdraw only when asked, only free USDC. It pays to the owner's wallet on
-   Ethereum in about 20 minutes, less up to $1; bringing it to Base is a second card
-   once it shows in `ethereum.usdc`:
+8. [FIXED] Withdraw only when asked, only free USDC: at most this turn's
+   `freeForNewPutsUsd`, rounded down to the cent. It pays to the owner's wallet on
+   Ethereum in about 20 minutes, less up to $1 (say so first); bringing it to Base is
+   a second card once it shows in `ethereum.usdc`:
 
    ```sh
    acp options withdraw --amount <USDC> --idempotency-key <KEY>:withdraw
@@ -159,8 +162,6 @@ Money commands need Butler's server signer and run from chat only, never from a 
    ```
 
 ## Idempotency and retries
-
-Quotes are free reads: re-run one past `valid_until` (60 s) rather than act on it.
 
 Derive one key per trade, such as `ot:eth:20261030:2600c:1`, with `:deposit`,
 `:open`, `:buy`, `:close`, `:withdraw`, `:home`. On an error, a timeout or an unclear
@@ -185,8 +186,8 @@ account` and wait. The `:home` leg is `acp trade`: look it up with `--route trad
 | Buy failed over `--max-cost` | Give the reason as written, then read `positions`: an option shown there was bought. Never buy again to fix it. |
 | Not enough free USDC | Fund (step 4) or re-quote smaller. |
 | Close larger than held, or the wrong bound | Refused, nothing done. Re-read `positions`: positive size sells back with `--min-proceeds`, negative buys back with `--max-cost`. |
-| Deposit refused, failed or partial | Give the reason as written (a wallet that cannot cover it lists its USDC per chain); re-read the account before any new deposit. Never move funds between chains to fix it. |
-| Withdraw or `:home` failed | Give the reason as written, and stop. |
+| Deposit refused, failed or partial | Give the reason as written; re-read the account before any new deposit. Never move funds between chains to fix it. |
+| Withdraw or `:home` failed | Give the reason as written, and stop (`only $N is free`: the rest backs sold puts). |
 | `OPTIONS_BAD_COMMAND` | Malformed or under a minimum. Nothing was filed. |
 | Card swept after 30 minutes | It failed unsigned. Re-quote before offering again. |
 | Derive or the account unreachable | Say Butler cannot see it now. Quote nothing; guess nothing. |
@@ -197,13 +198,12 @@ account` and wait. The `:home` leg is `acp trade`: look it up with `--route trad
   bought back. Buying: one call or put, paid in full, nothing borrowed; close any time
   the book bids. No spreads, leverage or covered calls; no rolling without a fresh yes.
 - **Monthly by default**; weeklies lose too much to fees and the spread.
-- **Cash settled.** A sold put ending in the money reduces USDC; a bought option pays
-  USDC into the Derive account. Nobody is handed ETH; money stays on Derive until
-  withdrawn.
+- **Cash settled** in USDC, never the asset; it stays on Derive until withdrawn.
 - Prices are the public book; a quote is the worst case. Not advice: never rank,
   never recommend.
 
 ## Say to the owner
 
-Worked sentences for each case end `references/selling.md` and `references/buying.md`.
+Worked sentences for each case end `references/selling.md`, `references/buying.md` and
+`references/account.md`.
 Close: "Selling back now gets about $178.73 after fees, against $190.03 you paid."
