@@ -16,7 +16,7 @@ change").
 
 ## What it does
 
-Three intents on [Derive](https://derive.xyz)'s options market:
+Four intents on [Derive](https://derive.xyz)'s options market:
 
 - **Earn**: sell one fully collateralised cash-secured put on USDC, so idle money
   earns while it waits to buy the asset lower. Behaviour unchanged from yield-notes
@@ -26,6 +26,9 @@ Three intents on [Derive](https://derive.xyz)'s options market:
   and can lose all of it; the skill gets an explicit yes to that number.
 - **Close**: before expiry, sell back an option the owner bought, or buy back a note
   they sold. Buying back frees the collateral and can cost more than the premium.
+- **Check or withdraw**: read the Derive account (free USDC and positions) from `acp
+  options account`, never from `bevo-read assets`, and withdraw free USDC to the owner's
+  wallet on Ethereum.
 
 The model never picks an instrument, a strike or a price: it passes an intent to the
 helper and gets back a quote object with every number fixed, including the bound the
