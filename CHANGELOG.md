@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.3.0
+
+- Routes more check and withdraw asks here, on top of 2.2.1's **Look or withdraw**:
+  keywords `derive positions`, `my option positions`, `withdraw from derive`, `withdraw
+  my free usdc`, and a description that names checking and withdrawing, so an installed
+  skill is picked for them too. "Free USDC" is Derive's `freeForNewPutsUsd`, not wallet
+  cash; a look is step 1 and then stop.
+- The Derive portfolio comes from `acp options account` and only from it. `bevo-read
+  assets` has no Derive section: its `perps` is Hyperliquid and its `cashUsd` the wallet.
+  A butler had reported Derive as empty from Hyperliquid's $0 while the account held
+  $1.62 free and four options. Step 1 now reads the account first, and the wallet only
+  to fund a trade.
+- A withdrawal is at most this turn's `freeForNewPutsUsd`, rounded down to the cent; the
+  owner hears the up-to-$1 fee before it is filed.
+- New `references/account.md`: what each `acp options account` field means, how to answer
+  a check, the withdrawal rules, and worked sentences.
+- Some wording in steps 4 to 7 is shorter, with the same rules, to keep the body under the
+  hub's 12,000-character limit.
+
 ## 2.2.1
 
 - A fourth case, **Look or withdraw**: "what's my free USDC in Derive", "list my
