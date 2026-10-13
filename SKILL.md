@@ -1,7 +1,7 @@
 ---
 name: options-trading
 description: Trade options on Derive - earn on idle USDC by selling cash-secured puts, buy a call or a put, close before expiry, and check or withdraw Derive USDC and positions.
-version: 2.3.0
+version: 2.3.1
 metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","withdraw","withdraw my usdc","derive","my options","options account","options positions","free usdc","derive positions","my option positions","withdraw from derive","withdraw my free usdc"],"requires":{"bins":["python3","bevo-read","acp"]}}}
 ---
 
@@ -27,12 +27,12 @@ picks a trade *for* them.
 ## Before you start
 
 1. **Which of the four.** Earning and buying are different promises; never blur them.
-   Selling fits only USDC whose owner would happily buy the asset lower; if not, there
-   is no note here.
+   Selling fits only USDC whose owner would happily buy the asset lower; a no to that
+   ends selling, every put on it.
 2. **One asset, one amount.** Selling locks collateral to expiry; buying spends the
    cost outright.
-3. **The bad case first, in their words, before any upside number.** Selling: *"ETH
-   drops to $2,000 and you have bought it at $2,300 anyway."* Buying: *"If ETH is not
+3. **The bad case first, in their words, before any upside number.** Selling, from
+   `bad_case`: *"If ETH falls 25% to $1,844, you pay $2,200: down $44."* Buying: *"If ETH is not
    above $2,664 on 30 October, the $190 is gone."*
 4. **First time for that kind of trade:** the plain yes answers in
    `references/selling.md` or `references/buying.md`. A no or a vague answer stops it.
@@ -67,19 +67,19 @@ Money commands need Butler's server signer and run from chat only, never a duty.
    python3 /tmp/derive_helper.py quote --side buyback --instrument <INSTRUMENT> --size <SIZE> --premium-received <USD>
    ```
 
-   Selling: screen first, then quote. Buying: `<PRODUCT>` is `call` or `put`,
-   `--budget` the most they will spend; `--delta 0.3` instead of `--otm-pct` holds the
-   odds steady. Closing: instrument and size from `positions`; positive is `--side
+   Selling: screen, never an APR menu, then quote the asset they name. Buying:
+   `<PRODUCT>` is `call` or `put`, `--budget` the most they will spend; `--delta 0.3`
+   instead of `--otm-pct` holds the odds steady. Closing: instrument and size from `positions`; positive is `--side
    close`, negative is `--side buyback` with the size positive and `--premium-received`
    the note's `netPremiumUsd` (or its duty's PREMIUM_USD) scaled to it. **Offer only
    `tradeable: true`**; give the `reasons` as written.
 
-3. [ADAPT] Offer it using **only** quote fields (the references map each to a
-   sentence; never compute a premium, a breakeven or an APR):
-   - **Sell:** bad case first, then `net_premium_usd`, `fee_usd`, the lock to
-     `expiry`. Then a **separate** yes: *"Happy to own 2.17 ETH at $2,300 on 30
-     October?"* A yes to the yield is not a yes to this. Derive settles in cash;
-     Butler buys the asset after settlement only if they ask for that now.
+3. [ADAPT] Offer it using **only** quote fields; never compute a number (the
+   references map each field to a sentence):
+   - **Sell:** `bad_case` first, then `net_premium_usd`, `fee_usd`, the lock to
+     `expiry`; `apr_pct` last. Then, on its own: *"Happy to own 0.13 ETH at $2,200 on
+     30 October?"* A no or a vague answer ends it: no other strike, tenor or asset.
+     Butler buys the asset afterwards only if they ask now.
    - **Buy:** not yield; `max_cost_usd` is the most they pay and can lose, all of it;
      `breakeven` is where it pays at expiry, and it loses value while the price stands
      still. Get an explicit yes to *"you can lose the whole $199.54"*.

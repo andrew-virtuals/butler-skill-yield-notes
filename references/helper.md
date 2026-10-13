@@ -42,6 +42,7 @@ softer - they are already written for an owner.
 | `min_premium_usd` | 95% of `net_premium_usd`, rounded down to the cent; passed to `--min-premium` |
 | `apr_pct` | the net premium over the collateral, annualised - "if you kept doing this" |
 | `breakeven` | strike less the bid for a put, plus it for a call |
+| `bad_case` | put only: `price`, the asset `fall_pct` (25) below spot, and `loss_usd`, what the note is down at expiry there, premium already counted. The bad case is said with these, first |
 | `edge_vs_fair_vol_pts` | how far the bid sits under Derive's own mark; negative for a seller |
 | `bid_depth` | contracts on the best bid; a note bigger than this is refused |
 | `valid_until` | 60 seconds after the read; quote again past it |
@@ -180,6 +181,9 @@ MIN_PREMIUM_SHARE = 0.95
 # --max-cost is set this far over the quoted total for a buy or a buy-back, and a buy is
 # sized so that ceiling still fits the owner's budget.
 MAX_COST_HEADROOM = 1.05
+# A sold put's bad case is said as a dollar loss at this fall from spot, so the
+# model never has to compute one; 25% sits well past the default 10% OTM strike.
+BAD_CASE_FALL = 0.25
 
 CURRENCIES = ["ETH", "BTC", "SOL", "XRP", "ADA", "HYPE",
               "ZEC", "XAUT", "LIT", "VVV", "PUMP", "CC"]
@@ -394,6 +398,13 @@ def build_quote(product, underlying, collateral_usd, tenor="monthly",
     })
     if dte > 0 and locked_usd > 0:
         q["apr_pct"] = rnd(net / locked_usd * (365 / dte) * 100, 2)
+    if opt_type == "P":
+        low = spot * (1 - BAD_CASE_FALL)
+        q["bad_case"] = {
+            "fall_pct": int(BAD_CASE_FALL * 100),
+            "price": rnd(low, 6),
+            "loss_usd": rnd(max(strike - low, 0.0) * size - net, 2),
+        }
 
     if bid_sz < size:
         q["reasons"].append(
