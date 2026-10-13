@@ -52,7 +52,7 @@ chat. One missing: ask, and file nothing this turn.
    0.16 held): say what they hold and ask. Never shrink it quietly.
 3. **They said yes to the number.** The loss, the ownership, or the floor or ceiling,
    with its dollar figure, after the quote. Never your default.
-4. **The quote is fresh.** Quote again after their last answer; file inside its 60 s.
+4. **The quote is fresh:** run after their last answer (step 5).
 
 ## Procedure
 
@@ -80,7 +80,7 @@ chat. One missing: ask, and file nothing this turn.
    python3 /tmp/derive_helper.py quote --side buyback --instrument <INSTRUMENT> --size <SIZE> --premium-received <USD>
    ```
 
-   Selling: screen, never an APR menu, then quote the asset they name. Buying:
+   Selling: the asset they named, or screen (never an APR menu) and ask. Buying:
    `<PRODUCT>` is `call` or `put`, `--budget` the most they will spend. Closing:
    instrument and size from `positions`; positive is `--side close`, negative is `--side buyback` with the size positive and `--premium-received`
    the note's `netPremiumUsd` (or its duty's PREMIUM_USD) scaled to it. **Offer only
@@ -116,8 +116,8 @@ chat. One missing: ask, and file nothing this turn.
    covers it alone. Never ask about gas or an address. Re-read `acp options account` until
    free USDC covers the trade; if it ends short, re-quote smaller and re-offer.
 
-5. [FIXED] With all four met, file the one command for the intent, with the quote's
-   fields and the bound they agreed:
+5. [FIXED] Run the quote again now, after their last answer. With all four met, file
+   the one command, with that quote's fields and the bound they agreed:
 
    ```sh
    acp options open --instrument <instrument> --size <size> --min-premium <min_premium_usd> --max-collateral <collateral.amount> --idempotency-key <KEY>:open
@@ -195,8 +195,8 @@ account` and wait. The `:home` leg is `acp trade`: look it up with `--route trad
 | Close larger than held, or the wrong bound | Refused, nothing done. Re-read `positions`: positive sells back, negative buys back. |
 | Deposit refused, failed or partial | Give the reason as written; re-read the account before any new deposit. Never move funds between chains to fix it. |
 | Withdraw or `:home` failed | Give the reason as written, and stop (`only $N is free`: the rest backs sold puts). |
-| `OPTIONS_BAD_COMMAND` | Malformed or under a minimum; nothing filed. |
-| Card swept after 30 minutes | Failed unsigned; re-quote before offering again. |
+| `OPTIONS_BAD_COMMAND` | Malformed or under a minimum; none filed. |
+| Card swept after 30 minutes | Unsigned; re-quote before offering again. |
 | Derive or the account unreachable | Say Butler cannot see it now; guess nothing. |
 
 ## Limits
