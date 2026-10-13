@@ -1,5 +1,27 @@
 # Changelog
 
+## 2.3.2
+
+- **Sizes are in the asset.** 1 contract is 1 ETH: 0.16 is 0.16 ETH, and Derive's 0.1
+  is only its minimum. Owners hear sizes as "0.16 ETH", never "contracts", and the
+  agent never converts. Seen live: told "sell 5 of my ETH calls", an agent said
+  "five contracts would be 0.5 ETH", while cards and duties count 1 contract as 1 ETH.
+- **Derive figures come only from this turn's reads**, never memory: a stored note
+  that disagrees with `acp options account` is wrong and gets corrected. The "0.5 ETH"
+  came from the agent's own working memory, saved in an earlier session as something
+  the owner had "clarified".
+- **Positions are relayed, not priced.** `acp options account` now gives each position
+  an owner-ready `summary` plus `valueUsd`, `costUsd`, `pnlUsd` and `expiresIn`, with the
+  per-unit prices renamed `markPerUnitUsd` and `entryPricePerUnitUsd` (bevo-server and
+  virtuals-agent changes that ship with this). `account.md` relays `summary` as written,
+  answers "up or down" from `pnlUsd`, and never works out a value, profit or date. Seen
+  live: "marked at ~$20.69" for a 0.16 ETH position worth about $3.30. Replays with a
+  poisoned memory: account checks right 8 of 8 with the new fields; without `pnlUsd`,
+  agents asked "up or down" computed it themselves and one flipped the sign of a whole
+  position. On an older server, sizes are said in the asset and `mark` labelled per ETH.
+- SKILL.md drops lines `account.md`, step 1 and the failure table already carry, to
+  stay under 12,000 characters.
+
 ## 2.3.1
 
 - **Selling says the bad case first, with a dollar figure.** The sell quote gains
