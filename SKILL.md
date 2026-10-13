@@ -1,7 +1,7 @@
 ---
 name: options-trading
 description: Trade options on Derive - earn on idle USDC by selling cash-secured puts, buy a call or a put, close before expiry, and check or withdraw Derive USDC and positions.
-version: 2.3.1
+version: 2.3.2
 metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","withdraw","withdraw my usdc","derive","my options","options account","options positions","free usdc","derive positions","my option positions","withdraw from derive","withdraw my free usdc"],"requires":{"bins":["python3","bevo-read","acp"]}}}
 ---
 
@@ -18,7 +18,8 @@ Your owner wants one of four things on Derive's options market:
   **bought**; "get out of my put", "free my collateral" **buys back** a note they
   **sold**. Buying back can cost more than the note brought in.
 - **Look or withdraw** - "what's my free USDC in Derive" (`freeForNewPutsUsd`, not
-  wallet cash), "list my positions": step 1, then stop. "Withdraw my free USDC":
+  wallet cash), "list my positions" (each `summary`; up or down: `pnlUsd`): step 1,
+  then stop. "Withdraw my free USDC":
   step 8, `acp options withdraw`, never an `acp trade` (`references/account.md`).
 
 Not this skill: covered calls, spreads, leverage, or a trade the helper refuses.
@@ -28,17 +29,16 @@ Not this skill: covered calls, spreads, leverage, or a trade the helper refuses.
 1. **Which of the four.** Earning and buying are different promises; never blur them.
    Selling fits only USDC whose owner would happily buy the asset lower; a no to that
    ends selling, every put on it.
-2. **One asset, one amount.** Selling locks collateral to expiry; buying spends the
-   cost outright.
+2. **Sizes are in the asset.** 1 contract is 1 ETH: 0.16 is 0.16 ETH, and Derive's 0.1
+   is only its minimum. Say "0.16 ETH", never "contracts", and never convert.
 3. **The bad case first, in their words, before any upside number.** Selling, from
    `bad_case`: *"If ETH falls 25% to $1,844, you pay $2,200: down $44."* Buying: *"If ETH is not
    above $2,664 on 30 October, the $190 is gone."*
 4. **First time for that kind of trade:** the plain yes answers in
    `references/selling.md` or `references/buying.md`. A no or a vague answer stops it.
-5. **Derive figures come only from `acp options account`.** `bevo-read assets` has
-   none: its `perps` is Hyperliquid, its `cashUsd` the wallet. Its $0 is not Derive's.
-
-Money commands need the server signer and run from chat, never a duty.
+5. **Derive figures come only from this turn's reads:** sizes, prices and positions
+   from `acp options account` and quotes, never memory; a note that disagrees is wrong,
+   so fix it. `bevo-read assets` has none.
 
 ### Never file without all four
 
@@ -86,8 +86,7 @@ this chat. One missing: ask, and file nothing this turn.
    the note's `netPremiumUsd` (or its duty's PREMIUM_USD) scaled to it. **Offer only
    `tradeable: true`**; give the `reasons` as written.
 
-3. [ADAPT] Offer it using **only** quote fields; never compute a number (the
-   references map each field to a sentence):
+3. [ADAPT] Offer it using **only** quote fields; never compute a number:
    - **Sell:** `bad_case` first, then `net_premium_usd`, `fee_usd`, the lock to
      `expiry`; `apr_pct` last. Then, on its own: *"Happy to own 0.13 ETH at $2,200 on
      30 October?"* A no or a vague answer ends it: no other strike, tenor or asset.
@@ -129,8 +128,8 @@ this chat. One missing: ask, and file nothing this turn.
    A close takes one bound: `--min-proceeds` sells back, `--max-cost` buys back. The
    reply is an approval card, not a fill: tell the owner to approve it in the app.
 
-6. [FIXED] Wait for the outcome; never re-run the command to find it. Butler's server
-   nudges you in this chat when the card lands. Then:
+6. [FIXED] Wait for the outcome; never re-run the command to find it. The server nudges
+   you here when the card lands. Then:
 
    ```sh
    bevo-read request <KEY>:<OP> --route options
