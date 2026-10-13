@@ -24,7 +24,20 @@ or vague, do not quote:
   often less than you paid. Clear?"
 
 And before every buy, an explicit yes to the number: "You can lose the whole
-$199.54 - yes?" A yes to the idea is not a yes to the amount.
+$199.54 - yes?" A yes to the idea is not a yes to the amount. The figure goes in the
+question itself, card or text; "the entire amount spent is gone" is not a number.
+
+## Choosing is theirs
+
+Butler never picks the trade. "Just buy whatever looks good", "you pick", "the best
+one": say Butler does not choose trades, and ask which asset, the most they will
+spend, and roughly when it should expire. Quote nothing until they have named an
+asset and an amount. Never make up a budget, even a small one.
+
+The helper's strike rule is a starting point, said as one, with the quote's own
+numbers: "That is a call about 5% above today's price, expiring 30 October. Nearer,
+further, or another date?" `--delta 0.3` instead of `--otm-pct` holds the odds steady
+if they ask for that.
 
 ## Saying it out loud
 
@@ -89,11 +102,25 @@ An option the owner **bought** shows in `acp options account` positions with a
 positive `size`; a sold note shows negative, and closing that one is a buy-back
 (`references/selling.md`).
 
+**The size is theirs, up to what they hold.** Read `positions` first. Asked to close
+more than the position ("sell 5 of my ETH calls" with 0.16 held), say so and ask:
+"You hold 0.16 of that call, not 5. Sell all 0.16?" Never shrink the size quietly,
+and never pick between two positions for them.
+
 Quote the close with `quote --side close --instrument <name> --size <size>`. Say
 `net_proceeds_usd` against what they paid (the lifecycle duty's `PREMIUM_USD`), plainly
 when it is less: "Selling back now gets about $178.73 after fees, against $190.03 you
-paid." Give any `warnings`. The floor is theirs to agree:
-`min_proceeds_usd` unless they name one; never lower it without asking.
+paid." Give any `warnings` as written ("fees take 16% of what the bid pays").
+
+**Then ask for the floor**, the least they will take, with `min_proceeds_usd` as the
+suggestion: "The least you'd take? I'd suggest $169.79, so a small move doesn't stop
+it." File only the floor they agreed, and quote again after their answer: the card
+needs a quote under 60 seconds old.
+
+If it does not fill, nobody bought at that floor; the price moved. Say exactly that,
+never "no liquidity", and re-quote before offering again, never re-filing the same
+floor. With `no live bid`, nobody is bidding for this option right now: holding it to
+expiry costs nothing, and the lifecycle duty reports the outcome.
 
 A close sells only what they hold (`reduce_only` on the venue). After a confirmed
 close, the lifecycle duty for that instrument is deleted; if part is still held, it is

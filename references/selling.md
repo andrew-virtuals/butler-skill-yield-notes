@@ -114,6 +114,9 @@ premium has been told half of it.
 price) x size; it does not deliver ETH. "You now own ETH at $2,300" is true only after
 a separate spot buy has filled. The lifecycle duty does that buy only when it is filed
 with `DELIVER_ASSET` on, which is only when the owner asked for it before the open.
+The duty then needs `TOKEN_ID`, the token it buys: ETH is `native:8453`; BTC is the
+verified, non-stock Base row of `bevo-read token-search BTC` as `<address>:8453` (ask
+if two fit).
 
 The premium and the freed collateral stay in the Derive account until withdrawn.
 
@@ -128,8 +131,11 @@ duty's `PREMIUM_USD`) scaled to the size being bought back.
 Say `total_cost_usd`, then `result_usd`, plainly when it is negative: "Buying it back
 now costs about $4.46 with fees. You were paid $3.00 for it, so you would take a $1.46
 loss now." Give any `warnings` as written. Then say what waiting does: holding to
-expiry costs nothing to do, and the note may still expire worthless. The ceiling is
-theirs to agree: `max_cost_usd` unless they name one; never raise it without asking.
+expiry costs nothing to do, and the note may still expire worthless. Then ask for the
+ceiling, the most they will pay, with `max_cost_usd` as the suggestion; file only the
+ceiling they agreed, quote again after their answer, and never raise it without
+asking. The size is at most what they sold (the negative `size`, as a positive
+number); asked for more, say what they hold and ask.
 
 The usual reasons: most of the premium is already earned and they want the collateral
 back, the asset is falling toward the strike and they would rather pay than buy it

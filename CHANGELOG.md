@@ -15,6 +15,28 @@
   told no to owning ETH, an agent offered quarterly ETH puts.
 - `screen` is never shown as an APR menu; with more than one tradeable asset, the
   owner names the one they would own.
+- **Never file without all four**, a gate in Before you start that every `acp options
+  open`, `buy` or `close` must pass, from the owner's own words: they chose it (asset
+  and amount, or option and size), they hold it (a close is at most `positions`' size),
+  they said yes to the number (loss, ownership, floor or ceiling, with its dollar
+  figure), and the quote is fresh (re-quoted after their last answer). Seen in
+  testing: told "just buy whatever ETH call looks good", an agent made up a $10 budget
+  and quoted the default strike; told "sell 5 of my ETH calls" with 0.16 held, it
+  filed 0.16 at a floor it chose, on a 91-second-old quote, never saying 5 was more
+  than held.
+- Closing asks for the floor or ceiling, with `min_proceeds_usd` / `max_cost_usd` as
+  the suggestion, instead of using it unless the owner names one. `buying.md` gains
+  "Choosing is theirs" (no picking, no made-up budget, the strike rule said as a
+  starting point; the loss figure goes in the question itself) and a size check
+  before any close.
+- A close that does not fill is "nobody bought at that floor", never "no liquidity",
+  and is re-quoted, never re-filed at the same floor. Seen in testing: three
+  sell-backs at a $4.05 floor above the bid failed and were reported as zero
+  liquidity. `no live bid` on a close says holding to expiry costs nothing.
+- Step 7's `duty_create` example uses placeholders; an agent had taken its real-looking
+  `SOL-20261030-160-C` for a holding and tried to close it. The `DELIVER_ASSET` token
+  rules moved to `selling.md`; SKILL.md trims repeated limits and funding detail
+  (still in `venue.md`) to stay under 12,000 characters.
 
 ## 2.3.0
 
