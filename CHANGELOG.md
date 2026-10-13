@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.3.1
+
+- **Selling says the bad case first, with a dollar figure.** The sell quote gains
+  `bad_case`: the asset 25% below spot (`price`, `fall_pct`) and `loss_usd`, what the
+  note is down at expiry there, premium counted. The skill forbids computing numbers,
+  and no field carried a loss, so agents dropped the loss example and led with APR.
+  `selling.md`'s four beats now open with the bad case (they used to put it third,
+  against SKILL.md); `apr_pct` comes last, if at all.
+- **The ownership question stands alone, and a no ends it.** "Happy to own 0.13 ETH at
+  $2,200 on 30 October?" is asked on its own after the offer. A no, a "maybe", or a
+  yes to the money with a no to the asset ends selling: no other strike, tenor, size
+  or asset, since every cash-secured put carries the same promise. Seen in testing:
+  told no to owning ETH, an agent offered quarterly ETH puts.
+- `screen` is never shown as an APR menu; with more than one tradeable asset, the
+  owner names the one they would own.
+
 ## 2.3.0
 
 - Routes more check and withdraw asks here, on top of 2.2.1's **Look or withdraw**:
