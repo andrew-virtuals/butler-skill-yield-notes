@@ -37,6 +37,11 @@
   quotes the asset the owner named, screening only when they named none. Found by
   replaying the test prompts against this skill: an agent filed from its pre-answer
   quote, and one screened every asset after the owner had said ETH.
+- The gate covers `acp options deposit` too, and step 4 funds only with all four met:
+  in a replay an agent took "yes to all, go ahead" after the first-time check as
+  approval and filed a $307 deposit without asking the ownership question. `selling.md`
+  says those yeses are not a yes to a trade, and that a no to owning the asset is not
+  followed by an invitation to name another.
 - Step 7's `duty_create` example uses placeholders; an agent had taken its real-looking
   `SOL-20261030-160-C` for a holding and tried to close it. The `DELIVER_ASSET` token
   rules moved to `selling.md`; SKILL.md trims repeated limits and funding detail

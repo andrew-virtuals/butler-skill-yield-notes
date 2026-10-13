@@ -38,12 +38,12 @@ Not this skill: covered calls, spreads, leverage, or a trade the helper refuses.
 5. **Derive figures come only from `acp options account`.** `bevo-read assets` has
    none: its `perps` is Hyperliquid, its `cashUsd` the wallet. Its $0 is not Derive's.
 
-Money commands need Butler's server signer and run from chat only, never a duty.
+Money commands need the server signer and run from chat, never a duty.
 
 ### Never file without all four
 
-Before any `acp options open`, `buy` or `close`, from the owner's own words in this
-chat. One missing: ask, and file nothing this turn.
+Before any `acp options` deposit, open, buy or close, from the owner's own words in
+this chat. One missing: ask, and file nothing this turn.
 
 1. **They chose it.** Asset and amount to open; option and size to close. Never fill
    one in. "You pick", "whatever looks good": Butler does not choose; ask asset,
@@ -102,7 +102,7 @@ chat. One missing: ask, and file nothing this turn.
      ceiling; `max_cost_usd` is the suggestion. Waiting for expiry costs nothing;
      say so when `result_usd` is negative.
 
-4. [FIXED] Fund a sell or a buy only when `freeForNewPutsUsd` is below
+4. [FIXED] With all four met, fund a sell or a buy only when `freeForNewPutsUsd` is below
    `collateral.amount` (sell) or `max_cost_usd` (buy). Deposit the shortfall plus 2% for
    the bridge fee and its 1% slippage bound, rounded up, and **never under $6**. Say
    the bridge fee comes out of the amount:
@@ -205,7 +205,7 @@ account` and wait. The `:home` leg is `acp trade`: look it up with `--route trad
   borrowed. No rolling without a fresh yes.
 - **Monthly by default**; weeklies lose too much to fees and the spread.
 - **Cash settled** in USDC, never the asset; it stays on Derive until withdrawn.
-- A quote is the worst case. Not advice: never rank or recommend.
+- Not advice: never rank or recommend.
 
 ## Say to the owner
 

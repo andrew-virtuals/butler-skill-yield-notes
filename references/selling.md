@@ -28,6 +28,10 @@ vague, do not quote:
   note back, and that can cost more than you were paid. Clear?"
 - "The premium is yours whatever happens. The collateral is not. Clear?"
 
+These yeses, and a "go ahead" with them, are not a yes to a trade. Nothing is filed,
+not even the deposit, until the quote has been offered and the ownership question
+answered yes.
+
 ## Saying a note out loud
 
 Every number below is a **field on the sell quote**. Nothing here is computed by the
@@ -70,8 +74,10 @@ yield is not a yes to this; never fold it into "shall I go ahead?".
 
 A no, a "maybe", or a yes to the money with a no to the asset ends selling. Say so in
 one line and stop. Every cash-secured put on that asset carries the same promise, so
-do not offer another strike, tenor or size, and do not suggest another asset. If the
-owner names an asset they *would* own, start again from the top for that one.
+do not offer another strike, tenor or size, and do not suggest or invite another asset:
+"if there's an asset you'd be happy to own, I can quote that" is an invitation, and so
+is pointing them at buying a call. Stop at the one line. Only if the owner names an
+asset they *would* own, unprompted, start again from the top for that one.
 
 ## Words
 
@@ -166,8 +172,8 @@ a $0.60 fee. If ETH is above $2,200 then, you keep it and your $286 is free agai
 until then it is locked." Then, on its own: "Happy to own 0.13 ETH at $2,200 on 30
 October?"
 
-A no to that: "Then a put is not for this money - every one is a promise to buy. I
-won't file anything."
+A no to that, and nothing after it: "Then a put is not for this money - every one is a
+promise to buy. I won't file anything."
 
 Nothing clears: "Nothing worth doing today - the market is wide; you would give away
 too much to get filled."
