@@ -1,5 +1,52 @@
 # Changelog
 
+## 2.3.1
+
+- **Selling says the bad case first, with a dollar figure.** The sell quote gains
+  `bad_case`: the asset 25% below spot (`price`, `fall_pct`) and `loss_usd`, what the
+  note is down at expiry there, premium counted. The skill forbids computing numbers,
+  and no field carried a loss, so agents dropped the loss example and led with APR.
+  `selling.md`'s four beats now open with the bad case (they used to put it third,
+  against SKILL.md); `apr_pct` comes last, if at all.
+- **The ownership question stands alone, and a no ends it.** "Happy to own 0.13 ETH at
+  $2,200 on 30 October?" is asked on its own after the offer. A no, a "maybe", or a
+  yes to the money with a no to the asset ends selling: no other strike, tenor, size
+  or asset, since every cash-secured put carries the same promise. Seen in testing:
+  told no to owning ETH, an agent offered quarterly ETH puts.
+- `screen` is never shown as an APR menu; with more than one tradeable asset, the
+  owner names the one they would own.
+- **Never file without all four**, a gate in Before you start that every `acp options
+  open`, `buy` or `close` must pass, from the owner's own words: they chose it (asset
+  and amount, or option and size), they hold it (a close is at most `positions`' size),
+  they said yes to the number (loss, ownership, floor or ceiling, with its dollar
+  figure), and the quote is fresh (re-quoted after their last answer). Seen in
+  testing: told "just buy whatever ETH call looks good", an agent made up a $10 budget
+  and quoted the default strike; told "sell 5 of my ETH calls" with 0.16 held, it
+  filed 0.16 at a floor it chose, on a 91-second-old quote, never saying 5 was more
+  than held.
+- Closing asks for the floor or ceiling, with `min_proceeds_usd` / `max_cost_usd` as
+  the suggestion, instead of using it unless the owner names one. `buying.md` gains
+  "Choosing is theirs" (no picking, no made-up budget, the strike rule said as a
+  starting point; the loss figure goes in the question itself) and a size check
+  before any close.
+- A close that does not fill is "nobody bought at that floor", never "no liquidity",
+  and is re-quoted, never re-filed at the same floor. Seen in testing: three
+  sell-backs at a $4.05 floor above the bid failed and were reported as zero
+  liquidity. `no live bid` on a close says holding to expiry costs nothing.
+- Step 5 opens with "run the quote again now, after their last answer", and selling
+  quotes the asset the owner named, screening only when they named none. Found by
+  replaying the test prompts against this skill: an agent filed from its pre-answer
+  quote, and one screened every asset after the owner had said ETH.
+- The gate covers `acp options deposit` too, and step 4 funds only with all four met:
+  in a replay an agent took "yes to all, go ahead" after the first-time check as
+  approval and filed a $307 deposit without asking the ownership question. `selling.md`
+  says those yeses are not a yes to a trade, and that a no to owning the asset is not
+  followed by an invitation to name another.
+- Step 7's `duty_create` example uses placeholders; an agent had taken its real-looking
+  `SOL-20261030-160-C` for a holding and tried to close it. The `DELIVER_ASSET` token
+  rules moved to `selling.md`; SKILL.md trims repeated limits and funding detail
+  (still in `venue.md`) to stay under 12,000 characters.
+
 ## 2.3.0
 
 - Routes more check and withdraw asks here, on top of 2.2.1's **Look or withdraw**:

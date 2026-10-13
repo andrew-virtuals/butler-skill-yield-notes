@@ -1,7 +1,7 @@
 ---
 name: options-trading
 description: Trade options on Derive - earn on idle USDC by selling cash-secured puts, buy a call or a put, close before expiry, and check or withdraw Derive USDC and positions.
-version: 2.3.0
+version: 2.3.1
 metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","withdraw","withdraw my usdc","derive","my options","options account","options positions","free usdc","derive positions","my option positions","withdraw from derive","withdraw my free usdc"],"requires":{"bins":["python3","bevo-read","acp"]}}}
 ---
 
@@ -21,25 +21,38 @@ Your owner wants one of four things on Derive's options market:
   wallet cash), "list my positions": step 1, then stop. "Withdraw my free USDC":
   step 8, `acp options withdraw`, never an `acp trade` (`references/account.md`).
 
-Not this skill: covered calls, spreads, leverage, or a trade the helper refuses. It never
-picks a trade *for* them.
+Not this skill: covered calls, spreads, leverage, or a trade the helper refuses.
 
 ## Before you start
 
 1. **Which of the four.** Earning and buying are different promises; never blur them.
-   Selling fits only USDC whose owner would happily buy the asset lower; if not, there
-   is no note here.
+   Selling fits only USDC whose owner would happily buy the asset lower; a no to that
+   ends selling, every put on it.
 2. **One asset, one amount.** Selling locks collateral to expiry; buying spends the
    cost outright.
-3. **The bad case first, in their words, before any upside number.** Selling: *"ETH
-   drops to $2,000 and you have bought it at $2,300 anyway."* Buying: *"If ETH is not
+3. **The bad case first, in their words, before any upside number.** Selling, from
+   `bad_case`: *"If ETH falls 25% to $1,844, you pay $2,200: down $44."* Buying: *"If ETH is not
    above $2,664 on 30 October, the $190 is gone."*
 4. **First time for that kind of trade:** the plain yes answers in
    `references/selling.md` or `references/buying.md`. A no or a vague answer stops it.
 5. **Derive figures come only from `acp options account`.** `bevo-read assets` has
    none: its `perps` is Hyperliquid, its `cashUsd` the wallet. Its $0 is not Derive's.
 
-Money commands need Butler's server signer and run from chat only, never a duty.
+Money commands need the server signer and run from chat, never a duty.
+
+### Never file without all four
+
+Before any `acp options` deposit, open, buy or close, from the owner's own words in
+this chat. One missing: ask, and file nothing this turn.
+
+1. **They chose it.** Asset and amount to open; option and size to close. Never fill
+   one in. "You pick", "whatever looks good": Butler does not choose; ask asset,
+   amount, expiry.
+2. **They hold it.** A close is at most `positions`' size. Asked for more ("sell 5",
+   0.16 held): say what they hold and ask. Never shrink it quietly.
+3. **They said yes to the number.** The loss, the ownership, or the floor or ceiling,
+   with its dollar figure, after the quote. Never your default.
+4. **The quote is fresh:** run after their last answer (step 5).
 
 ## Procedure
 
@@ -67,30 +80,29 @@ Money commands need Butler's server signer and run from chat only, never a duty.
    python3 /tmp/derive_helper.py quote --side buyback --instrument <INSTRUMENT> --size <SIZE> --premium-received <USD>
    ```
 
-   Selling: screen first, then quote. Buying: `<PRODUCT>` is `call` or `put`,
-   `--budget` the most they will spend; `--delta 0.3` instead of `--otm-pct` holds the
-   odds steady. Closing: instrument and size from `positions`; positive is `--side
-   close`, negative is `--side buyback` with the size positive and `--premium-received`
+   Selling: the asset they named, or screen (never an APR menu) and ask. Buying:
+   `<PRODUCT>` is `call` or `put`, `--budget` the most they will spend. Closing:
+   instrument and size from `positions`; positive is `--side close`, negative is `--side buyback` with the size positive and `--premium-received`
    the note's `netPremiumUsd` (or its duty's PREMIUM_USD) scaled to it. **Offer only
    `tradeable: true`**; give the `reasons` as written.
 
-3. [ADAPT] Offer it using **only** quote fields (the references map each to a
-   sentence; never compute a premium, a breakeven or an APR):
-   - **Sell:** bad case first, then `net_premium_usd`, `fee_usd`, the lock to
-     `expiry`. Then a **separate** yes: *"Happy to own 2.17 ETH at $2,300 on 30
-     October?"* A yes to the yield is not a yes to this. Derive settles in cash;
-     Butler buys the asset after settlement only if they ask for that now.
+3. [ADAPT] Offer it using **only** quote fields; never compute a number (the
+   references map each field to a sentence):
+   - **Sell:** `bad_case` first, then `net_premium_usd`, `fee_usd`, the lock to
+     `expiry`; `apr_pct` last. Then, on its own: *"Happy to own 0.13 ETH at $2,200 on
+     30 October?"* A no or a vague answer ends it: no other strike, tenor or asset.
+     Butler buys the asset afterwards only if they ask now.
    - **Buy:** not yield; `max_cost_usd` is the most they pay and can lose, all of it;
-     `breakeven` is where it pays at expiry, and it loses value while the price stands
-     still. Get an explicit yes to *"you can lose the whole $199.54"*.
+     `breakeven` is where it pays at expiry. Get an explicit yes to *"you can lose the whole $199.54"*.
    - **Close (sell back):** `net_proceeds_usd` now, against what they paid (the duty's
-     PREMIUM_USD); they agree the floor (`min_proceeds_usd` unless they name one).
+     PREMIUM_USD); `warnings` as written. Ask the floor; `min_proceeds_usd` is the
+     suggestion.
    - **Close (buy back):** `total_cost_usd` now, then `result_usd`: what the note made
-     or lost once bought back; `warnings` as written; it frees `frees`. They agree the
-     ceiling (`max_cost_usd` unless they name one). Waiting for expiry costs nothing;
+     or lost once bought back; `warnings` as written; it frees `frees`. Ask the
+     ceiling; `max_cost_usd` is the suggestion. Waiting for expiry costs nothing;
      say so when `result_usd` is negative.
 
-4. [FIXED] Fund a sell or a buy only when `freeForNewPutsUsd` is below
+4. [FIXED] With all four met, fund a sell or a buy only when `freeForNewPutsUsd` is below
    `collateral.amount` (sell) or `max_cost_usd` (buy). Deposit the shortfall plus 2% for
    the bridge fee and its 1% slippage bound, rounded up, and **never under $6**. Say
    the bridge fee comes out of the amount:
@@ -100,13 +112,12 @@ Money commands need Butler's server signer and run from chat only, never a duty.
    ```
 
    The trade bot gathers USDC from **whichever chains hold it** (`references/venue.md`):
-   never judge a deposit by one chain's balance. Add `--from 1` only when
-   `ethereum.usdc` already covers it: the bot does not gather from Ethereum ($5
-   minimum). Never ask about gas or an address. Re-read `acp options account` until
+   never judge a deposit by one chain's balance. `--from 1` only when `ethereum.usdc`
+   covers it alone. Never ask about gas or an address. Re-read `acp options account` until
    free USDC covers the trade; if it ends short, re-quote smaller and re-offer.
 
-5. [FIXED] Quote again if `valid_until` (60 s) has passed, then file the one command for the
-   intent, with the quote's own fields:
+5. [FIXED] Run the quote again now, after their last answer. With all four met, file
+   the one command, with that quote's fields and the bound they agreed:
 
    ```sh
    acp options open --instrument <instrument> --size <size> --min-premium <min_premium_usd> --max-collateral <collateral.amount> --idempotency-key <KEY>:open
@@ -125,10 +136,9 @@ Money commands need Butler's server signer and run from chat only, never a duty.
    bevo-read request <KEY>:<OP> --route options
    ```
 
-   `approvalStatus: confirmed` - `approvalOutcome` holds the fill: open
-   `filledSize`, `netPremiumUsd`, `collateral`; buy `filledSize`, `totalCostUsd`;
-   close `direction` (`sell_back` / `buy_back`), `filledSize`, `netProceedsUsd` or
-   `totalCostUsd`. A fill can be partial. `failed` or `rejected` - nothing traded;
+   `approvalStatus: confirmed` - `approvalOutcome` holds the fill, maybe partial:
+   `filledSize`, plus open `netPremiumUsd`, `collateral`; buy `totalCostUsd`; close
+   `direction`, `netProceedsUsd` or `totalCostUsd`. `failed` or `rejected` - nothing traded;
    give `approvalFailureReason` as written. `pending` or `signed` - still waiting.
 
 7. [FIXED] Only on `confirmed`, keep the lifecycle duty in step, numbers from
@@ -136,17 +146,15 @@ Money commands need Butler's server signer and run from chat only, never a duty.
 
    ```json
    {"recipe": "options-lifecycle@4", "triggers": [{"kind": "timer", "intervalSeconds": 900}],
-    "params": {"INSTRUMENT": "SOL-20261030-160-C", "PRODUCT": "long_call", "UNDERLYING": "SOL",
-    "STRIKE": 160, "SIZE": 2, "PREMIUM_USD": 19.03, "COLLATERAL_USD": 0}}
+    "params": {"INSTRUMENT": "<instrument>", "PRODUCT": "<product>", "UNDERLYING": "<prefix>",
+    "STRIKE": <strike>, "SIZE": <filledSize>, "PREMIUM_USD": <usd>, "COLLATERAL_USD": <usd>}}
    ```
 
    Sold put: PRODUCT `cash_secured_put`, PREMIUM_USD `netPremiumUsd`, COLLATERAL_USD
    `collateral`. Bought: PRODUCT `long_call` or `long_put`, PREMIUM_USD `totalCostUsd`,
    COLLATERAL_USD 0. Always SIZE `filledSize`, STRIKE `strike`, UNDERLYING the
-   instrument's prefix. Only if they
-   asked in step 3 to own the asset after an assigned put: `DELIVER_ASSET: true` with
-   TOKEN_ID, the token to buy: ETH is `native:8453`; BTC is the verified, non-stock Base
-   row of `bevo-read token-search BTC` as `<address>:8453` (ask if two fit). After a close,
+   instrument's prefix. `DELIVER_ASSET` and its TOKEN_ID only if they asked in step 3
+   (`references/selling.md`). After a close,
    `duty_delete` that instrument's duty; if part is still open, file it again with SIZE
    from `positions` (positive) and PREMIUM_USD and COLLATERAL_USD scaled to it. Never
    file for an unknown or failed trade.
@@ -175,35 +183,31 @@ account` and wait. The `:home` leg is `acp trade`: look it up with `--route trad
 | Outcome | What to do |
 | --- | --- |
 | Nothing `tradeable` | Say nothing is worth doing today and why. Never loosen a gate. |
-| `no live bid` / `no live ask` | Nobody is trading it now. Another strike, expiry or asset, or stop. |
+| `no live bid` / `no live ask` | Opening: another strike, expiry or asset, or stop. Closing: nobody bids for theirs now; holding costs nothing. |
 | `vol points wide`, `paying N% over fair value` | A poor price; say so, never trade it. |
 | `fees are N% of the premium` | Too small or too short. Offer monthly or bigger. |
 | `collateral too small`, `budget too small` | Under Derive's minimum. Give the figure from the reason. |
-| `OPTIONS_SIGNER_NOT_READY` | The signer must be enabled first; nothing filed. |
-| `OPTIONS_CHAT_ONLY` | A duty tried a money command; only chat trades. |
+| `OPTIONS_SIGNER_NOT_READY`, `OPTIONS_CHAT_ONLY` | Nothing filed: enable the signer; only chat trades. |
 | `OPTIONS_BOUNDS_MISMATCH` | Re-quote; never raise a bound past what the owner agreed. |
-| No fill (open, buy or close) | Nothing traded, spent or locked: the price moved past the bound. Re-quote and re-offer; never move the bound quietly. |
+| No fill (open, buy or close) | Nobody took it at the agreed bound; never call it no liquidity. Nothing moved. Re-quote, re-ask, never re-file the same bound. |
 | Buy failed over `--max-cost` | Give the reason as written, then read `positions`: anything shown there was bought. Never buy again. |
 | Not enough free USDC | Fund (step 4) or re-quote smaller. |
-| Close larger than held, or the wrong bound | Refused, nothing done. Re-read `positions`: positive sells back (`--min-proceeds`), negative buys back (`--max-cost`). |
-| Deposit refused, failed or partial | Give the reason as written (a short wallet lists its USDC per chain); re-read the account before any new deposit. Never move funds between chains to fix it. |
+| Close larger than held, or the wrong bound | Refused, nothing done. Re-read `positions`: positive sells back, negative buys back. |
+| Deposit refused, failed or partial | Give the reason as written; re-read the account before any new deposit. Never move funds between chains to fix it. |
 | Withdraw or `:home` failed | Give the reason as written, and stop (`only $N is free`: the rest backs sold puts). |
-| `OPTIONS_BAD_COMMAND` | Malformed or under a minimum; nothing filed. |
-| Card swept after 30 minutes | Failed unsigned; re-quote before offering again. |
+| `OPTIONS_BAD_COMMAND` | Malformed or under a minimum; none filed. |
+| Card swept after 30 minutes | Unsigned; re-quote before offering again. |
 | Derive or the account unreachable | Say Butler cannot see it now; guess nothing. |
 
 ## Limits
 
-- Selling: cash-secured puts only, fully collateralised, locked until expiry or
-  bought back. Buying: one call or put, paid in full, nothing borrowed; close any time
-  the book bids. No spreads, leverage or covered calls; no rolling without a fresh yes.
+- Selling locks collateral until expiry or a buy-back; buying is paid in full, nothing
+  borrowed. No rolling without a fresh yes.
 - **Monthly by default**; weeklies lose too much to fees and the spread.
 - **Cash settled** in USDC, never the asset; it stays on Derive until withdrawn.
-- Prices are the public book; a quote is the worst case. Not advice: never rank,
-  never recommend.
+- Not advice: never rank or recommend.
 
 ## Say to the owner
 
 Worked sentences for each case end `references/selling.md`, `references/buying.md` and
 `references/account.md`.
-Close: "Selling back now gets about $178.73 after fees, against $190.03 you paid."
