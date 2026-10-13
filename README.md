@@ -26,7 +26,7 @@ Four intents on [Derive](https://derive.xyz)'s options market:
   and can lose all of it; the skill gets an explicit yes to that number.
 - **Close**: before expiry, sell back an option the owner bought, or buy back a note
   they sold. Buying back frees the collateral and can cost more than the premium.
-- **Check or withdraw**: read the Derive account (free USDC and positions) from `acp
+- **Look or withdraw**: read the Derive account (free USDC and positions) from `acp
   options account`, never from `bevo-read assets`, and withdraw free USDC to the owner's
   wallet on Ethereum.
 

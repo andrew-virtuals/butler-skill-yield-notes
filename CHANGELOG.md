@@ -2,12 +2,11 @@
 
 ## 2.3.0
 
-- **Check or withdraw** is a fourth intent. "My free USDC on Derive", "my Derive
-  positions" and "withdraw my free USDC" now route here: new keywords (`derive`,
-  `derive positions`, `my option positions`, `withdraw from derive`, `withdraw my free
-  usdc`) and a description that names checking and withdrawing, so an installed skill
-  is picked for them too. A butler had answered "withdraw my free USDC" with an `acp
-  trade` from the wallet to the owner's own address, which moved nothing and cost a fee.
+- Routes more check and withdraw asks here, on top of 2.2.1's **Look or withdraw**:
+  keywords `derive positions`, `my option positions`, `withdraw from derive`, `withdraw
+  my free usdc`, and a description that names checking and withdrawing, so an installed
+  skill is picked for them too. "Free USDC" is Derive's `freeForNewPutsUsd`, not wallet
+  cash; a look is step 1 and then stop.
 - The Derive portfolio comes from `acp options account` and only from it. `bevo-read
   assets` has no Derive section: its `perps` is Hyperliquid and its `cashUsd` the wallet.
   A butler had reported Derive as empty from Hyperliquid's $0 while the account held
@@ -19,6 +18,16 @@
   a check, the withdrawal rules, and worked sentences.
 - Some wording in steps 4 to 7 is shorter, with the same rules, to keep the body under the
   hub's 12,000-character limit.
+
+## 2.2.1
+
+- A fourth case, **Look or withdraw**: "what's my free USDC in Derive", "list my
+  positions", "withdraw my free USDC" are answered from `acp options account` and
+  step 8. Derive money is never in `bevo-read assets`, and a withdrawal is `acp
+  options withdraw`, never an `acp trade`. Seen live: asked to withdraw, an agent
+  without this skill loaded traded Base USDC for Base USDC and called it done, then
+  read Hyperliquid's $0 as the Derive balance. Keywords gain `withdraw`, `derive`,
+  `options account`, `options positions`, `free usdc`.
 
 ## 2.2.0
 
