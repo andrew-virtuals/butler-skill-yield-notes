@@ -33,6 +33,10 @@
   and is re-quoted, never re-filed at the same floor. Seen in testing: three
   sell-backs at a $4.05 floor above the bid failed and were reported as zero
   liquidity. `no live bid` on a close says holding to expiry costs nothing.
+- Step 5 opens with "run the quote again now, after their last answer", and selling
+  quotes the asset the owner named, screening only when they named none. Found by
+  replaying the test prompts against this skill: an agent filed from its pre-answer
+  quote, and one screened every asset after the owner had said ETH.
 - Step 7's `duty_create` example uses placeholders; an agent had taken its real-looking
   `SOL-20261030-160-C` for a holding and tried to close it. The `DELIVER_ASSET` token
   rules moved to `selling.md`; SKILL.md trims repeated limits and funding detail
