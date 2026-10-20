@@ -4,7 +4,8 @@
 
 - **Derive on the wallet's Platforms tab.** After a confirmed `acp options deposit`, and
   in step 1 whenever `account.exists`, the skill files the new `derive-account@1` duty
-  once, if `duty_list` has none (new step 9). That duty keeps one Platforms row at what
+  once, if `duty_list` has none (new step 9; step 4 sends a deposit there once it
+  lands, so the watcher is filed in the same turn). That duty keeps one Platforms row at what
   the account is worth, every 10 minutes, and tells the owner when a deposit lands.
   Butler never writes its own Derive watcher and never runs `bevo-platforms set` for
   Derive: the duty owns the row. Butler itself no longer explains `acp options` and

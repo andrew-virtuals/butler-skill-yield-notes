@@ -111,7 +111,8 @@ this chat. One missing: ask, and file nothing this turn.
    The trade bot gathers USDC from **whichever chains hold it** (`references/venue.md`):
    never judge a deposit by one chain's balance. `--from 1` only when `ethereum.usdc`
    covers it alone. Never ask about gas or an address. Re-read `acp options account` until
-   free USDC covers the trade; if it ends short, re-quote smaller and re-offer.
+   free USDC covers the trade, and do step 9; if it ends short, re-quote smaller and
+   re-offer.
 
 5. [FIXED] Run the quote again now, after their last answer. With all four met, file
    the one command, with that quote's fields and the bound they agreed:
@@ -176,8 +177,8 @@ this chat. One missing: ask, and file nothing this turn.
    {"recipe": "derive-account@1", "title": "Derive account", "triggers": [{"kind": "timer", "intervalSeconds": 600}]}
    ```
 
-   It alone keeps Derive's row on the wallet's Platforms tab: never write your own
-   Derive watcher or run `bevo-platforms set` for Derive.
+   It alone keeps Derive's Platforms row: never write your own Derive watcher or run
+   `bevo-platforms set` for Derive.
 
 ## Idempotency and retries
 
