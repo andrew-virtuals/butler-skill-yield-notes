@@ -1,5 +1,33 @@
 # Changelog
 
+## 2.4.0
+
+- **Derive on the wallet's Platforms tab.** After a confirmed `acp options deposit`, and
+  in step 1 whenever `account.exists`, the skill files the new `derive-account@1` duty
+  once, if `duty_list` has none (new step 9). That duty keeps one Platforms row at what
+  the account is worth, every 10 minutes, and tells the owner when a deposit lands.
+  Butler never writes its own Derive watcher and never runs `bevo-platforms set` for
+  Derive: the duty owns the row. Butler itself no longer explains `acp options` and
+  follows a skill's own steps for a platform row (virtuals-agent#218).
+- **Every duty has a `"title"`.** The container refuses a create without one, and step 7's
+  JSON had none.
+- **A second duty from the same template in one chat** names the earlier ones in
+  `"alongside"`, or the container refuses it as a follow-up. A duty from another template,
+  like the account watcher beside a per-position one, needs none.
+- **The duty templates live here now**, under `templates/`, beside the skill that files
+  them: `options-lifecycle` (moved from the deprecated `butler-skill-options-lifecycle`)
+  and the new `derive-account`. The hub lists each with a `path` into this repo.
+- Step 7 files `options-lifecycle@6` (was `@4`): an option closed early ends the duty
+  whenever it was closed (`@5`), and its Duties row shows a status line (`@6`).
+- `account.md`: the Platforms row belongs to the watcher duty and catches up within
+  about 10 minutes, so a row behind the read is that delay.
+- SKILL.md stays under 12,000 characters by dropping lines that say again what is said
+  elsewhere: the failure rows "not enough free USDC" (step 4), "close larger than held"
+  (the "they hold it" gate and step 2) and "Derive unreachable" (step 1 and
+  `account.md`); step 1's field list, the position sign and Look's `summary` / `pnlUsd`
+  (all in `account.md`); "buying back can cost more" (step 3's `result_usd`); and the
+  withdrawal's route detail in step 8 (`account.md`).
+
 ## 2.3.2
 
 - **Sizes are in the asset.** 1 contract is 1 ETH: 0.16 is 0.16 ETH, and Derive's 0.1

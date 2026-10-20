@@ -46,7 +46,8 @@ helper and gets back a quote object with every number fixed, including the bound
 | Closing | `acp options close --min-proceeds` or `--max-cost` | Approval card; an IOC `reduce_only` limit sell of a bought position, or limit buy of a sold one. |
 | Outcome | `bevo-read request <key> --route options` | `approvalStatus`, plus `approvalOutcome` (`filledSize`, `netPremiumUsd` / `totalCostUsd` / `netProceedsUsd`, …) or `approvalFailureReason`. |
 | Withdrawing | `acp options withdraw`, then `acp trade` back to Base | Approval cards. |
-| Watching to expiry | the `options-lifecycle@4` duty template | Filed only when `approvalStatus` is `confirmed`, from `approvalOutcome`: `cash_secured_put`, `long_call` or `long_put`. Deleted after a confirmed close. |
+| Watching to expiry | the `options-lifecycle@6` duty template, `templates/options-lifecycle/` | Filed only when `approvalStatus` is `confirmed`, from `approvalOutcome`: `cash_secured_put`, `long_call` or `long_put`. Deleted after a confirmed close. |
+| Platforms row | the `derive-account@1` duty template, `templates/derive-account/` | One per owner, filed once the account exists or a deposit is confirmed. Sole writer of Derive's row on the wallet's Platforms tab, and the only deposit-landed note. |
 
 The rail contract is bevo-server's `docs/derive-options.md`. bevo-server is the only
 thing that signs: there is no session key and nothing in this repo touches a key.
@@ -111,8 +112,34 @@ This needs a hub validator that knows the `acp options` group, including `buy` a
 `close` as money commands (butler-skills branch `feat/options-buy-close` until it
 merges); an older one does not count them as money.
 
+The duty templates are checked one folder at a time, with their own unit tests:
+
+```sh
+python3 validate.py --standalone templates/options-lifecycle
+python3 validate.py --standalone templates/derive-account
+python3 -m unittest discover -s templates/options-lifecycle/tests
+python3 -m unittest discover -s templates/derive-account/tests
+```
+
+## Duty templates
+
+`templates/` holds the duty templates this skill files, each a complete template
+(`recipe.json`, `duty.py`, `README.md`, plus `CHANGELOG.md` and `tests/`):
+
+- `templates/options-lifecycle/`: one per option, from the fill to the outcome. It
+  moved here from `butler-skill-options-lifecycle`, which is deprecated; its history
+  up to `@6` is in that repo.
+- `templates/derive-account/`: one per owner, the Derive row on the wallet's Platforms
+  tab.
+
+The hub lists each in `templates.json` with this repo, a ref and a `path` to its folder.
+A template's `version` is its own integer, separate from the skill's semver; a changed
+template needs a bump and a `CHANGELOG.md` entry in its folder.
+
 ## Releasing
 
 Bump `version` in `SKILL.md`, add the `CHANGELOG.md` entry, merge to `main`. A
 published `name@version` is immutable. Listing a skill is maintainer-only; 2.0.0 is a
 new name, so it is a new listing, and `yield-notes` should be de-listed with it.
+The templates are released from the same tag as the skill: their `templates.json`
+entries follow it with their `path`.
