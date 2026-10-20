@@ -1,7 +1,7 @@
 ---
 name: options-trading
 description: Trade options on Derive - earn on idle USDC by selling cash-secured puts, buy a call or a put, close before expiry, and check or withdraw Derive USDC and positions.
-version: 2.3.2
+version: 2.4.0
 metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","withdraw","withdraw my usdc","derive","my options","options account","options positions","free usdc","derive positions","my option positions","withdraw from derive","withdraw my free usdc"],"requires":{"bins":["python3","bevo-read","acp"]}}}
 ---
 
@@ -16,11 +16,10 @@ Your owner wants one of four things on Derive's options market:
   Not yield: they pay up front and can lose all of it (`references/buying.md`).
 - **Close** - before expiry: "sell my call back" **sells back** an option they
   **bought**; "get out of my put", "free my collateral" **buys back** a note they
-  **sold**. Buying back can cost more than the note brought in.
-- **Look or withdraw** - "what's my free USDC in Derive" (`freeForNewPutsUsd`, not
-  wallet cash), "list my positions" (each `summary`; up or down: `pnlUsd`): step 1,
-  then stop. "Withdraw my free USDC":
-  step 8, `acp options withdraw`, never an `acp trade` (`references/account.md`).
+  **sold**.
+- **Look or withdraw** - "my free USDC in Derive" (`freeForNewPutsUsd`, not wallet
+  cash), "my positions": step 1, then stop. "Withdraw my free USDC": step 8, never an
+  `acp trade` (`references/account.md`).
 
 Not this skill: covered calls, spreads, leverage, or a trade the helper refuses.
 
@@ -64,10 +63,9 @@ this chat. One missing: ask, and file nothing this turn.
    bevo-read assets
    ```
 
-   `signerReady: false` - stop: the owner must enable Butler's signer first. Note
-   `account.freeForNewPutsUsd` (`exists: false` is no account yet),
-   `account.positions` (positive `size` = bought, negative = sold) and `ethereum.usdc`
-   (`references/account.md`). An unreadable account is not an empty one.
+   `signerReady: false` - stop: the owner must enable Butler's signer first. Fields:
+   `references/account.md`. An unreadable account is not an empty one. On
+   `exists: true`, step 9.
 
 2. [FIXED] Write the script in `references/helper.md` to `/tmp/derive_helper.py`.
    Quote with the line for the intent; the strike is a rule, never your number:
@@ -113,7 +111,8 @@ this chat. One missing: ask, and file nothing this turn.
    The trade bot gathers USDC from **whichever chains hold it** (`references/venue.md`):
    never judge a deposit by one chain's balance. `--from 1` only when `ethereum.usdc`
    covers it alone. Never ask about gas or an address. Re-read `acp options account` until
-   free USDC covers the trade; if it ends short, re-quote smaller and re-offer.
+   free USDC covers the trade, and do step 9; if it ends short, re-quote smaller and
+   re-offer.
 
 5. [FIXED] Run the quote again now, after their last answer. With all four met, file
    the one command, with that quote's fields and the bound they agreed:
@@ -144,7 +143,8 @@ this chat. One missing: ask, and file nothing this turn.
    `approvalOutcome`, never the quote. After an open or a buy, `duty_create`:
 
    ```json
-   {"recipe": "options-lifecycle@4", "triggers": [{"kind": "timer", "intervalSeconds": 900}],
+   {"recipe": "options-lifecycle@6", "title": "Watch {INSTRUMENT} to expiry",
+    "triggers": [{"kind": "timer", "intervalSeconds": 900}],
     "params": {"INSTRUMENT": "<instrument>", "PRODUCT": "<product>", "UNDERLYING": "<prefix>",
     "STRIKE": <strike>, "SIZE": <filledSize>, "PREMIUM_USD": <usd>, "COLLATERAL_USD": <usd>}}
    ```
@@ -153,20 +153,32 @@ this chat. One missing: ask, and file nothing this turn.
    `collateral`. Bought: PRODUCT `long_call` or `long_put`, PREMIUM_USD `totalCostUsd`,
    COLLATERAL_USD 0. Always SIZE `filledSize`, STRIKE `strike`, UNDERLYING the
    instrument's prefix. `DELIVER_ASSET` and its TOKEN_ID only if they asked in step 3
-   (`references/selling.md`). After a close,
-   `duty_delete` that instrument's duty; if part is still open, file it again with SIZE
-   from `positions` (positive) and PREMIUM_USD and COLLATERAL_USD scaled to it. Never
-   file for an unknown or failed trade.
+   (`references/selling.md`). After a close, `duty_delete` that instrument's duty; if
+   part is still open, file it again with SIZE from `positions` (positive) and
+   PREMIUM_USD and COLLATERAL_USD scaled to it. Never file for an unknown or failed
+   trade. Every `duty_create` needs a `"title"`. A second `options-lifecycle` duty in
+   one chat needs `"alongside": [<this chat's earlier ones' names>]`; step 9's needs
+   none.
 
 8. [FIXED] Withdraw only when asked, only free USDC: at most this turn's
-   `freeForNewPutsUsd`, rounded down to the cent. It pays to the owner's wallet on
-   Ethereum in about 20 minutes, less up to $1 (say so first); bringing it to Base is
-   a second card once it shows in `ethereum.usdc`:
+   `freeForNewPutsUsd`, rounded down to the cent. It lands on Ethereum in about 20
+   minutes, less up to $1 (say so first); `:home` brings it to Base once it shows in
+   `ethereum.usdc`:
 
    ```sh
    acp options withdraw --amount <USDC> --idempotency-key <KEY>:withdraw
    acp trade --token-in usdc --chain-in 1 --amount-in <USDC_ARRIVED> --token-out usdc --chain-out 8453 --idempotency-key <KEY>:home
    ```
+
+9. [FIXED] On `exists: true` or a `confirmed` deposit, if `duty_list` has no
+   `derive-account` duty, `duty_create` it once:
+
+   ```json
+   {"recipe": "derive-account@1", "title": "Derive account", "triggers": [{"kind": "timer", "intervalSeconds": 600}]}
+   ```
+
+   It alone keeps Derive's Platforms row: never write your own Derive watcher or run
+   `bevo-platforms set` for Derive.
 
 ## Idempotency and retries
 
@@ -190,13 +202,10 @@ account` and wait. The `:home` leg is `acp trade`: look it up with `--route trad
 | `OPTIONS_BOUNDS_MISMATCH` | Re-quote; never raise a bound past what the owner agreed. |
 | No fill (open, buy or close) | Nobody took it at the agreed bound; never call it no liquidity. Nothing moved. Re-quote, re-ask, never re-file the same bound. |
 | Buy failed over `--max-cost` | Give the reason as written, then read `positions`: anything shown there was bought. Never buy again. |
-| Not enough free USDC | Fund (step 4) or re-quote smaller. |
-| Close larger than held, or the wrong bound | Refused, nothing done. Re-read `positions`: positive sells back, negative buys back. |
 | Deposit refused, failed or partial | Give the reason as written; re-read the account before any new deposit. Never move funds between chains to fix it. |
 | Withdraw or `:home` failed | Give the reason as written, and stop (`only $N is free`: the rest backs sold puts). |
 | `OPTIONS_BAD_COMMAND` | Malformed or under a minimum; none filed. |
 | Card swept after 30 minutes | Unsigned; re-quote before offering again. |
-| Derive or the account unreachable | Say Butler cannot see it now; guess nothing. |
 
 ## Limits
 
@@ -208,5 +217,4 @@ account` and wait. The `:home` leg is `acp trade`: look it up with `--route trad
 
 ## Say to the owner
 
-Worked sentences for each case end `references/selling.md`, `references/buying.md` and
-`references/account.md`.
+Worked sentences end each file in `references/`.

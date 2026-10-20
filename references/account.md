@@ -46,6 +46,16 @@ A position is not cash. A bought option turns into USDC only when it is sold bac
 or settles in the money; a sold put's collateral frees up only when it settles or is
 bought back.
 
+## The Platforms row
+
+The wallet page shows Derive as one row on its Platforms tab, with no separate options line
+in the wallet total. That row belongs to the `derive-account` duty (step 9), which reads the
+account every 10 minutes and also tells the owner when a deposit lands. Butler never writes
+the row itself: no `bevo-platforms set` for Derive, and no Derive watcher of its own.
+
+The row catches up within about 10 minutes of a deposit, trade, withdrawal or settlement.
+A row behind this turn's read is that delay, not a discrepancy: answer from the read.
+
 ## A withdrawal
 
 "Withdraw my free USDC" means out of Derive, to the owner's wallet. It is `acp options
