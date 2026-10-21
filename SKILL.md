@@ -1,7 +1,7 @@
 ---
 name: options-trading
 description: Trade options on Derive - earn on idle USDC by selling cash-secured puts, buy a call or a put, close before expiry, and check or withdraw Derive USDC and positions.
-version: 2.4.0
+version: 2.5.0
 metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","withdraw","withdraw my usdc","derive","my options","options account","options positions","free usdc","derive positions","my option positions","withdraw from derive","withdraw my free usdc"],"requires":{"bins":["python3","bevo-read","acp"]}}}
 ---
 
@@ -108,11 +108,11 @@ this chat. One missing: ask, and file nothing this turn.
    acp options deposit --amount <DEPOSIT_USDC> --idempotency-key <KEY>:deposit
    ```
 
-   The trade bot gathers USDC from **whichever chains hold it** (`references/venue.md`):
-   never judge a deposit by one chain's balance. `--from 1` only when `ethereum.usdc`
-   covers it alone. Never ask about gas or an address. Re-read `acp options account` until
-   free USDC covers the trade, and do step 9; if it ends short, re-quote smaller and
-   re-offer.
+   The bot gathers USDC from **every chain**, not one (`references/venue.md`).
+   `--from 1` only when `ethereum.usdc` covers it alone. Never ask about gas or an
+   address. Re-read `acp options account` until free USDC covers the trade, and do step
+   9; if it ends short, re-quote smaller and re-offer. Free USDC spans their Derive
+   accounts: the server moves it (`account.md`).
 
 5. [FIXED] Run the quote again now, after their last answer. With all four met, file
    the one command, with that quote's fields and the bound they agreed:
@@ -124,8 +124,8 @@ this chat. One missing: ask, and file nothing this turn.
    acp options close --instrument <instrument> --size <size> --max-cost <AGREED_CEILING> --idempotency-key <KEY>:close
    ```
 
-   A close takes one bound: `--min-proceeds` sells back, `--max-cost` buys back. The
-   reply is an approval card, not a fill: tell the owner to approve it in the app.
+   One bound per close. The reply is an approval card, not a fill: tell the owner to
+   approve it in the app.
 
 6. [FIXED] Wait for the outcome; never re-run the command to find it. The server nudges
    you here when the card lands. Then:
@@ -136,7 +136,8 @@ this chat. One missing: ask, and file nothing this turn.
 
    `approvalStatus: confirmed` - `approvalOutcome` holds the fill, maybe partial:
    `filledSize`, plus open `netPremiumUsd`, `collateral`; buy `totalCostUsd`; close
-   `direction`, `netProceedsUsd` or `totalCostUsd`. `failed` or `rejected` - nothing traded;
+   `direction`, `netProceedsUsd` or `totalCostUsd`; `funding`: USDC moved first, say so.
+   `failed` or `rejected` - nothing traded;
    give `approvalFailureReason` as written. `pending` or `signed` - still waiting.
 
 7. [FIXED] Only on `confirmed`, keep the lifecycle duty in step, numbers from
