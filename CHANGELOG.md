@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.5.0
+
+- **Options outside ETH and BTC trade.** Derive splits its markets into risk universes
+  (PRIME: ETH, BTC; ALT: SOL, XRP, ADA, ZEC…; MIDCAP: HYPE; RWA: gold), and an account
+  trades only its own. Every SOL attempt failed as `Zero liquidity … (11009)` because the
+  owner's only account was PRIME. Butler's server now opens the owner's account in the
+  option's universe on first use and moves just the USDC a trade needs into it after the
+  card is approved (bevo-server: risk-universe funding). The skill files the same commands;
+  it does not move funds itself.
+- `account.md`: free USDC and positions total every Derive account, `account.accounts`
+  lists each, and a new section says what the server moves and when, and what to tell
+  the owner (`funding` in the outcome, the card's `Account` line). Withdrawals take the
+  total; the server gathers it first.
+- `venue.md`: one subaccount per risk universe, and why the wrong one says 11009.
+- SKILL.md: step 4 says free USDC spans the accounts and the server moves it; step 6
+  relays `funding`; step 5's one-bound line shortened to stay under 12,000 characters.
+
 ## 2.4.0
 
 - **Derive on the wallet's Platforms tab.** After a confirmed `acp options deposit`, and

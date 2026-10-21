@@ -19,10 +19,11 @@ back to `bevo-read assets`, and never report an unreadable account as empty.
 | --- | --- |
 | `signerReady` | `false`: Butler's signer is not enabled, so nothing can be filed. Reads still answer. |
 | `account.exists` | `false`: no Derive account yet. The first deposit creates it. |
-| `account.usdc` | All USDC in the account: free plus locked. |
+| `account.usdc` | All USDC on Derive, across every account below: free plus locked. |
 | `account.lockedForPutsUsd` | USDC backing sold puts. It cannot leave until the put settles or is bought back. |
-| `account.freeForNewPutsUsd` | **Free USDC**: what can be withdrawn, or spent on a new sell or buy. |
-| `account.positions` | One row per open option. `size` positive = bought, negative = sold, in the asset: 0.16 is 0.16 ETH (`sizeUnit`; `contractSize` is 1: one contract is 1 ETH). |
+| `account.freeForNewPutsUsd` | **Free USDC**, across every account: what can be withdrawn, or spent on a new sell or buy. |
+| `account.accounts` | Each Derive account on its own (below): `universe`, `usdc`, `freeForNewPutsUsd`, `positions`. Only for a question about one of them; answer totals from the fields above. |
+| `account.positions` | One row per open option, from every account. `size` positive = bought, negative = sold, in the asset: 0.16 is 0.16 ETH (`sizeUnit`; `contractSize` is 1: one contract is 1 ETH). |
 | `positions[].summary` | The position in one owner-ready line: size, strike, expiry and how long is left, what it cost, its worth at mark, up or down. Relay it as written. |
 | `positions[].valueUsd`, `costUsd`, `pnlUsd` | Worth at mark, what it cost (or received, if sold), and up (positive) or down. |
 | `positions[].markPerUnitUsd`, `entryPricePerUnitUsd` | Prices **per 1 ETH**, never what the position is worth: that is `valueUsd`. |
@@ -46,6 +47,26 @@ A position is not cash. A bought option turns into USDC only when it is sold bac
 or settles in the money; a sold put's collateral frees up only when it settles or is
 bought back.
 
+## More than one Derive account
+
+Derive keeps its markets in separate groups ("risk universes"), and an account trades only
+its own group: **PRIME** (ETH, BTC), **ALT** (SOL, XRP, ADA, ZEC and others), **MIDCAP**
+(HYPE), **RWA** (gold). Deposits land in PRIME. A SOL option needs the owner's ALT account.
+
+Butler's server handles this after the owner approves the card, never you:
+
+- If that account holds less free USDC than the trade needs, the server moves **only the
+  gap** into it from their other Derive accounts, then trades. The first time, it opens
+  the account: at least $5 moves, and Derive charges a $1 fee for opening it. Moves
+  between accounts that already exist are free.
+- What is left over stays where it is; the next trade, or a withdrawal, moves it again.
+  So free USDC is the total across accounts: never ask the owner to move it, and never
+  deposit just because one account is short while the total covers the trade.
+- A card for such an option says so under `Account`, and a confirmed one reports
+  `funding: {movedUsd, createdAccount, universe}` in its outcome. Tell the owner.
+- A move that has not shown up when the trade runs trades nothing; the reason says the
+  USDC is still theirs. Re-read the account before anything else.
+
 ## The Platforms row
 
 The wallet page shows Derive as one row on its Platforms tab, with no separate options line
@@ -62,7 +83,8 @@ A row behind this turn's read is that delay, not a discrepancy: answer from the 
 withdraw` (step 8), never an `acp trade` from the wallet to the owner's own address: that
 moves nothing and still costs a fee.
 
-- The amount is at most this turn's `freeForNewPutsUsd`, rounded down to the cent. "All
+- The amount is at most this turn's `freeForNewPutsUsd` (the total across accounts; the
+  server gathers it into one before paying out), rounded down to the cent. "All
   of it" is that figure. Butler's server refuses more with `only $N is free; the rest
   backs open notes until they settle`.
 - It pays to the owner's wallet on **Ethereum**, about 20 minutes later, less a fee of up
@@ -79,6 +101,9 @@ Oct 2026 (in 10 days), paid $5.49, worth $3.31 at mark, down $2.18; …"
 
 Nothing free: "All $250 on Derive is backing your ETH put until it settles on 30 October.
 Buying it back would free it now."
+
+Moved first: "To buy the SOL call, $45 moved from your main Derive account into a new SOL
+account (Derive charged $1 to open it). Bought 0.5 SOL-20261106-116-C for $5.63."
 
 Withdraw: "Withdrawing $1.61 from Derive: it reaches your wallet on Ethereum in about 20
 minutes, less a fee of up to $1, so as little as $0.61 may arrive."

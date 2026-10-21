@@ -19,6 +19,13 @@ spread or a depth: those move by the hour.
 
 - **The owner's wallet is the account.** No smart-contract wallet, no account to
   create: the first deposit creates it, with a subaccount.
+- **One subaccount per risk universe.** Derive splits its markets into risk universes,
+  each with its own subaccounts, and rejects a trade between two (from the wrong one it
+  says `Zero liquidity for market or IOC/FOK order (11009)`, whatever the book holds):
+  PRIME (ETH, BTC), ALT (SOL, XRP, ADA, ZEC, …), MIDCAP (HYPE), RWA (XAUT). Deposits land
+  in PRIME; Butler's server moves the USDC a trade needs into the right one after approval
+  (`account.md`). Live list: `public/get_risk_universes`; an option's universe is its
+  `risk_universe_id`.
 - Deposits and withdrawals happen on **Ethereum L1**, in USDC. Derive gives each
   account its own deposit address there (`public/register_deposit_address`), and a
   keeper sweeps what lands in it.
@@ -118,7 +125,7 @@ so a quote here is the worst case.
 
 - **open** (sell): priced from the owner's minimum net premium plus the fee.
 - **buy**: refused unless free USDC (what is not backing a sold note) covers
-  `--max-cost`; priced at (max cost - fee) / size per contract, rounded down to the
+  `--max-cost`, in the option's own subaccount once the server has moved the gap there; priced at (max cost - fee) / size per contract, rounded down to the
   tick. After the fill, premium plus fee must be within the max cost.
 - **close**: never more than the account holds, always `reduce_only`, so the venue
   itself refuses to turn a close into a new position. With `--min-proceeds` it sells
