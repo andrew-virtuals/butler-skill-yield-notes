@@ -9,6 +9,12 @@ butler. Only `SKILL.md` and `references/**/*.md` reach one.
 hub's `skills.json` entry list it under the new name and repo. Until then this repo
 serves it.
 
+**Paradex (2.6.0).** A second venue on the same rail: `--venue paradex` on every helper
+and `acp options` line, `references/paradex.md` for what differs, `options-lifecycle@7`
+with `VENUE`. The helper reads Paradex's public API into Derive's field shapes, so one
+quote engine and one set of gates serve both. A Paradex withdrawal pays to the owner's
+wallet on Base through Layerswap, usually within a minute.
+
 **Status: v2.0.0, built for Derive v3 and the `acp options` rail.** Selling needs the
 hub validator that knows `acp options open|deposit|withdraw|account`; buying and
 closing need the one that also knows `acp options buy|close` (see "Validating a
@@ -48,6 +54,7 @@ helper and gets back a quote object with every number fixed, including the bound
 | Withdrawing | `acp options withdraw`, then `acp trade` back to Base | Approval cards. |
 | Watching to expiry | the `options-lifecycle@6` duty template, `templates/options-lifecycle/` | Filed only when `approvalStatus` is `confirmed`, from `approvalOutcome`: `cash_secured_put`, `long_call` or `long_put`. Deleted after a confirmed close. |
 | Platforms row | the `derive-account@1` duty template, `templates/derive-account/` | One per owner, filed once the account exists or a deposit is confirmed. Sole writer of Derive's row on the wallet's Platforms tab, and the only deposit-landed note. |
+| Platforms row, other venues | the `options-account@1` duty template (`VENUE`), `templates/options-account/` | One per owner and venue (Paradex today), filed the same way. Sole writer of that venue's row, with its positions listed; no notes. A new venue is a new `VENUE` value. |
 
 The rail contract is bevo-server's `docs/derive-options.md`. bevo-server is the only
 thing that signs: there is no session key and nothing in this repo touches a key.
@@ -117,8 +124,10 @@ The duty templates are checked one folder at a time, with their own unit tests:
 ```sh
 python3 validate.py --standalone templates/options-lifecycle
 python3 validate.py --standalone templates/derive-account
+python3 validate.py --standalone templates/options-account
 python3 -m unittest discover -s templates/options-lifecycle/tests
 python3 -m unittest discover -s templates/derive-account/tests
+python3 -m unittest discover -s templates/options-account/tests
 ```
 
 ## Duty templates
@@ -131,6 +140,9 @@ python3 -m unittest discover -s templates/derive-account/tests
   up to `@6` is in that repo.
 - `templates/derive-account/`: one per owner, the Derive row on the wallet's Platforms
   tab.
+- `templates/options-account/`: one per owner and venue (`VENUE`), that venue's row on
+  the Platforms tab; Paradex today. Its name and site come from bevo-server's account
+  read, so a new venue needs no new template.
 
 The hub lists each in `templates.json` with this repo, a ref and a `path` to its folder.
 A template's `version` is its own integer, separate from the skill's semver; a changed

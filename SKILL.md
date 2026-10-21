@@ -1,13 +1,13 @@
 ---
 name: options-trading
-description: Trade options on Derive - earn on idle USDC by selling cash-secured puts, buy a call or a put, close before expiry, and check or withdraw Derive USDC and positions.
-version: 2.5.0
-metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","withdraw","withdraw my usdc","derive","my options","options account","options positions","free usdc","derive positions","my option positions","withdraw from derive","withdraw my free usdc"],"requires":{"bins":["python3","bevo-read","acp"]}}}
+description: Trade options on Derive or Paradex - earn on idle USDC by selling cash-secured puts, buy a call or a put, close before expiry, and check or withdraw USDC and positions.
+version: 2.6.0
+metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","withdraw","withdraw my usdc","derive","my options","options account","options positions","free usdc","derive positions","my option positions","withdraw from derive","withdraw my free usdc","paradex","paradex options","paradex positions"],"requires":{"bins":["python3","bevo-read","acp"]}}}
 ---
 
 ## When to use
 
-Your owner wants one of four things on Derive's options market:
+Your owner wants one of four things on Derive's or Paradex's options market:
 
 - **Earn** - "earn on my USDC", "get paid to buy the dip": **sell** one cash-secured
   put, fully collateralised in USDC. They keep the premium and may end up buying the
@@ -38,6 +38,8 @@ Not this skill: covered calls, spreads, leverage, or a trade the helper refuses.
 5. **Derive figures come only from this turn's reads:** sizes, prices and positions
    from `acp options account` and quotes, never memory; a note that disagrees is wrong,
    so fix it. `bevo-read assets` has none.
+6. **Venue.** Derive, unless they name Paradex or hold it there: then add `--venue
+   paradex` everywhere (`references/paradex.md`, which also has its withdrawal).
 
 ### Never file without all four
 
@@ -71,9 +73,9 @@ this chat. One missing: ask, and file nothing this turn.
    Quote with the line for the intent; the strike is a rule, never your number:
 
    ```sh
-   python3 /tmp/derive_helper.py screen --tenor monthly --collateral <USD>
-   python3 /tmp/derive_helper.py quote --product cash_secured_put --underlying <ASSET> --collateral <USD> --tenor monthly --otm-pct 10
-   python3 /tmp/derive_helper.py quote --side buy --product <PRODUCT> --underlying <ASSET> --budget <USD> --tenor monthly --otm-pct 5
+   python3 /tmp/derive_helper.py screen --collateral <USD>
+   python3 /tmp/derive_helper.py quote --product cash_secured_put --underlying <ASSET> --collateral <USD>
+   python3 /tmp/derive_helper.py quote --side buy --product <PRODUCT> --underlying <ASSET> --budget <USD>
    python3 /tmp/derive_helper.py quote --side close --instrument <INSTRUMENT> --size <SIZE>
    python3 /tmp/derive_helper.py quote --side buyback --instrument <INSTRUMENT> --size <SIZE> --premium-received <USD>
    ```
@@ -144,9 +146,9 @@ this chat. One missing: ask, and file nothing this turn.
    `approvalOutcome`, never the quote. After an open or a buy, `duty_create`:
 
    ```json
-   {"recipe": "options-lifecycle@6", "title": "Watch {INSTRUMENT} to expiry",
+   {"recipe": "options-lifecycle@7", "title": "Watch {INSTRUMENT} to expiry",
     "triggers": [{"kind": "timer", "intervalSeconds": 900}],
-    "params": {"INSTRUMENT": "<instrument>", "PRODUCT": "<product>", "UNDERLYING": "<prefix>",
+    "params": {"VENUE": "<venue>", "INSTRUMENT": "<instrument>", "PRODUCT": "<product>", "UNDERLYING": "<prefix>",
     "STRIKE": <strike>, "SIZE": <filledSize>, "PREMIUM_USD": <usd>, "COLLATERAL_USD": <usd>}}
    ```
 
@@ -171,15 +173,14 @@ this chat. One missing: ask, and file nothing this turn.
    acp trade --token-in usdc --chain-in 1 --amount-in <USDC_ARRIVED> --token-out usdc --chain-out 8453 --idempotency-key <KEY>:home
    ```
 
-9. [FIXED] On `exists: true` or a `confirmed` deposit, if `duty_list` has no
-   `derive-account` duty, `duty_create` it once:
+9. [FIXED] On `exists: true` or a `confirmed` deposit, file that venue's row duty once,
+   unless `duty_list` has it. Derive's (Paradex's: `references/paradex.md`):
 
    ```json
    {"recipe": "derive-account@1", "title": "Derive account", "triggers": [{"kind": "timer", "intervalSeconds": 600}]}
    ```
 
-   It alone keeps Derive's Platforms row: never write your own Derive watcher or run
-   `bevo-platforms set` for Derive.
+   It alone writes that venue's Platforms row: no watcher or `bevo-platforms set` of yours.
 
 ## Idempotency and retries
 
@@ -199,13 +200,11 @@ account` and wait. The `:home` leg is `acp trade`: look it up with `--route trad
 | `vol points wide`, `paying N% over fair value` | A poor price; say so, never trade it. |
 | `fees are N% of the premium` | Too small or too short. Offer monthly or bigger. |
 | `collateral too small`, `budget too small` | Under Derive's minimum. Give the figure from the reason. |
-| `OPTIONS_SIGNER_NOT_READY`, `OPTIONS_CHAT_ONLY` | Nothing filed: enable the signer; only chat trades. |
-| `OPTIONS_BOUNDS_MISMATCH` | Re-quote; never raise a bound past what the owner agreed. |
+| An `OPTIONS_*` refusal | Nothing filed: follow its hint; never raise a bound the owner agreed. |
 | No fill (open, buy or close) | Nobody took it at the agreed bound; never call it no liquidity. Nothing moved. Re-quote, re-ask, never re-file the same bound. |
 | Buy failed over `--max-cost` | Give the reason as written, then read `positions`: anything shown there was bought. Never buy again. |
 | Deposit refused, failed or partial | Give the reason as written; re-read the account before any new deposit. Never move funds between chains to fix it. |
 | Withdraw or `:home` failed | Give the reason as written, and stop (`only $N is free`: the rest backs sold puts). |
-| `OPTIONS_BAD_COMMAND` | Malformed or under a minimum; none filed. |
 | Card swept after 30 minutes | Unsigned; re-quote before offering again. |
 
 ## Limits
@@ -213,7 +212,7 @@ account` and wait. The `:home` leg is `acp trade`: look it up with `--route trad
 - Selling locks collateral until expiry or a buy-back; buying is paid in full, nothing
   borrowed. No rolling without a fresh yes.
 - **Monthly by default**; weeklies lose too much to fees and the spread.
-- **Cash settled** in USDC, never the asset; it stays on Derive until withdrawn.
+- **Cash settled** in USDC, never the asset; it stays on the venue until withdrawn.
 - Not advice: never rank or recommend.
 
 ## Say to the owner

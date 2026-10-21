@@ -1,0 +1,41 @@
+{
+  "id": "options-account",
+  "version": 1,
+  "description": "Keep an options venue's account on the wallet's Platforms tab.",
+  "keywords": [
+    "paradex",
+    "paradex account",
+    "paradex balance",
+    "options account",
+    "options balance",
+    "platforms",
+    "wallet"
+  ],
+  "triggers": [
+    "timer"
+  ],
+  "params": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "VENUE"
+    ],
+    "properties": {
+      "VENUE": {
+        "type": "string",
+        "enum": [
+          "paradex"
+        ],
+        "description": "The options venue whose account the row shows. Derive has its own derive-account duty."
+      }
+    }
+  },
+  "status": {
+    "starting": "First check {next}",
+    "ok": "${value} · {positions} open · next check {next}",
+    "no_account": "No deposit credited yet · next check {next}",
+    "signer_off": "Butler's signer is off · next check {next}",
+    "unreadable": "Couldn't read it · retry {next}",
+    "unpriced": "Some positions unpriced · retry {next}"
+  }
+}

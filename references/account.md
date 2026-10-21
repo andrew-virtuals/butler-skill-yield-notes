@@ -2,7 +2,8 @@
 
 ## Where the numbers come from
 
-`acp options account` is the Derive portfolio, and the only source of it. Read it fresh
+`acp options account` is the Derive portfolio, and the only source of it. It now lists
+every venue, Derive first; Paradex's account is in `references/paradex.md`. Read it fresh
 for every check and before every withdrawal; never reuse an earlier turn's figures.
 
 `bevo-read assets` knows nothing about Derive. Its `perps` block, `futuresUsd` and
@@ -74,14 +75,16 @@ in the wallet total. That row belongs to the `derive-account` duty (step 9), whi
 account every 10 minutes and also tells the owner when a deposit lands. Butler never writes
 the row itself: no `bevo-platforms set` for Derive, and no Derive watcher of its own.
 
-The row catches up within about 10 minutes of a deposit, trade, withdrawal or settlement.
+Paradex has its own row, kept the same way by the `options-account` duty
+(`references/paradex.md`). The row catches up within about 10 minutes of a deposit, trade, withdrawal or settlement.
 A row behind this turn's read is that delay, not a discrepancy: answer from the read.
 
 ## A withdrawal
 
 "Withdraw my free USDC" means out of Derive, to the owner's wallet. It is `acp options
 withdraw` (step 8), never an `acp trade` from the wallet to the owner's own address: that
-moves nothing and still costs a fee.
+moves nothing and still costs a fee. Out of Paradex it pays to Base instead
+(`references/paradex.md`); the rest of this section is Derive's.
 
 - The amount is at most this turn's `freeForNewPutsUsd` (the total across accounts; the
   server gathers it into one before paying out), rounded down to the cent. "All

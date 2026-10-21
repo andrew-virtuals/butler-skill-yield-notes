@@ -1,7 +1,7 @@
 """Watch one yield note from open to outcome, and say what happened.
 
-A note is one option the owner sold on Derive, fully collateralised; a bought
-option is one they paid a premium for. The options-trading skill opens either
+A note is one option the owner sold on Derive or Paradex (VENUE), fully
+collateralised; a bought option is one they paid a premium for. The options-trading skill opens either
 and files this duty with the fill's own numbers.
 Three moments matter and the owner should never have to ask about any of them:
 
@@ -21,8 +21,8 @@ not hand over ETH. So "you now own 2.04 ETH" is only true when DELIVER_ASSET is
 on and the spot buy actually executed. Until then the duty says the owner is
 holding the loss in cash, because that is what has happened.
 
-Settings: INSTRUMENT, PRODUCT, UNDERLYING, TOKEN_ID, STRIKE, SIZE, PREMIUM_USD,
-COLLATERAL_USD, DELIVER_ASSET, HEADS_UP_HOURS.
+Settings: VENUE, INSTRUMENT, PRODUCT, UNDERLYING, TOKEN_ID, STRIKE, SIZE,
+PREMIUM_USD, COLLATERAL_USD, DELIVER_ASSET, HEADS_UP_HOURS.
 """
 
 import bevo
@@ -36,6 +36,11 @@ import time
 
 PARAMS = json.loads(os.environ.get("PARAMS", "{}"))
 
+VENUE = str(PARAMS.get("VENUE") or "derive").strip().lower()
+VENUE_NAME = {"derive": "Derive", "paradex": "Paradex"}.get(VENUE, VENUE)
+#: Every options read names the venue, except Derive's: a Derive duty reads exactly
+#: what it read before venues existed.
+VENUE_QUERY = {} if VENUE == "derive" else {"venue": VENUE}
 INSTRUMENT = str(PARAMS.get("INSTRUMENT") or "").strip().upper()
 PRODUCT = str(PARAMS.get("PRODUCT") or "").strip()
 UNDERLYING = str(PARAMS.get("UNDERLYING") or "").strip().upper()
@@ -99,19 +104,26 @@ def answer_of(text):
 
 
 def parse_instrument(name):
-    """Pull expiry and option type back out of ETH-20261030-2450-P.
+    """Pull expiry and option type back out of ETH-20261030-2450-P (Derive) or
+    ETH-USD-30OCT26-2450-P (Paradex).
 
-    Derive writes a decimal strike with an underscore (ADA-...-0_25-P), so the
-    strike is parsed but never trusted over the STRIKE setting.
+    Both write a decimal strike with an underscore (ADA-...-0_25-P), so the
+    strike is parsed but never trusted over the STRIKE setting. Both expire at
+    08:00 UTC.
     """
-    m = re.match(r"^([A-Z0-9]+)-(\d{8})-([0-9_]+)-([PC])$", name)
+    if VENUE == "paradex":
+        m = re.match(r"^([A-Z0-9]+)-USD-(\d{1,2}[A-Z]{3}\d{2})-([0-9_]+)-([PC])$", name)
+        day_format = "%d%b%y"
+    else:
+        m = re.match(r"^([A-Z0-9]+)-(\d{8})-([0-9_]+)-([PC])$", name)
+        day_format = "%Y%m%d"
     if not m:
         return None
-    _, yyyymmdd, _strike, kind = m.groups()
+    _, day, _strike, kind = m.groups()
     try:
         # Pinned to UTC: read in a DST zone this is an hour out, enough to
         # call settlement before it has happened.
-        moment = datetime.datetime.strptime(yyyymmdd + " 08:00", "%Y%m%d %H:%M")
+        moment = datetime.datetime.strptime(day.title() + " 08:00", day_format + " %H:%M")
         expiry = int(moment.replace(tzinfo=datetime.timezone.utc).timestamp())
     except ValueError:
         return None
@@ -123,8 +135,11 @@ DETAIL = parse_instrument(INSTRUMENT) if INSTRUMENT else None
 #: Sold notes (income) and bought options, by the option type each must be.
 PRODUCT_KIND = {"cash_secured_put": "P", "covered_call": "C", "long_call": "C", "long_put": "P"}
 
-if not DETAIL:
-    PROBLEM = "INSTRUMENT %r is not a Derive option name like ETH-20261030-2450-P" % INSTRUMENT
+if VENUE not in ("derive", "paradex"):
+    PROBLEM = "VENUE must be derive or paradex, not %r" % VENUE
+elif not DETAIL:
+    PROBLEM = "INSTRUMENT %r is not a %s option name like %s" % (
+        INSTRUMENT, VENUE_NAME, "ETH-USD-30OCT26-2450-P" if VENUE == "paradex" else "ETH-20261030-2450-P")
 elif PRODUCT not in PRODUCT_KIND:
     PROBLEM = "PRODUCT must be one of %s, not %r" % (", ".join(sorted(PRODUCT_KIND)), PRODUCT)
 elif DETAIL["kind"] != PRODUCT_KIND[PRODUCT]:
@@ -176,7 +191,8 @@ def still_held():
     case that was missed.
     """
     try:
-        body = bevo.read("/options/account") or {}
+        body = (bevo.read("/options/account", VENUE_QUERY) if VENUE_QUERY
+                else bevo.read("/options/account")) or {}
     except bevo.BevoError as exc:
         say("could not read the account: %s" % exc)
         return None
@@ -214,7 +230,7 @@ def spot_now():
     index, the number the option settles against, so it needs no token pin and
     works for any currency Derive lists. An empty answer is a gap, not a zero.
     """
-    body = bevo.read("/options/ticker", {"instrument": INSTRUMENT}) or {}
+    body = bevo.read("/options/ticker", {"instrument": INSTRUMENT, **VENUE_QUERY}) or {}
     value = body.get("index")
     if value in (None, ""):
         return None
@@ -229,7 +245,10 @@ def settlement_price():
     all — a different thing, and the owner is told about it rather than being
     given a guess.
     """
-    body = bevo.read("/options/settlement", {"underlying": UNDERLYING, "expiry": EXPIRY}) or {}
+    # Paradex keys a settlement by the option itself; Derive by asset and expiry.
+    query = ({"instrument": INSTRUMENT, **VENUE_QUERY} if VENUE_QUERY
+             else {"underlying": UNDERLYING, "expiry": EXPIRY})
+    body = bevo.read("/options/settlement", query) or {}
     value = body.get("price")
     if value in (None, ""):
         return None
@@ -289,9 +308,9 @@ def outcome_sentences(settled):
         paid = intrinsic(settled)
         if paid > 0:
             net = paid - PREMIUM_USD
-            return ("%s settled at %s, %s your %s: your %s paid %s into your Derive account. After "
+            return ("%s settled at %s, %s your %s: your %s paid %s into your %s account. After "
                     "the %s it cost, you are %s %s."
-                    % (UNDERLYING, price(settled), side, price(STRIKE), kind, usd(paid),
+                    % (UNDERLYING, price(settled), side, price(STRIKE), kind, usd(paid), VENUE_NAME,
                        usd(PREMIUM_USD), "down" if net < 0 else "up", usd(abs(net))), False)
         return ("%s settled at %s, %s your %s: the %s expired worthless, so the %s you paid is lost."
                 % (UNDERLYING, price(settled), "at or under" if IS_CALL else "at or above",
@@ -375,9 +394,9 @@ def settle():
     if settled is None:
         if late > SETTLE_ALARM_SECONDS and not bevo.state.get("settle_alarm"):
             bevo.state["settle_alarm"] = True
-            bevo.notify("%s: your note expired %d hours ago and Derive has not published a "
+            bevo.notify("%s: your note expired %d hours ago and %s has not published a "
                         "settlement price yet. Nothing is lost and I am still watching."
-                        % (NAME, round(late / 3600)))
+                        % (NAME, round(late / 3600), VENUE_NAME))
         else:
             say("settlement not published yet (%d min past expiry)" % round(late / 60))
         bevo.status("settling")
@@ -402,15 +421,16 @@ def settle():
                 tail = (" I am not certain whether the %s purchase went through; check before "
                         "buying again." % UNDERLYING)
         else:
-            tail = (" Derive settles in cash, so you are holding the loss in cash, not the %s."
-                    % UNDERLYING)
+            tail = (" %s settles in cash, so you are holding the loss in cash, not the %s."
+                    % (VENUE_NAME, UNDERLYING))
     if IS_LONG:
         if intrinsic(settled) > 0:
-            tail += " The payout is free cash in your Derive account."
+            tail += " The payout is free cash in your %s account." % VENUE_NAME
     elif IS_PUT:
-        tail += " What is left of your collateral is free cash in your Derive account."
+        tail += " What is left of your collateral is free cash in your %s account." % VENUE_NAME
     else:
-        tail += " What is left of your %s collateral is free again in your Derive account." % UNDERLYING
+        tail += " What is left of your %s collateral is free again in your %s account." % (
+            UNDERLYING, VENUE_NAME)
 
     bevo.status("done", price=settled)
     bevo.done("%s: %s%s" % (NAME, headline, tail))

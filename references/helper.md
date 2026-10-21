@@ -1,8 +1,8 @@
-# The Derive helper
+# The options helper
 
 Write the script below to `/tmp/derive_helper.py` and run it with `python3`. Stdlib
 only, no API key, no secret, read-only: it screens and quotes against Derive v3's
-public API and nothing else. Selling, buying, closing, funding and withdrawing are
+public API, or Paradex's with `--venue paradex`, and nothing else. Selling, buying, closing, funding and withdrawing are
 `acp options` commands in `SKILL.md`, never this file.
 
 ```sh
@@ -14,7 +14,15 @@ python3 /tmp/derive_helper.py quote --side buy --product put --underlying ETH --
 python3 /tmp/derive_helper.py quote --side close --instrument ETH-20261030-2600-C --size 2.95
 python3 /tmp/derive_helper.py quote --side buyback --instrument ETH-20261030-2300-P --size 2 --premium-received 61.40
 python3 /tmp/derive_helper.py chain --underlying ETH --tenor monthly --type C
+python3 /tmp/derive_helper.py quote --venue paradex --side buy --product call --underlying ETH --budget 50
+python3 /tmp/derive_helper.py quote --venue paradex --side close --instrument ETH-USD-27NOV26-2600-C --size 0.1
 ```
+
+`--venue paradex` (any command) reads Paradex instead, and every field below means the
+same there: names like `ETH-USD-27NOV26-2600-C`, sizes in the asset on a 0.1 step, a
+minimum of $20 of the underlying per order, Paradex's fee (no base fee), and only
+markets its order book trades (never an RFQ-only one). `venue` on every quote says
+which venue priced it; file the command on that venue (`references/paradex.md`).
 
 It prints one JSON object (a list for `screen` and `chain`) on stdout. Exit `0`: the
 read succeeded. Exit `1`: it did not, with a one-line `error: …` on stderr - Derive is
@@ -125,7 +133,7 @@ A buy-back is refused only when there is no ask or the ask is thinner than the s
 owner getting out of a falling put may accept a wide market; tell them it is wide.
 
 ```python
-"""Screen and quote options on Derive v3, from its public API.
+"""Screen and quote options on Derive v3 or Paradex, from their public APIs.
 
 Four sides:
 
@@ -154,6 +162,8 @@ Usage:
     derive_helper.py quote --side buyback --instrument ETH-20261030-2300-P --size 2 \
         [--premium-received 61.40]
     derive_helper.py chain --underlying ETH [--tenor monthly] [--type P]
+
+Every command takes --venue derive (the default) or --venue paradex.
 """
 
 import argparse
@@ -163,10 +173,18 @@ import math
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 BASE = "https://api.derive.xyz/v3"
+PARADEX = "https://api.prod.paradex.trade/v1"
 UA = "butler-options-trading/2.0"
+
+# The venue this run reads: set once from --venue, then read by every function
+# whose answer depends on it. The quote logic itself is the same on both.
+V = {"id": "derive", "name": "Derive"}
+VENUES = {"derive": {"id": "derive", "name": "Derive"},
+          "paradex": {"id": "paradex", "name": "Paradex"}}
 
 # Calibrated against measured spreads and fees; see references/venue.md.
 # ETH and BTC bids sit a few vol points under mark, every other listed asset
@@ -187,6 +205,9 @@ BAD_CASE_FALL = 0.25
 
 CURRENCIES = ["ETH", "BTC", "SOL", "XRP", "ADA", "HYPE",
               "ZEC", "XAUT", "LIT", "VVV", "PUMP", "CC"]
+# Paradex's crypto option underlyings, measured 2026-10-20 (it also lists
+# equity and index options, which a note on idle USDC does not screen).
+PARADEX_CURRENCIES = ["BTC", "ETH", "SOL", "HYPE", "NEAR", "ZEC"]
 
 TENOR_DAYS = {"weekly": 9, "monthly": 24, "quarterly": 80}
 
@@ -228,6 +249,101 @@ def post(method, params, tries=3):
     raise TransportError("%s failed: %s" % (method, last))
 
 
+def get(path, query, tries=3):
+    """GET one public Paradex path. A 4xx is Paradex's answer: asking again changes nothing."""
+    last = None
+    url = "%s%s?%s" % (PARADEX, path, urllib.parse.urlencode(query))
+    for attempt in range(tries):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": UA})
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                return json.load(resp)
+        except urllib.error.HTTPError as exc:
+            last = "HTTP %s" % exc.code
+            if 400 <= exc.code < 500 and exc.code != 429:
+                raise TransportError(last)
+        except Exception as exc:  # noqa: BLE001 - retried, then surfaced
+            last = exc
+        if attempt < tries - 1:
+            time.sleep(1.2 * (attempt + 1))
+    raise TransportError("%s failed: %s" % (path, last))
+
+
+# Paradex answers are reshaped into Derive's, so one set of quote functions
+# serves both: an instrument as `get_all_instruments` names its fields, a
+# ticker as `get_tickers` does (b/B bid, a/A ask, M mark, I index, and
+# option_pricing bi/ai/i IVs and d delta).
+_PDX_SUMMARIES = None
+
+
+def pdx_summaries():
+    """Every Paradex market's summary in one read (about 5 MB), once per run."""
+    global _PDX_SUMMARIES
+    if _PDX_SUMMARIES is None:
+        rows = get("/markets/summary", {"market": "ALL"}).get("results") or []
+        _PDX_SUMMARIES = {r.get("symbol"): r for r in rows}
+    return _PDX_SUMMARIES
+
+
+def pdx_inst(m):
+    fees = m.get("fee_config") or {}
+    # Butler's orders go out as Retail (Paradex's interactive flow), so the retail schedule applies.
+    fee = ((fees.get("interactive_fee") or fees.get("api_fee") or {}).get("taker_fee")) or {}
+    return {
+        "instrument_name": m["symbol"],
+        "is_active": True,
+        "option_details": {
+            "strike": m.get("strike_price"),
+            "expiry": int(m["expiry_at"]) // 1000,
+            "option_type": "C" if m.get("option_type") == "CALL" else "P",
+        },
+        "amount_step": m.get("order_size_increment"),
+        # Raised to Paradex's minimum notional once the index is known (pdx_minimum).
+        "minimum_amount": m.get("order_size_increment"),
+        "min_notional": m.get("min_notional"),
+        # Paradex charges no base fee; its taker fee is a rate on the underlying's
+        # notional, capped at a share of the premium.
+        "base_fee": "0",
+        "taker_fee_rate": fee.get("fee"),
+        "mark_price_fee_rate_cap": fee.get("fee_cap"),
+        "price_band": m.get("price_bands_width"),
+    }
+
+
+def pdx_ticker(s, inst):
+    """A side priced outside the market's price band cannot be taken (an order may
+    pay at most mark x (1 + band), and sell at no less than mark x (1 - band)),
+    so it is dropped, as if the book had none."""
+    greeks = s.get("greeks") or {}
+    bid, ask, mark, band = num(s.get("bid")), num(s.get("ask")), num(s.get("mark_price")), num(inst.get("price_band"))
+    bid_ok = not (band > 0 and mark > 0 and bid < mark * (1 - band))
+    ask_ok = not (band > 0 and mark > 0 and ask > mark * (1 + band))
+    return {
+        "b": s.get("bid") if bid_ok else None, "B": s.get("bid_size") if bid_ok else None,
+        "a": s.get("ask") if ask_ok else None, "A": s.get("ask_size") if ask_ok else None,
+        "M": s.get("mark_price"), "I": s.get("underlying_price"),
+        "option_pricing": {"bi": s.get("bid_iv"), "ai": s.get("ask_iv"),
+                           "i": s.get("mark_iv"), "d": greeks.get("delta", s.get("delta"))},
+    }
+
+
+def pdx_minimum(inst, index):
+    """Paradex takes an order of at least `min_notional` dollars of the underlying."""
+    step, floor = num(inst.get("amount_step")), num(inst.get("min_notional"))
+    if step > 0 and index > 0:
+        inst["minimum_amount"] = round(max(step, math.ceil(floor / index / step - 1e-9) * step), 8)
+
+
+def pdx_active_options(currency, opt_type):
+    """Order-book options only: an RFQ-only market cannot be filed through acp options."""
+    rows = get("/markets", {"asset_kind": "OPTION", "base_asset": currency}).get("results") or []
+    now = time.time()
+    return [pdx_inst(m) for m in rows
+            if m.get("trading_mode") == "STANDARD" and m.get("expiry_at")
+            and int(m["expiry_at"]) / 1000.0 > now
+            and ("C" if m.get("option_type") == "CALL" else "P") == opt_type]
+
+
 def num(x):
     """Derive sends numbers as strings, and nulls for an empty side."""
     try:
@@ -253,6 +369,8 @@ def iso(sec):
 
 
 def active_options(currency, opt_type):
+    if V["id"] == "paradex":
+        return pdx_active_options(currency, opt_type)
     out, page = [], 1
     while True:
         r = post("public/get_all_instruments", {
@@ -296,18 +414,26 @@ def load_chain(underlying, opt_type, tenor, now):
     try:
         insts = active_options(underlying, opt_type)
         if not insts:
-            raise VenueError("%s has no active %s options on Derive"
-                             % (underlying, "put" if opt_type == "P" else "call"))
+            raise VenueError("%s has no active %s options on %s"
+                             % (underlying, "put" if opt_type == "P" else "call", V["name"]))
         expiry = pick_expiry(insts, tenor, now)
-        tickers = tickers_for(underlying, expiry)
+        if V["id"] == "paradex":
+            sums = pdx_summaries()
+            tickers = {i["instrument_name"]: pdx_ticker(sums[i["instrument_name"]], i) for i in insts
+                       if i["option_details"]["expiry"] == expiry and i["instrument_name"] in sums}
+        else:
+            tickers = tickers_for(underlying, expiry)
     except VenueError:
         raise
     except Exception as exc:  # noqa: BLE001 - transport or a malformed answer
-        raise VenueError("could not read Derive's %s options: %s" % (underlying, exc))
+        raise VenueError("could not read %s's %s options: %s" % (V["name"], underlying, exc))
     chain = [i for i in insts
              if i["option_details"]["expiry"] == expiry and i["instrument_name"] in tickers]
     if not chain:
         raise VenueError("no %s prices published for that expiry" % underlying)
+    if V["id"] == "paradex":
+        for i in chain:
+            pdx_minimum(i, num(tickers[i["instrument_name"]].get("I")))
     return expiry, chain, tickers
 
 
@@ -341,7 +467,7 @@ def build_quote(product, underlying, collateral_usd, tenor="monthly",
 
     q = {
         "product": product,
-        "venue": "derive",
+        "venue": V["id"],
         "underlying": underlying,
         "instrument": inst["instrument_name"],
         "spot": rnd(spot, 6),
@@ -367,8 +493,8 @@ def build_quote(product, underlying, collateral_usd, tenor="monthly",
 
     if size < min_amt or size <= 0:
         q["reasons"].append(
-            "collateral too small: Derive's minimum is %s contracts, which needs about $%s"
-            % (plain(min_amt), "{:,}".format(int(math.floor(min_amt * per_unit + 0.5)))))
+            "collateral too small: %s's minimum is %s contracts, which needs about $%s"
+            % (V["name"], plain(min_amt), "{:,}".format(int(math.floor(min_amt * per_unit + 0.5)))))
         return q
     if bid <= 0 or bid_iv <= 0:
         q["reasons"].append("no live bid on %s - nobody is buying this option right now"
@@ -465,7 +591,7 @@ def build_buy_quote(product, underlying, budget_usd=None, tenor="monthly",
     q = {
         "side": "buy",
         "product": product,
-        "venue": "derive",
+        "venue": V["id"],
         "underlying": underlying,
         "instrument": inst["instrument_name"],
         "spot": rnd(spot, 6),
@@ -507,9 +633,9 @@ def build_buy_quote(product, underlying, budget_usd=None, tenor="monthly",
     if size < min_amt or size <= 0:
         need = (min_amt * per_contract + base) * MAX_COST_HEADROOM
         q["reasons"].append(
-            "%s too small: Derive's minimum is %s contracts, which costs about $%.2f "
+            "%s too small: %s's minimum is %s contracts, which costs about $%.2f "
             "with fees and room for the price to move"
-            % ("size" if want_size is not None else "budget", plain(min_amt),
+            % ("size" if want_size is not None else "budget", V["name"], plain(min_amt),
                math.ceil(need * 100) / 100))
         return q
 
@@ -561,6 +687,8 @@ def build_buy_quote(product, underlying, budget_usd=None, tenor="monthly",
 
 def held_option(instrument):
     """One named option and its ticker, for pricing a position already held."""
+    if V["id"] == "paradex":
+        return pdx_held_option(instrument)
     name = instrument.strip().upper()
     parts = name.split("-")
     if len(parts) != 4 or parts[3] not in ("C", "P"):
@@ -580,6 +708,30 @@ def held_option(instrument):
     return name, inst, t
 
 
+def pdx_held_option(instrument):
+    name = instrument.strip().upper()
+    parts = name.split("-")
+    if len(parts) != 5 or parts[1] != "USD" or parts[4] not in ("C", "P"):
+        raise VenueError("%r is not a Paradex option name like ETH-USD-27NOV26-2750-C" % instrument)
+    try:
+        m = next((x for x in get("/markets", {"market": name}).get("results") or []
+                  if x.get("symbol") == name), None)
+        if m is None or m.get("trading_mode") != "STANDARD":
+            raise VenueError("%s is not an option Paradex's order book trades" % name)
+        s = next((x for x in get("/markets/summary", {"market": name}).get("results") or []
+                  if x.get("symbol") == name), None)
+    except VenueError:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise VenueError("could not read Paradex's %s options: %s" % (parts[0], exc))
+    if not s:
+        raise VenueError("no price published for %s" % name)
+    inst = pdx_inst(m)
+    t = pdx_ticker(s, inst)
+    pdx_minimum(inst, num(t.get("I")))
+    return name, inst, t
+
+
 def build_close_quote(instrument, size):
     """What selling back `size` of a bought option fetches on the book now.
     Only a missing or thin bid, or nothing left after fees, stops a close: an
@@ -593,7 +745,7 @@ def build_close_quote(instrument, size):
     expiry = inst["option_details"]["expiry"]
     q = {
         "side": "close",
-        "venue": "derive",
+        "venue": V["id"],
         "instrument": name,
         "strike": num(inst["option_details"]["strike"]),
         "expiry": iso(expiry),
@@ -631,8 +783,8 @@ def build_close_quote(instrument, size):
             % (plain(bid_sz), plain(size), plain(bid_sz)))
     if net <= 0:
         q["reasons"].append(
-            "Derive's fee ($%.2f) is more than the bid pays ($%.2f): closing gets nothing back"
-            % (fee, gross))
+            "%s's fee ($%.2f) is more than the bid pays ($%.2f): closing gets nothing back"
+            % (V["name"], fee, gross))
     if gap > MAX_VOL_GAP_PTS:
         q["warnings"].append(
             "the market is %.1f vol points wide: selling back here gets %d%% under fair value"
@@ -658,7 +810,7 @@ def build_buyback_quote(instrument, size, premium_received=None):
     expiry = inst["option_details"]["expiry"]
     q = {
         "side": "buyback",
-        "venue": "derive",
+        "venue": V["id"],
         "instrument": name,
         "strike": strike,
         "expiry": iso(expiry),
@@ -714,7 +866,7 @@ def screen(tenor="monthly", collateral_usd=5000.0, otm_pct=10.0):
     """Which underlyings can carry a note right now. The offerable set is an
     output of the gates, not an allowlist; one bad asset never stops the screen."""
     out = []
-    for cur in CURRENCIES:
+    for cur in (PARADEX_CURRENCIES if V["id"] == "paradex" else CURRENCIES):
         try:
             out.append(build_quote("cash_secured_put", cur, collateral_usd,
                                    tenor=tenor, otm_pct=otm_pct))
@@ -814,7 +966,10 @@ def main():
     c.add_argument("--tenor", default="monthly", choices=sorted(TENOR_DAYS))
     c.add_argument("--type", default="P", choices=["P", "C"])
 
+    for sp in (s, q, c):
+        sp.add_argument("--venue", default="derive", choices=sorted(VENUES))
     a = p.parse_args()
+    V.update(VENUES[a.venue])
 
     if a.cmd == "screen":
         out = screen(a.tenor, a.collateral, a.otm_pct)
