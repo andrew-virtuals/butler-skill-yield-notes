@@ -62,6 +62,8 @@ Derive's: free USDC on one never pays for a trade on the other.
 - It is usually credited within minutes. The outcome's `depositStatus` is `CREDITED`
   with the amount credited, or still on its way; re-read the account, never deposit
   again to find out.
+- Once it is credited, file the Platforms row duty (below) in the same turn, unless
+  `duty_list` has it: the owner should never have to ask for the row.
 
 ## Withdrawing
 
@@ -82,6 +84,8 @@ Paradex's row on the wallet's Platforms tab belongs to the `options-account` dut
 per owner, filed once, the first time the account reads `exists: true` or a Paradex
 deposit is `confirmed`, unless `duty_list` already has it. Never file `derive-account`
 for Paradex, and never write a Paradex row with `bevo-platforms`.
+As long as the Paradex account exists and `duty_list` has no `Paradex account` duty,
+file it on any turn that reads the account, without being asked.
 
 ```json
 {"recipe": "options-account@1", "title": "Paradex account", "params": {"VENUE": "paradex"}, "triggers": [{"kind": "timer", "intervalSeconds": 600}]}

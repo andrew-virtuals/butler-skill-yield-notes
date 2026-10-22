@@ -67,7 +67,7 @@ this chat. One missing: ask, and file nothing this turn.
 
    `signerReady: false` - stop: the owner must enable Butler's signer first. Fields:
    `references/account.md`. An unreadable account is not an empty one. On
-   `exists: true`, step 9.
+   `exists: true` on either venue, step 9.
 
 2. [FIXED] Write the script in `references/helper.md` to `/tmp/derive_helper.py`.
    Quote with the line for the intent; the strike is a rule, never your number:
@@ -173,8 +173,8 @@ this chat. One missing: ask, and file nothing this turn.
    acp trade --token-in usdc --chain-in 1 --amount-in <USDC_ARRIVED> --token-out usdc --chain-out 8453 --idempotency-key <KEY>:home
    ```
 
-9. [FIXED] On `exists: true` or a `confirmed` deposit, file that venue's row duty once,
-   unless `duty_list` has it. Derive's (Paradex's: `references/paradex.md`):
+9. [FIXED] As long as a venue's account exists and `duty_list` has no duty keeping its
+   Platforms entry, file one, unasked. Derive's (Paradex's: `references/paradex.md`):
 
    ```json
    {"recipe": "derive-account@1", "title": "Derive account", "triggers": [{"kind": "timer", "intervalSeconds": 600}]}
