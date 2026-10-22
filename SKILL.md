@@ -173,14 +173,14 @@ this chat. One missing: ask, and file nothing this turn.
    acp trade --token-in usdc --chain-in 1 --amount-in <USDC_ARRIVED> --token-out usdc --chain-out 8453 --idempotency-key <KEY>:home
    ```
 
-9. [FIXED] As long as a venue's account exists and `duty_list` has no duty keeping its
-   Platforms entry, file one, unasked. Derive's (Paradex's: `references/paradex.md`):
+9. [FIXED] As long as an account exists on any venue and `duty_list` has no
+   `options-account` duty, file it, unasked, then delete any `derive-account` duty:
 
    ```json
-   {"recipe": "derive-account@1", "title": "Derive account", "triggers": [{"kind": "timer", "intervalSeconds": 600}]}
+   {"recipe": "options-account@1", "title": "Options accounts", "triggers": [{"kind": "timer", "intervalSeconds": 600}]}
    ```
 
-   It alone writes that venue's Platforms row: no watcher or `bevo-platforms set` of yours.
+   It alone writes every venue's Platforms row: no watcher or `bevo-platforms set` of yours.
 
 ## Idempotency and retries
 

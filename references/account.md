@@ -70,13 +70,12 @@ Butler's server handles this after the owner approves the card, never you:
 
 ## The Platforms row
 
-The wallet page shows Derive as one row on its Platforms tab, with no separate options line
-in the wallet total. That row belongs to the `derive-account` duty (step 9), which reads the
-account every 10 minutes and also tells the owner when a deposit lands. Butler never writes
-the row itself: no `bevo-platforms set` for Derive, and no Derive watcher of its own.
-
-Paradex has its own row, kept the same way by the `options-account` duty
-(`references/paradex.md`). The row catches up within about 10 minutes of a deposit, trade, withdrawal or settlement.
+The wallet page shows each venue (Derive, Paradex) as one row on its Platforms tab, with no
+separate options line in the wallet total. Every one of those rows belongs to the one
+`options-account` duty (step 9), which reads every venue every 10 minutes, writes each at
+the venue's own figure for what the account is worth, and also tells the owner when a
+Derive deposit lands. An older `derive-account` duty is replaced by it (step 9). Butler
+never writes a row itself: no `bevo-platforms set`, and no watcher of its own. A row catches up within about 10 minutes of a deposit, trade, withdrawal or settlement.
 A row behind this turn's read is that delay, not a discrepancy: answer from the read.
 
 ## A withdrawal

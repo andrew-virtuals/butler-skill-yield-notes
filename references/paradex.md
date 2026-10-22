@@ -62,8 +62,8 @@ Derive's: free USDC on one never pays for a trade on the other.
 - It is usually credited within minutes. The outcome's `depositStatus` is `CREDITED`
   with the amount credited, or still on its way; re-read the account, never deposit
   again to find out.
-- Once it is credited, file the Platforms row duty (below) in the same turn, unless
-  `duty_list` has it: the owner should never have to ask for the row.
+- Once it is credited, do `SKILL.md` step 9 in the same turn: the owner should never
+  have to ask for the row.
 
 ## Withdrawing
 
@@ -80,19 +80,13 @@ never its `:home` line.
 
 ## The Platforms row (step 9)
 
-Paradex's row on the wallet's Platforms tab belongs to the `options-account` duty: one
-per owner, filed once, the first time the account reads `exists: true` or a Paradex
-deposit is `confirmed`, unless `duty_list` already has it. Never file `derive-account`
-for Paradex, and never write a Paradex row with `bevo-platforms`.
-As long as the Paradex account exists and `duty_list` has no `Paradex account` duty,
-file it on any turn that reads the account, without being asked.
+Paradex's row on the wallet's Platforms tab is written by the same `options-account`
+duty as Derive's: one per owner, for every venue, filed by `SKILL.md` step 9 as soon as
+the Paradex account exists, unless `duty_list` already has it. There is no Paradex duty
+of its own, and never write a Paradex row with `bevo-platforms`.
 
-```json
-{"recipe": "options-account@1", "title": "Paradex account", "params": {"VENUE": "paradex"}, "triggers": [{"kind": "timer", "intervalSeconds": 600}]}
-```
-
-It reads the account every 10 minutes and lists each position. It sends no notes: the
-deposit card already says when the USDC is credited.
+It reads every venue every 10 minutes and lists each position. It sends no note for a
+Paradex deposit: the deposit card already says when the USDC is credited.
 
 ## What does not exist on Paradex
 

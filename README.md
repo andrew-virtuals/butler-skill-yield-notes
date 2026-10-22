@@ -53,8 +53,7 @@ helper and gets back a quote object with every number fixed, including the bound
 | Outcome | `bevo-read request <key> --route options` | `approvalStatus`, plus `approvalOutcome` (`filledSize`, `netPremiumUsd` / `totalCostUsd` / `netProceedsUsd`, …) or `approvalFailureReason`. |
 | Withdrawing | `acp options withdraw`, then `acp trade` back to Base | Approval cards. |
 | Watching to expiry | the `options-lifecycle@6` duty template, `templates/options-lifecycle/` | Filed only when `approvalStatus` is `confirmed`, from `approvalOutcome`: `cash_secured_put`, `long_call` or `long_put`. Deleted after a confirmed close. |
-| Platforms row | the `derive-account@1` duty template, `templates/derive-account/` | One per owner, filed once the account exists or a deposit is confirmed. Sole writer of Derive's row on the wallet's Platforms tab, and the only deposit-landed note. |
-| Platforms row, other venues | the `options-account@1` duty template (`VENUE`), `templates/options-account/` | One per owner and venue (Paradex today), filed the same way. Sole writer of that venue's row, with its positions listed; no notes. A new venue is a new `VENUE` value. |
+| Platforms rows | the `options-account@1` duty template, `templates/options-account/` | One per owner, filed once an account exists on any venue; it replaces an older `derive-account` duty. Sole writer of every venue's row on the wallet's Platforms tab, at the venue's own `worthUsd`, with its positions listed, and the only deposit-landed note (Derive's). A venue bevo-server adds needs no change here. |
 
 The rail contract is bevo-server's `docs/derive-options.md`. bevo-server is the only
 thing that signs: there is no session key and nothing in this repo touches a key.
@@ -138,11 +137,11 @@ python3 -m unittest discover -s templates/options-account/tests
 - `templates/options-lifecycle/`: one per option, from the fill to the outcome. It
   moved here from `butler-skill-options-lifecycle`, which is deprecated; its history
   up to `@6` is in that repo.
-- `templates/derive-account/`: one per owner, the Derive row on the wallet's Platforms
-  tab.
-- `templates/options-account/`: one per owner and venue (`VENUE`), that venue's row on
-  the Platforms tab; Paradex today. Its name and site come from bevo-server's account
-  read, so a new venue needs no new template.
+- `templates/options-account/`: one per owner, a row on the Platforms tab for every
+  venue whose account exists. Each row's name, site and worth come from bevo-server's
+  account read, so a new venue needs no new template and no refiling.
+- `templates/derive-account/`: superseded by `options-account`, which the skill files
+  instead and which replaces it. Kept for the duties already running it.
 
 The hub lists each in `templates.json` with this repo, a ref and a `path` to its folder.
 A template's `version` is its own integer, separate from the skill's semver; a changed

@@ -80,7 +80,7 @@ def run(times, reads=None, state=None, params=None):
     sys.modules["bevo"] = fake
     spec = importlib.util.spec_from_file_location("duty_under_test", ROOT / "duty.py")
     module = importlib.util.module_from_spec(spec)
-    env = {"PARAMS": json.dumps({"VENUE": "paradex"} if params is None else params)}
+    env = {"PARAMS": json.dumps(params or {})}
     with mock.patch("time.time", lambda: fake.now), mock.patch("time.sleep", lambda _s: None), \
             mock.patch.dict(os.environ, env):
         spec.loader.exec_module(module)
@@ -91,20 +91,35 @@ def every(minutes, count, start=START):
     return [start + i * minutes * 60 for i in range(count)]
 
 
-SITE = "https://www.paradex.trade"
+DERIVE = "https://www.derive.xyz"
+PARADEX = "https://www.paradex.trade"
 
 
-def account(usdc="0", positions=(), assets=None, exists=True):
-    """bevo-server's `/options/account?venue=paradex` answer."""
-    return {"venue": "paradex", "name": "Paradex", "site": SITE, "available": True,
-            "wallet": WALLET, "network": "mainnet", "signerReady": True,
+def venue(vid, name, site, usdc="0", worth=None, positions=(), exists=True, late=False):
+    """One entry of `venues` in bevo-server's bare `/options/account` answer."""
+    return {"venue": vid, "name": name, "site": site, "depositsLandLater": late, "available": True,
+            "wallet": WALLET, "signerReady": True,
             "account": {"exists": exists, "usdc": usdc, "positions": list(positions),
-                        "assets": dict(assets or {})},
+                        "worthUsd": worth},
             "lines": []}
+
+
+def derive(usdc="0", worth=None, positions=(), exists=True):
+    return venue("derive", "Derive", DERIVE, usdc, worth, positions, exists, late=True)
+
+
+def paradex(usdc="0", worth=None, positions=(), exists=True):
+    return venue("paradex", "Paradex", PARADEX, usdc, worth, positions, exists)
+
+
+def accounts(*venues):
+    """The bare read: Derive's legacy body at the top, every venue in `venues`."""
+    return {"wallet": WALLET, "signerReady": True, "account": None, "venues": list(venues)}
 
 
 def position(instrument, size, value, pnl=None):
     parts = instrument.split("-")
+    strike = parts[-2]
     return {"instrument": instrument, "size": size, "underlying": parts[0],
-            "strike": float(parts[3].replace("_", ".")), "type": parts[4],
+            "strike": float(strike.replace("_", ".")), "type": parts[-1],
             "valueUsd": value, "pnlUsd": pnl, "expiresIn": "in 2 days"}
