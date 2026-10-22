@@ -26,6 +26,9 @@
   venue with `depositsLandLater`. Step 9 files it whenever an account exists and it is
   missing, unasked, and deletes any `derive-account` duty, which it supersedes. Needs
   bevo-server's `worthUsd` and `depositsLandLater` (bevo-server#1179).
+- **`templates/derive-account` removed.** `options-account` supersedes `derive-account@1`,
+  so the registry resolves that ref to it; a duty already running it keeps its stored code
+  and writes the same Derive row until step 9 replaces it. Its last copy is at `v2.4.0`.
 - **Paradex withdrawals.** `acp options withdraw --venue paradex` pays to the owner's
   wallet on Base through Layerswap, usually within a minute, less a few cents; no
   `:home` leg (`references/paradex.md` § Withdrawing).

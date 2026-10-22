@@ -122,10 +122,8 @@ The duty templates are checked one folder at a time, with their own unit tests:
 
 ```sh
 python3 validate.py --standalone templates/options-lifecycle
-python3 validate.py --standalone templates/derive-account
 python3 validate.py --standalone templates/options-account
 python3 -m unittest discover -s templates/options-lifecycle/tests
-python3 -m unittest discover -s templates/derive-account/tests
 python3 -m unittest discover -s templates/options-account/tests
 ```
 
@@ -139,9 +137,9 @@ python3 -m unittest discover -s templates/options-account/tests
   up to `@6` is in that repo.
 - `templates/options-account/`: one per owner, a row on the Platforms tab for every
   venue whose account exists. Each row's name, site and worth come from bevo-server's
-  account read, so a new venue needs no new template and no refiling.
-- `templates/derive-account/`: superseded by `options-account`, which the skill files
-  instead and which replaces it. Kept for the duties already running it.
+  account read, so a new venue needs no new template and no refiling. It supersedes
+  `derive-account@1` (removed in 2.6.0; its last copy is at `v2.4.0`), so the registry
+  resolves that ref to it.
 
 The hub lists each in `templates.json` with this repo, a ref and a `path` to its folder.
 A template's `version` is its own integer, separate from the skill's semver; a changed
