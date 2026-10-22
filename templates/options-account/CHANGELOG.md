@@ -12,6 +12,6 @@
   value while the others are written. A 0 is only ever an account that read fine and
   holds nothing.
 - One note: a deposit landing, only on a venue whose deposits are credited after their
-  card has closed (`depositsLandLater`, Derive's bridge). Supersedes `derive-account`,
-  which the skill no longer files.
+  card has closed (`depositsLandLater`, Derive's bridge). Supersedes `derive-account@1`
+  (`"supersedes"`), so the registry resolves that ref here.
 - Read-only: no `acp` call, never `bevo.fail()`.
