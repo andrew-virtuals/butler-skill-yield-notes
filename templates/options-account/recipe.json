@@ -1,0 +1,36 @@
+{
+  "id": "options-account",
+  "version": 1,
+  "description": "Keep every options venue's account on the wallet's Platforms tab.",
+  "keywords": [
+    "derive",
+    "derive account",
+    "paradex",
+    "paradex account",
+    "options account",
+    "options balance",
+    "platforms",
+    "wallet"
+  ],
+  "triggers": [
+    "timer"
+  ],
+  "params": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  },
+  "status": {
+    "starting": "First check {next}",
+    "ok": "${value} · {positions} open · next check {next}",
+    "credited": {
+      "last": "Deposit credited ${credit}",
+      "next": "next check {next}"
+    },
+    "partial": "${value} · {skipped} not read · retry {next}",
+    "no_account": "No deposit credited yet · next check {next}",
+    "signer_off": "Butler's signer is off · next check {next}",
+    "unreadable": "Couldn't read it · retry {next}",
+    "unpriced": "No worth from the venue · retry {next}"
+  }
+}

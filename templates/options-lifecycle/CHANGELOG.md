@@ -1,5 +1,13 @@
 # Changelog
 
+## 7
+
+- **Paradex.** A `VENUE` setting, `derive` (the default) or `paradex`. On Paradex it reads
+  Paradex's names (`ETH-USD-30OCT26-2450-P`), adds `venue=paradex` to its account and
+  ticker reads, reads the settlement by the option itself (`instrument`; Paradex keys it
+  by market), and names Paradex in every sentence the owner reads. A Derive duty reads
+  exactly what it read before. Supersedes `options-lifecycle@6`.
+
 ## 6
 
 - Reports a status line for the owner's Duties row, which read "nothing yet": "Settles in 3

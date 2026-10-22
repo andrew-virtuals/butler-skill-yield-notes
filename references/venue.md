@@ -1,5 +1,7 @@
 # Derive v3: the facts that shape a trade
 
+Derive's facts only; Paradex's are in `references/paradex.md`.
+
 Venue facts, not design choices. Measured against Derive v3 mainnet on **7 October
 2026** (selling) and **9 October 2026** (buying). Re-measure before relying on a
 spread or a depth: those move by the hour.

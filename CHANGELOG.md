@@ -1,5 +1,35 @@
 # Changelog
 
+## 2.6.0
+
+- **Paradex, a second venue.** Every command takes `--venue paradex` (bevo-server's options
+  rail is venue-neutral: `docs/options-venues.md`). New `references/paradex.md`: names
+  (`ETH-USD-27NOV26-2600-C`), the $20-of-underlying minimum, Paradex's retail fee and
+  price band, order-book markets only, the account fields (`address`, `otherPositions`),
+  funding from Base USDC only, and withdrawing to Base.
+- The helper reads Paradex with `--venue paradex` (any command): Paradex's market list
+  and summaries, reshaped into Derive's fields so the quote logic, its gates and every
+  field are the same; RFQ-only markets are skipped, fees follow Paradex's retail
+  schedule (Butler's orders are retail), and a side priced outside the market's price
+  band is dropped, since no order can reach it. Derive's output is byte-identical
+  (replayed against the same Derive answers through 2.5.0's script and this one).
+- SKILL.md: a venue rule (Before you start, 6); the lifecycle duty is `options-lifecycle@7`
+  with `VENUE`; step 9 files one `options-account` duty for every venue; one failure row for every
+  `OPTIONS_*` refusal, whose reply now carries the server's `hint`; the helper lines drop
+  flags that were their defaults, to stay under 12,000 characters.
+- `templates/options-lifecycle` 7: `VENUE`, Paradex names, settlement read by instrument.
+- **One Platforms duty for every venue.** New `templates/options-account` 1: one duty per
+  owner reads bevo-server's `/options/account` once and keeps a row for each venue whose
+  account exists (Derive and Paradex), at the venue's own `worthUsd`, with its positions
+  listed and the row's name and site from the read. A venue bevo-server adds appears on
+  the next check, with nothing refiled. It keeps Derive's deposit-landed note, only for a
+  venue with `depositsLandLater`. Step 9 files it whenever an account exists and it is
+  missing, unasked, and deletes any `derive-account` duty, which it supersedes. Needs
+  bevo-server's `worthUsd` and `depositsLandLater` (bevo-server#1179).
+- **Paradex withdrawals.** `acp options withdraw --venue paradex` pays to the owner's
+  wallet on Base through Layerswap, usually within a minute, less a few cents; no
+  `:home` leg (`references/paradex.md` § Withdrawing).
+
 ## 2.5.0
 
 - **Options outside ETH and BTC trade.** Derive splits its markets into risk universes

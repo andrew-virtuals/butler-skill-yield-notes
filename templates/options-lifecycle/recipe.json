@@ -1,17 +1,19 @@
 {
   "id": "options-lifecycle",
-  "version": 6,
-  "description": "Watch one Derive option to expiry, sold or bought, on any asset Derive lists: a heads-up the day before, the outcome once it settles, and, only if asked, buying the asset an assigned put agreed to.",
+  "version": 7,
+  "description": "Watch one Derive or Paradex option to expiry, sold or bought: a heads-up the day before, the outcome once it settles, and, only if asked, buying the asset an assigned put agreed to.",
   "keywords": [
     "assigned",
     "bought option",
     "call option",
     "cash secured put",
     "covered call",
+    "derive",
     "expiry",
     "long call",
     "long put",
     "option",
+    "paradex",
     "put option",
     "roll",
     "settlement",
@@ -25,7 +27,8 @@
     "options-lifecycle@2",
     "options-lifecycle@3",
     "options-lifecycle@4",
-    "options-lifecycle@5"
+    "options-lifecycle@5",
+    "options-lifecycle@6"
   ],
   "keys": [
     "note:<duty>:deliver"
@@ -42,9 +45,18 @@
       "PREMIUM_USD"
     ],
     "properties": {
+      "VENUE": {
+        "type": "string",
+        "enum": [
+          "derive",
+          "paradex"
+        ],
+        "default": "derive",
+        "description": "The venue the option trades on: derive (the default) or paradex. Every options read the duty makes names it."
+      },
       "INSTRUMENT": {
         "type": "string",
-        "description": "Derive's own name for the option sold, exactly as it was filled: ETH-20261030-2450-P. The expiry and strike are read back out of this, so it must match the fill.",
+        "description": "The venue's own name for the option, exactly as it was filled: ETH-20261030-2450-P on Derive, ETH-USD-30OCT26-2450-P on Paradex. The expiry and strike are read back out of this, so it must match the fill.",
         "minLength": 8,
         "maxLength": 64
       },
@@ -60,7 +72,7 @@
       },
       "UNDERLYING": {
         "type": "string",
-        "description": "The asset ticker, the prefix of INSTRUMENT: ETH, BTC, SOL, XRP, HYPE or any other currency Derive lists options on. Used for the settlement read.",
+        "description": "The asset ticker, the prefix of INSTRUMENT: ETH, BTC, SOL, HYPE or any other currency the venue lists options on. Used for the settlement read on Derive.",
         "minLength": 2,
         "maxLength": 12
       },
@@ -83,7 +95,7 @@
       "PREMIUM_USD": {
         "type": "number",
         "minimum": 0,
-        "description": "For a sold note, what the owner kept at open, net of Derive's fee. For a bought option, the total it cost including the fee (the open's totalCostUsd). Quoted back at expiry."
+        "description": "For a sold note, what the owner kept at open, net of the venue's fee. For a bought option, the total it cost including the fee (the open's totalCostUsd). Quoted back at expiry."
       },
       "COLLATERAL_USD": {
         "type": "number",
@@ -94,7 +106,7 @@
       "DELIVER_ASSET": {
         "type": "boolean",
         "default": false,
-        "description": "Only for a sold put that settles in the money (cash_secured_put). Derive settles in cash, so the owner holds the loss in cash and no asset. With this on, the duty spends SIZE x the settlement price of wallet USDC buying the TOKEN_ID token on its chain, so TOKEN_ID is required with it. Off by default: it spends money, so the owner has to have asked."
+        "description": "Only for a sold put that settles in the money (cash_secured_put). Options settle in cash, so the owner holds the loss in cash and no asset. With this on, the duty spends SIZE x the settlement price of wallet USDC buying the TOKEN_ID token on its chain, so TOKEN_ID is required with it. Off by default: it spends money, so the owner has to have asked."
       },
       "HEADS_UP_HOURS": {
         "type": "number",

@@ -323,6 +323,35 @@ class Settings(unittest.TestCase):
         self.assertIn("is not a Derive option name", fake.notes[0])
 
 
+class Paradex(unittest.TestCase):
+    """VENUE paradex: Paradex's names, and every options read names the venue."""
+
+    PUT = dict(PUT, VENUE="paradex", INSTRUMENT="ETH-USD-30OCT26-2450-P")
+    LONG_CALL = dict(LONG_CALL, VENUE="paradex", INSTRUMENT="ETH-USD-30OCT26-2800-C")
+
+    def test_reads_the_paradex_account_and_ticker(self):
+        fake = run(self.PUT, [EXPIRY - hours(20)], dict(PRICE, **{"/options/account": {
+            "venue": "paradex", "account": {"positions": [
+                {"instrument": "ETH-USD-30OCT26-2450-P", "size": -2.04}]}}}))
+        self.assertIn(("/options/account", {"venue": "paradex"}), fake.read_calls)
+        self.assertIn(("/options/ticker", {"instrument": "ETH-USD-30OCT26-2450-P", "venue": "paradex"}),
+                      fake.read_calls)
+        self.assertEqual(len(fake.notes), 1)
+
+    def test_reads_settlement_by_the_option_and_names_paradex(self):
+        fake = run(self.LONG_CALL, [SETTLED_AT], settled("3000"))
+        self.assertEqual(fake.read_calls[-1],
+                         ("/options/settlement", {"instrument": "ETH-USD-30OCT26-2800-C", "venue": "paradex"}))
+        self.assertIn("your call paid $100.00 into your Paradex account", fake.dones[0])
+        self.assertIn("free cash in your Paradex account", fake.dones[0])
+        self.assertNotIn("Derive", fake.dones[0])
+
+    def test_a_derive_name_on_paradex_does_nothing(self):
+        fake = run(dict(self.PUT, INSTRUMENT="ETH-20261030-2450-P"), [EXPIRY - hours(20)], PRICE)
+        self.assertEqual(fake.read_calls, [])
+        self.assertTrue(any("Paradex option name" in f for f in fake.fails + fake.logs))
+
+
 class StatusLine(unittest.TestCase):
     def test_counts_down_in_days_then_hours(self):
         fake = run(PUT, [EXPIRY - hours(72), EXPIRY - hours(30), EXPIRY - hours(1)], PRICE)
