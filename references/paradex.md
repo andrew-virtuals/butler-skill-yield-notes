@@ -19,6 +19,9 @@ python3 /tmp/derive_helper.py quote --venue paradex --side buy --product call --
 
 ## The market
 
+- **What it lists**: `chain --venue paradex` with no `--underlying` - crypto, stocks,
+  indices and commodities alike, each by ticker (`MU`, `US500`). Paradex gives no company
+  name, so say the ticker alone; an asset not listed there has no options on Paradex.
 - **Names** are `ETH-USD-27NOV26-2600-C`; a decimal strike is written with `_`
   (`HYPE-USD-6NOV26-72_5-P`). Pass them exactly as the quote gives them.
 - **Sizes** are in the asset, on a 0.1 step for ETH (0.001 for BTC), and an order must

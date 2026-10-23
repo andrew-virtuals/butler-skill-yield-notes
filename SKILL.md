@@ -1,7 +1,7 @@
 ---
 name: options-trading
 description: Trade options on Derive or Paradex - earn on idle USDC by selling cash-secured puts, buy a call or a put, close before expiry, and check or withdraw USDC and positions.
-version: 2.6.1
+version: 2.6.2
 metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","withdraw","withdraw my usdc","derive","my options","options account","options positions","free usdc","derive positions","my option positions","withdraw from derive","withdraw my free usdc","paradex","paradex options","paradex positions"],"requires":{"bins":["python3","bevo-read","acp"]}}}
 ---
 
@@ -38,8 +38,8 @@ Not this skill: covered calls, spreads, leverage, or a trade the helper refuses.
 5. **Derive figures come only from this turn's reads:** sizes, prices and positions
    from `acp options account` and quotes, never memory; a note that disagrees is wrong,
    so fix it. `bevo-read assets` has none.
-6. **Venue.** Derive, unless they name Paradex or hold it there: then add `--venue
-   paradex` everywhere (`references/paradex.md`, which also has its withdrawal).
+6. **Venue.** Derive, unless they name Paradex or hold it there: then `--venue paradex`
+   everywhere (`references/paradex.md`, also for withdrawing).
 
 ### Never file without all four
 
@@ -53,7 +53,7 @@ this chat. One missing: ask, and file nothing this turn.
    0.16 held): say what they hold and ask. Never shrink it quietly.
 3. **They said yes to the number.** The loss, the ownership, or the floor or ceiling,
    with its dollar figure, after the quote. Never your default.
-4. **The quote is fresh:** run after their last answer (step 5).
+4. **The helper's quote is fresh:** run after their last answer (step 5).
 
 ## Procedure
 
@@ -84,7 +84,8 @@ this chat. One missing: ask, and file nothing this turn.
    `<PRODUCT>` is `call` or `put`, `--budget` the most they will spend. Closing:
    instrument and size from `positions`; positive is `--side close`, negative is `--side buyback` with the size positive and `--premium-received`
    the note's `netPremiumUsd` (or its duty's PREMIUM_USD) scaled to it. **Offer only
-   `tradeable: true`**; give the `reasons` as written.
+   `tradeable: true`**; give the `reasons` as written. Listing: `chain`
+   alone; names as given, no company name.
 
 3. [ADAPT] Offer it using **only** quote fields; never compute a number:
    - **Sell:** `bad_case` first, then `net_premium_usd`, `fee_usd`, the lock to
@@ -159,7 +160,7 @@ this chat. One missing: ask, and file nothing this turn.
    (`references/selling.md`). After a close, `duty_delete` that instrument's duty; if
    part is still open, file it again with SIZE from `positions` (positive) and
    PREMIUM_USD and COLLATERAL_USD scaled to it. Never file for an unknown or failed
-   trade. Every `duty_create` needs a `"title"`. A second `options-lifecycle` duty in
+   trade. A second `options-lifecycle` duty in
    one chat needs `"alongside": [<this chat's earlier ones' names>]`; step 9's needs
    none.
 

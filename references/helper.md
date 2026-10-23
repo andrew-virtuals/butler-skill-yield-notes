@@ -14,6 +14,7 @@ python3 /tmp/derive_helper.py quote --side buy --product put --underlying ETH --
 python3 /tmp/derive_helper.py quote --side close --instrument ETH-20261030-2600-C --size 2.95
 python3 /tmp/derive_helper.py quote --side buyback --instrument ETH-20261030-2300-P --size 2 --premium-received 61.40
 python3 /tmp/derive_helper.py chain --underlying ETH --tenor monthly --type C
+python3 /tmp/derive_helper.py chain --venue paradex
 python3 /tmp/derive_helper.py quote --venue paradex --side buy --product call --underlying ETH --budget 50
 python3 /tmp/derive_helper.py quote --venue paradex --side close --instrument ETH-USD-27NOV26-2600-C --size 0.1
 ```
@@ -28,6 +29,12 @@ It prints one JSON object (a list for `screen` and `chain`) on stdout. Exit `0`:
 read succeeded. Exit `1`: it did not, with a one-line `error: …` on stderr - Derive is
 unreachable, does not list that asset, or the option named is not active. Exit `2`: the
 command line was wrong (usage on stderr).
+
+`chain` with no `--underlying` lists what the venue trades: one row per underlying, its
+`underlying` ticker and its `expiries` (ISO, UTC), order-book markets only. It is the
+answer to "what can I trade on Derive or Paradex"; `chain --underlying <ticker>` then
+gives one expiry's strikes. Name each exactly as listed: the venue gives no company
+name, so add none.
 
 `quote` is the sell side unless `--side buy`, `--side close` or `--side buyback` says
 otherwise. Every
@@ -162,6 +169,7 @@ Usage:
     derive_helper.py quote --side buyback --instrument ETH-20261030-2300-P --size 2 \
         [--premium-received 61.40]
     derive_helper.py chain --underlying ETH [--tenor monthly] [--type P]
+    derive_helper.py chain
 
 Every command takes --venue derive (the default) or --venue paradex.
 """
@@ -368,9 +376,7 @@ def iso(sec):
     return datetime.datetime.fromtimestamp(int(sec), datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def active_options(currency, opt_type):
-    if V["id"] == "paradex":
-        return pdx_active_options(currency, opt_type)
+def derive_options(currency):
     out, page = [], 1
     while True:
         r = post("public/get_all_instruments", {
@@ -381,8 +387,39 @@ def active_options(currency, opt_type):
         if page >= ((r.get("pagination") or {}).get("num_pages") or 1):
             break
         page += 1
-    return [i for i in out if i.get("is_active")
-            and (i.get("option_details") or {}).get("option_type") == opt_type]
+    return [i for i in out if i.get("is_active")]
+
+
+def active_options(currency, opt_type):
+    if V["id"] == "paradex":
+        return pdx_active_options(currency, opt_type)
+    return [i for i in derive_options(currency)
+            if (i.get("option_details") or {}).get("option_type") == opt_type]
+
+
+def listed():
+    """Every underlying the venue has order-book options on, and its expiries, by
+    the venue's own ticker. No venue gives a company name, so neither does this."""
+    now = time.time()
+    found = {}
+    try:
+        if V["id"] == "paradex":
+            for m in get("/markets", {"asset_kind": "OPTION"}).get("results") or []:
+                exp = int(m.get("expiry_at") or 0) // 1000
+                if m.get("trading_mode") == "STANDARD" and exp > now:
+                    found.setdefault(m.get("base_currency"), set()).add(exp)
+        else:
+            for c in post("public/get_all_currencies", {}) or []:
+                if not c.get("option"):
+                    continue
+                for i in derive_options(c["currency"]):
+                    exp = int((i.get("option_details") or {}).get("expiry") or 0)
+                    if exp > now:
+                        found.setdefault(c["currency"], set()).add(exp)
+    except Exception as exc:  # noqa: BLE001 - transport or a malformed answer
+        raise VenueError("could not list %s's options: %s" % (V["name"], exc))
+    return [{"underlying": u, "expiries": [iso(e) for e in sorted(es)]}
+            for u, es in sorted(found.items()) if u]
 
 
 def pick_expiry(insts, tenor, now):
@@ -961,8 +998,9 @@ def main():
                       help="strike this far out of the money (sell 10, buy 5 by default)")
     rule.add_argument("--delta", type=float, default=None)
 
-    c = sub.add_parser("chain", help="one expiry's strikes, with the book")
-    c.add_argument("--underlying", required=True)
+    c = sub.add_parser("chain", help="one expiry's strikes, with the book; "
+                                     "without --underlying, every underlying listed")
+    c.add_argument("--underlying")
     c.add_argument("--tenor", default="monthly", choices=sorted(TENOR_DAYS))
     c.add_argument("--type", default="P", choices=["P", "C"])
 
@@ -975,8 +1013,10 @@ def main():
         out = screen(a.tenor, a.collateral, a.otm_pct)
     elif a.cmd == "quote":
         out = run_quote(p, a)
-    else:
+    elif a.underlying:
         out = chain_rows(a.underlying, a.tenor, a.type)
+    else:
+        out = listed()
     print(json.dumps(tidy(out), indent=2))
 
 
