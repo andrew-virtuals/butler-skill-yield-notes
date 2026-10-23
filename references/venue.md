@@ -38,11 +38,11 @@ spread or a depth: those move by the hour.
   minutes after the bridge. Ethereum USDC is the exception: the bot does not gather from
   it, so it deposits directly with `--from 1` and is credited about **two minutes**
   after it is mined.
-- The minimum deposit is $5; Derive gives a smaller one to its security module, so
+- The minimum deposit is $10; Derive gives a smaller one to its security module, so
   Butler's server refuses it. A bridged deposit is priced first: if the bridge's
-  guaranteed arrival (bounded at 1% slippage) is under $5.05, it is refused with nothing
+  guaranteed arrival (bounded at 1% slippage) is under $10, it is refused with nothing
   moved. The direct Base bridge costs about $0.10; a route from another chain costs
-  more. In practice, never send under $6.
+  more.
 - A withdrawal pays to the owner's wallet on Ethereum once Derive's batch is proven:
   about **20 minutes** (17 measured), less a fee of up to $1. Bringing it
   to Base (the `:home` leg) is an ordinary `acp trade` with the trade bot's $2 minimum
