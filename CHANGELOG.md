@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.6.1
+
+- **Derive's minimum deposit is $10, not $5.** Derive's docs now say a deposit worth less
+  than $10 is not credited and goes to its Security Module, and Butler's server refuses
+  under $10. `references/venue.md` names $10 alone: the $5.05 bridge floor and the
+  "never send under $6" line are gone.
+
 ## 2.6.0
 
 - **Paradex, a second venue.** Every command takes `--venue paradex` (bevo-server's options
