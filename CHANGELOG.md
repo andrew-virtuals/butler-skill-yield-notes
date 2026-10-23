@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.6.2
+
+- **What a venue lists comes from the helper.** `chain` with no `--underlying` lists every
+  underlying the venue has order-book options on, with its expiries (ISO, UTC), from one
+  read of the venue's market list (Derive: its option currencies). Seen in QA: asked
+  "what stock options can I trade on Paradex", an agent answered from web docs, wrote
+  Paradex's symbols in Derive's form (`META-USD-20261130-650-C`) and named `MU`
+  "Mitsubishi UFJ Financial Group". SKILL.md step 2 now names the listing, and names are
+  said as listed, never with a company name (no venue gives one). `references/paradex.md`
+  notes that Paradex's list includes stocks, indices and commodities.
+- Check 4 of "Never file without all four" is the **helper's** quote: in the same test the
+  agent filed a buy priced from Paradex's raw mark, with no quote at all.
+- To stay under 12,000 characters: the `"title"` line in step 7 is dropped (the JSON there
+  already carries one) and step 6's pointer to `references/paradex.md` is shorter.
+
 ## 2.6.1
 
 - **Derive's minimum deposit is $10, not $5.** Derive's docs now say a deposit worth less
