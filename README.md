@@ -10,7 +10,7 @@ hub's `skills.json` entry list it under the new name and repo. Until then this r
 serves it.
 
 **Paradex (2.6.0).** A second venue on the same rail: `--venue paradex` on every helper
-and `acp options` line, `references/paradex.md` for what differs, `options-lifecycle@7`
+and `acp options` line, `references/paradex.md` for what differs, `options-lifecycle@8`
 with `VENUE`. The helper reads Paradex's public API into Derive's field shapes, so one
 quote engine and one set of gates serve both. A Paradex withdrawal pays to the owner's
 wallet on Base through Layerswap, usually within a minute.
@@ -52,7 +52,7 @@ helper and gets back a quote object with every number fixed, including the bound
 | Closing | `acp options close --min-proceeds` or `--max-cost` | Approval card; an IOC `reduce_only` limit sell of a bought position, or limit buy of a sold one. |
 | Outcome | `bevo-read request <key> --route options` | `approvalStatus`, plus `approvalOutcome` (`filledSize`, `netPremiumUsd` / `totalCostUsd` / `netProceedsUsd`, …) or `approvalFailureReason`. |
 | Withdrawing | `acp options withdraw`, then `acp trade` back to Base | Approval cards. |
-| Watching to expiry | the `options-lifecycle@6` duty template, `templates/options-lifecycle/` | Filed only when `approvalStatus` is `confirmed`, from `approvalOutcome`: `cash_secured_put`, `long_call` or `long_put`. Deleted after a confirmed close. |
+| Watching to expiry | the `options-lifecycle@8` duty template, `templates/options-lifecycle/` | Filed only when `approvalStatus` is `confirmed`, from `approvalOutcome`: `cash_secured_put`, `long_call` or `long_put`. Deleted after a confirmed close. |
 | Platforms rows | the `options-account@1` duty template, `templates/options-account/` | One per owner, filed once an account exists on any venue; it replaces an older `derive-account` duty. Sole writer of every venue's row on the wallet's Platforms tab, at the venue's own `worthUsd`, with its positions listed, and the only deposit-landed note (Derive's). A venue bevo-server adds needs no change here. |
 
 The rail contract is bevo-server's `docs/derive-options.md`. bevo-server is the only

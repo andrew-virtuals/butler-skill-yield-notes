@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.6.3
+
+- Files `options-lifecycle@8`. It reads exactly as @7 for Derive and Paradex; @8 adds
+  `VENUE: rysk` for the rysk skill, which files it after a Rysk sale.
+- `templates/options-lifecycle` 8: Rysk names, no early-close check or delivery buy on
+  Rysk, and the outcome from what Rysk paid out (`settled` in `/options/account`) rather
+  than from the price, since near the strike the maker chooses whether to exercise.
+
 ## 2.6.2
 
 - **What a venue lists comes from the helper.** `chain` with no `--underlying` lists every

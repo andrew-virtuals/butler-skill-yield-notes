@@ -1,7 +1,7 @@
 ---
 name: options-trading
 description: Trade options on Derive or Paradex - earn on idle USDC by selling cash-secured puts, buy a call or a put, close before expiry, and check or withdraw USDC and positions.
-version: 2.6.2
+version: 2.6.3
 metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","withdraw","withdraw my usdc","derive","my options","options account","options positions","free usdc","derive positions","my option positions","withdraw from derive","withdraw my free usdc","paradex","paradex options","paradex positions"],"requires":{"bins":["python3","bevo-read","acp"]}}}
 ---
 
@@ -147,7 +147,7 @@ this chat. One missing: ask, and file nothing this turn.
    `approvalOutcome`, never the quote. After an open or a buy, `duty_create`:
 
    ```json
-   {"recipe": "options-lifecycle@7", "title": "Watch {INSTRUMENT} to expiry",
+   {"recipe": "options-lifecycle@8", "title": "Watch {INSTRUMENT} to expiry",
     "triggers": [{"kind": "timer", "intervalSeconds": 900}],
     "params": {"VENUE": "<venue>", "INSTRUMENT": "<instrument>", "PRODUCT": "<product>", "UNDERLYING": "<prefix>",
     "STRIKE": <strike>, "SIZE": <filledSize>, "PREMIUM_USD": <usd>, "COLLATERAL_USD": <usd>}}

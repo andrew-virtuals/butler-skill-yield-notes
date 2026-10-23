@@ -1,5 +1,15 @@
 # Changelog
 
+## 8
+
+- **Rysk.** `VENUE` `rysk`, sold puts only, named as Rysk's fields (`SOL-30OCT26-95-P`,
+  `HYPE-6NOV26-56.5-P`); every read adds `venue=rysk`. Rysk settles **physically** and,
+  near the strike, the maker chooses whether to exercise, so the outcome is what Rysk
+  paid out - the asset or the USDC - from `/options/account`'s `settled` (bevo-server's
+  Rysk venue), never inferred from the price; the duty waits for it as for a missing
+  price. No delivery buy (`DELIVER_ASSET` stops a Rysk duty) and no early-close check:
+  a Rysk put cannot be bought back. Supersedes `options-lifecycle@7`.
+
 ## 7
 
 - **Paradex.** A `VENUE` setting, `derive` (the default) or `paradex`. On Paradex it reads
