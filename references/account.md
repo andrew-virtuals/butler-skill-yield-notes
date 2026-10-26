@@ -70,8 +70,9 @@ Butler's server handles this after the owner approves the card, never you:
 
 ## The Platforms row
 
-The wallet page shows each venue (Derive, Paradex) as one row on its Platforms tab, with no
-separate options line in the wallet total. Every one of those rows belongs to the one
+The wallet page shows each venue as one row on its Platforms tab, and Derive as one row per
+subaccount (`PRIME`, `RWA`), each with its cash and positions, with no separate options
+line in the wallet total. Every one of those rows belongs to the one
 `options-account` duty (step 9), which reads every venue every 10 minutes, writes each at
 the venue's own figure for what the account is worth, and also tells the owner when a
 Derive deposit lands. An older `derive-account` duty is replaced by it (step 9). Butler

@@ -61,7 +61,7 @@ helper and gets back a quote object with every number fixed, including the bound
 | Outcome | `bevo-read request <key> --route options` | `approvalStatus`, plus `approvalOutcome` (`filledSize`, `netPremiumUsd` / `totalCostUsd` / `netProceedsUsd`, …) or `approvalFailureReason`. |
 | Withdrawing | `acp options withdraw`, then `acp trade` back to Base | Approval cards. |
 | Watching to expiry | the `options-lifecycle@8` duty template, `templates/options-lifecycle/` | Filed only when `approvalStatus` is `confirmed`, from `approvalOutcome`: `cash_secured_put`, `long_call` or `long_put`. Deleted after a confirmed close. |
-| Platforms rows | the `options-account@1` duty template, `templates/options-account/` | One per owner, filed once an account exists on any venue; it replaces an older `derive-account` duty. Sole writer of every venue's row on the wallet's Platforms tab, at the venue's own `worthUsd`, with its positions listed, and the only deposit-landed note (Derive's). A venue bevo-server adds needs no change here. |
+| Platforms rows | the `options-account@2` duty template, `templates/options-account/` | One per owner, filed once an account exists on any venue; it replaces an older `derive-account` duty. Sole writer of every venue's row on the wallet's Platforms tab (one per Derive subaccount), at the venue's own `worthUsd`, with its positions listed, and the only deposit-landed note (Derive's). A venue bevo-server adds needs no change here. |
 
 The rail contract is bevo-server's `docs/derive-options.md`. bevo-server is the only
 thing that signs: there is no session key and nothing in this repo touches a key.

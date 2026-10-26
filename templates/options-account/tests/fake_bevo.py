@@ -9,6 +9,7 @@ assertions.
 import importlib.util
 import json
 import os
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -27,14 +28,16 @@ class BevoError(Exception):
 class FakeBevo:
     BevoError = BevoError
 
-    def __init__(self, times, reads, state):
+    def __init__(self, times, reads, state, platforms=None, refuse=()):
         self.times = list(times)
         self.reads = {path: list(value) if isinstance(value, list) else value
                       for path, value in reads.items()}
         self.state = dict(state)
         self.now = self.times[0]
+        self.platforms = [] if platforms is None else platforms
+        self.refuse = set(refuse)
         self.logs, self.notes, self.pushes, self.fails = [], [], [], []
-        self.statuses, self.rows, self.read_calls = [], [], []
+        self.statuses, self.rows, self.read_calls, self.removed = [], [], [], []
 
     def log(self, message):
         self.logs.append(str(message))
@@ -53,7 +56,19 @@ class FakeBevo:
     def platform_balance(self, site, name, usd, account="", icon=None, positions=None):
         self.rows.append({"site": site, "name": name, "usd": usd, "account": account,
                           "positions": positions})
-        return {"id": "row-1"}
+        # The SDK answers {} for a write the server refused (logged, never raised).
+        return {} if account in self.refuse else {"id": "row-1"}
+
+    def platform_balances(self):
+        if isinstance(self.platforms, BaseException):
+            raise self.platforms
+        return list(self.platforms)
+
+    def spawned(self, argv, **_kwargs):
+        """`subprocess.run`: records `bevo-platforms remove <id>` instead of running it."""
+        if list(argv[:2]) == ["bevo-platforms", "remove"]:
+            self.removed.append(argv[2])
+        return subprocess.CompletedProcess(argv, 0, "", "")
 
     def read(self, path, params=None):
         """A list fixture answers one item per call and repeats its last."""
@@ -75,14 +90,14 @@ class FakeBevo:
             yield {"kind": "timer"}
 
 
-def run(times, reads=None, state=None, params=None):
-    fake = FakeBevo(times, reads or {}, state or {})
+def run(times, reads=None, state=None, params=None, platforms=None, refuse=()):
+    fake = FakeBevo(times, reads or {}, state or {}, platforms, refuse)
     sys.modules["bevo"] = fake
     spec = importlib.util.spec_from_file_location("duty_under_test", ROOT / "duty.py")
     module = importlib.util.module_from_spec(spec)
     env = {"PARAMS": json.dumps(params or {})}
     with mock.patch("time.time", lambda: fake.now), mock.patch("time.sleep", lambda _s: None), \
-            mock.patch.dict(os.environ, env):
+            mock.patch("subprocess.run", fake.spawned), mock.patch.dict(os.environ, env):
         spec.loader.exec_module(module)
     return fake
 
@@ -104,8 +119,24 @@ def venue(vid, name, site, usdc="0", worth=None, positions=(), exists=True, late
             "lines": []}
 
 
-def derive(usdc="0", worth=None, positions=(), exists=True):
-    return venue("derive", "Derive", DERIVE, usdc, worth, positions, exists, late=True)
+def derive(usdc="0", worth=None, positions=(), exists=True, subs=None):
+    entry = venue("derive", "Derive", DERIVE, usdc, worth, positions, exists, late=True)
+    if subs is not None:
+        entry["account"]["accounts"] = list(subs)
+    return entry
+
+
+def subaccount(universe, sub_id, usdc, worth, positions=()):
+    """One entry of Derive's `account.accounts`: a risk universe's own subaccount."""
+    return {"exists": True, "subaccountId": sub_id, "universe": universe, "usdc": usdc,
+            "worthUsd": worth, "positions": list(positions)}
+
+
+def platform(row_id, site, account):
+    """A row as `bevo.platform_balances()` lists it."""
+    host = site.split("://", 1)[1].split("/", 1)[0].lower()
+    return {"id": row_id, "siteHost": host[4:] if host.startswith("www.") else host,
+            "account": account}
 
 
 def paradex(usdc="0", worth=None, positions=(), exists=True):

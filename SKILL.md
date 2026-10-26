@@ -1,7 +1,7 @@
 ---
 name: options-trading
 description: Trade options on Derive, Paradex or Rysk - earn on idle USDC by selling cash-secured puts, buy a call or a put, close before expiry, and check or withdraw USDC and positions.
-version: 2.7.0
+version: 2.7.1
 metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","withdraw","withdraw my usdc","derive","my options","options account","options positions","free usdc","derive positions","my option positions","withdraw from derive","withdraw my free usdc","paradex","paradex options","paradex positions","rysk","rysk options","rysk positions","physically settled","hyperevm"],"requires":{"bins":["python3","bevo-read","acp"]}}}
 ---
 
@@ -67,7 +67,7 @@ this chat. One missing: ask, and file nothing this turn.
 
    `signerReady: false` - stop: the owner must enable Butler's signer first. Fields:
    `references/account.md`. An unreadable account is not an empty one. On
-   `exists: true` on either venue, step 9.
+   `exists: true` on any venue, step 9.
 
 2. [FIXED] Write the script in `references/helper.md` to `/tmp/derive_helper.py`.
    Quote with the line for the intent; the strike is a rule, never your number:
@@ -173,14 +173,15 @@ this chat. One missing: ask, and file nothing this turn.
    acp trade --token-in usdc --chain-in 1 --amount-in <USDC_ARRIVED> --token-out usdc --chain-out 8453 --idempotency-key <KEY>:home
    ```
 
-9. [FIXED] As long as an account exists on any venue and `duty_list` has no
-   `options-account` duty, file it, unasked, then delete any `derive-account` duty:
+9. [FIXED] Once an account exists on any venue, unasked: with no `options-account`
+   duty, file it and delete any `derive-account` duty; one on `options-account@1`,
+   `duty_update` with this recipe.
 
    ```json
-   {"recipe": "options-account@1", "title": "Options accounts", "triggers": [{"kind": "timer", "intervalSeconds": 600}]}
+   {"recipe": "options-account@2", "title": "Options accounts", "triggers": [{"kind": "timer", "intervalSeconds": 600}]}
    ```
 
-   It alone writes every venue's Platforms row: no watcher or `bevo-platforms set` of yours.
+   It alone writes Platforms rows; never `bevo-platforms set`.
 
 ## Idempotency and retries
 

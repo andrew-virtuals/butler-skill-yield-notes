@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.7.1
+
+- Files `options-account@2`: one Platforms row per Derive subaccount (`PRIME`, `RWA`),
+  each at its own worth with its cash and positions, replacing the one row that merged
+  them. Step 9 updates a duty still on `@1` in place, unasked.
+
 ## 2.7.0
 
 - **Rysk, as a third venue.** Selling a cash-secured put on Rysk is the same procedure as

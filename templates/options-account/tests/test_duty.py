@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fake_bevo import (DERIVE, PARADEX, WALLET, BevoError, accounts, derive, every,  # noqa: E402
-                       paradex, position, run, venue)
+                       paradex, platform, position, run, subaccount, venue)
 
 SOURCE = (Path(__file__).resolve().parent.parent / "duty.py").read_text()
 
@@ -58,6 +58,51 @@ class EveryVenue(unittest.TestCase):
     def test_checks_at_start_and_on_every_tick(self):
         fake = run(every(10, 3), {"/options/account": accounts(paradex("5", 5))})
         self.assertEqual(len(fake.rows), 3)
+
+
+def split_derive(prime_worth=51.53, rwa_worth=6.58):
+    # Mainnet (2026-10-26): PRIME holds ETH options, RWA a XAUT call.
+    prime = subaccount("PRIME", 1, 17.02, prime_worth, [position("ETH-20261030-2700-C", 0.1, 0.13),
+                                                        position("ETH-20261030-2450-P", 0.24, 34.38)])
+    rwa = subaccount("RWA", 2, 0, rwa_worth, [position("XAUT-20261113-4200-C", 0.23, 6.58)])
+    return derive("17.02", 58.11, subs=[prime, rwa])
+
+
+class Subaccounts(unittest.TestCase):
+    def test_one_row_per_subaccount_at_its_own_worth_cash_first(self):
+        fake = run([0], {"/options/account": accounts(split_derive())})
+        self.assertEqual([(row["account"], row["usd"]) for row in fake.rows], [("PRIME", 51.53), ("RWA", 6.58)])
+        self.assertEqual({(row["site"], row["name"]) for row in fake.rows}, {(DERIVE, "Derive")})
+        self.assertEqual([(p["title"], p["valueUsd"]) for p in fake.rows[0]["positions"]],
+                         [("Cash", 17.02), ("Bought 0.1 ETH 2,700 call", 0.13), ("Bought 0.24 ETH 2,450 put", 34.38)])
+        self.assertEqual([(p["title"], p["valueUsd"]) for p in fake.rows[1]["positions"]],
+                         [("Cash", 0), ("Bought 0.23 XAUT 4,200 call", 6.58)])
+        self.assertEqual(fake.statuses, [("ok", {"value": 58.11, "positions": 3})])
+
+    def test_the_venue_row_and_a_gone_subaccount_are_retired_and_nothing_else(self):
+        existing = [platform("old", DERIVE, WALLET), platform("alt", DERIVE, "ALT"),
+                    platform("prime", DERIVE, "PRIME"), platform("px", PARADEX, WALLET),
+                    platform("stake", "https://stake.com", "")]
+        fake = run([0], {"/options/account": accounts(split_derive(), paradex("5", 5))}, platforms=existing)
+        self.assertEqual(fake.removed, ["old", "alt"])
+
+    def test_nothing_is_retired_while_a_subaccount_row_is_unsaved(self):
+        fake = run([0], {"/options/account": accounts(split_derive())},
+                   platforms=[platform("old", DERIVE, WALLET)], refuse={"RWA"})
+        self.assertEqual(fake.removed, [])
+
+    def test_a_subaccount_with_no_worth_keeps_every_row(self):
+        fake = run([0], {"/options/account": accounts(split_derive(rwa_worth=None), paradex("5", 5))},
+                   platforms=[platform("old", DERIVE, WALLET)])
+        self.assertEqual(rows(fake), [(PARADEX, "Paradex", 5)])
+        self.assertEqual(fake.removed, [])
+        self.assertEqual(fake.statuses, [("partial", {"value": 5, "skipped": 1})])
+
+    def test_rows_that_cannot_be_listed_are_left_and_the_check_still_reports(self):
+        fake = run([0], {"/options/account": accounts(split_derive())}, platforms=BevoError("503"))
+        self.assertEqual(fake.removed, [])
+        self.assertTrue(any("none was retired" in line for line in fake.logs))
+        self.assertEqual(fake.statuses, [("ok", {"value": 58.11, "positions": 3})])
 
 
 class OneVenueMissed(unittest.TestCase):
@@ -146,7 +191,7 @@ class Source(unittest.TestCase):
                 imported |= {alias.name for alias in node.names}
             elif isinstance(node, ast.ImportFrom):
                 imported.add(node.module)
-        self.assertEqual(imported, {"bevo", "random", "time"})
+        self.assertEqual(imported, {"bevo", "random", "subprocess", "time"})
 
     def test_names_no_venue_and_never_fails_or_runs_acp(self):
         called = {node.func.attr for node in ast.walk(ast.parse(SOURCE))
