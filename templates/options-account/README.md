@@ -4,7 +4,7 @@ Keeps the owner's account on every options venue on the wallet page's Platforms 
 
 ## How it is filed
 
-`{"recipe": "options-account@2", "title": "Options accounts", "triggers": [{"kind": "timer", "intervalSeconds": 600}]}`. No settings. One per owner: a second one adds nothing, because both write the same rows. An owner still running `derive-account` has it removed when this one is filed, so each row has one writer. A duty filed from `options-account@1` is updated in place with `duty_update {"recipe": "options-account@2"}`.
+`{"recipe": "options-account@3", "title": "Options accounts", "triggers": [{"kind": "timer", "intervalSeconds": 600}]}`. No settings. One per owner: a second one adds nothing, because both write the same rows. An owner still running `derive-account` has it removed when this one is filed, so each row has one writer. A duty on `@1`/`@2`, or forked from one, is updated in place with `duty_update {"recipe": "options-account@3"}`.
 
 ## What it does
 
@@ -19,7 +19,7 @@ It checks once when it starts, then on every tick, a random 0 to 60 seconds afte
 | `available: false` with a `reason` (not traded here) | none | not counted |
 | `account: null` (Butler's signer is off) | untouched | Butler's signer is off |
 
-The worth is the venue's own `worthUsd`, written as it stands: Paradex's is its `account_value`. Each position is listed as `Bought 0.1 ETH 2,550 call`, with its instrument, its signed value (a sold option is negative: what buying it back costs), when it expires and how far up or down it is.
+The worth is the venue's own `worthUsd`, written as it stands: Paradex's is its `account_value`. Each position is listed as `Bought 0.1 ETH 2,550 call`, with its instrument, its signed value (a sold option is negative: what buying it back costs), when it expires and how far up or down it is. A position its venue does not mark (Rysk) has no value, as the worth counts it: the premium received and a put's collateral; once expired, "Awaiting settlement".
 
 ## Subaccounts
 

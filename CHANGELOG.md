@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.7.2
+
+- Files `options-account@3`: a Rysk put is listed on its Platforms row, with no value, the
+  premium received and its collateral. Step 9 updates a duty on `@1` or `@2`, or a fork of
+  one, in place, unasked.
+
 ## 2.7.1
 
 - Files `options-account@2`: one Platforms row per Derive subaccount (`PRIME`, `RWA`),

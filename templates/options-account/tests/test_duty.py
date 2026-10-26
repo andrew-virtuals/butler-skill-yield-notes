@@ -60,6 +60,35 @@ class EveryVenue(unittest.TestCase):
         self.assertEqual(len(fake.rows), 3)
 
 
+RYSK = "https://app.rysk.finance"
+
+
+def sold_put(instrument="SOL-30OCT26-93-P", size=10, received=2.15, expires="in 3 days"):
+    # Butler's server reads Rysk with no mark, so no value and no P&L; `costUsd` is the premium received.
+    parts = instrument.split("-")
+    return {"instrument": instrument, "size": -size, "underlying": parts[0], "strike": float(parts[2]),
+            "type": "P", "valueUsd": None, "costUsd": received, "pnlUsd": None, "expiresIn": expires}
+
+
+class Unmarked(unittest.TestCase):
+    # Mainnet (2026-10-26): a sold SOL put on Rysk, which marks no position.
+    def test_a_position_with_no_mark_is_listed_without_a_value(self):
+        rysk = venue("rysk", "Rysk", RYSK, "0", 930, [sold_put()])
+        fake = run([0], {"/options/account": accounts(rysk)})
+        self.assertEqual(rows(fake), [(RYSK, "Rysk", 930)])
+        self.assertEqual(fake.rows[0]["positions"], [{
+            "title": "Sold 10 SOL 93 put", "subtitle": "SOL-30OCT26-93-P",
+            "details": [{"label": "Expires", "value": "in 3 days"}, {"label": "Received", "value": "$2.15"},
+                        {"label": "Collateral", "value": "$930.00"}]}])
+        self.assertEqual(fake.statuses, [("ok", {"value": 930, "positions": 1})])
+
+    def test_an_expired_unsettled_one_awaits_settlement(self):
+        rysk = venue("rysk", "Rysk", RYSK, "0", 930, [sold_put(expires="expired")])
+        line = run([0], {"/options/account": accounts(rysk)}).rows[0]["positions"][0]
+        self.assertEqual(line["status"], "Awaiting settlement")
+        self.assertNotIn("Expires", [d["label"] for d in line["details"]])
+
+
 def split_derive(prime_worth=51.53, rwa_worth=6.58):
     # Mainnet (2026-10-26): PRIME holds ETH options, RWA a XAUT call.
     prime = subaccount("PRIME", 1, 17.02, prime_worth, [position("ETH-20261030-2700-C", 0.1, 0.13),

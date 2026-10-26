@@ -61,18 +61,41 @@ def listed(account):
     rows = []
     for row in account.get("positions") or []:
         size = float(row.get("size") or 0)
-        if not size or row.get("valueUsd") is None:
+        if not size:
             continue
         kind = "call" if row.get("type") == "C" else "put"
+        strike = float(row.get("strike") or 0)
         title = "%s %s %s %s %s" % ("Bought" if size > 0 else "Sold", format(abs(size), "g"),
-                                    row.get("underlying") or "", format(float(row.get("strike") or 0), ",g"), kind)
-        value = float(row["valueUsd"])
-        details = [{"label": "Expires", "value": str(row.get("expiresIn") or "")}]
-        if row.get("pnlUsd") is not None:
-            details.append({"label": "Up/down", "value": "$%s" % format(round(float(row["pnlUsd"]), 2), ",.2f")})
-        rows.append({"title": " ".join(title.split()), "subtitle": str(row.get("instrument") or ""),
-                     "valueUsd": round(value if size > 0 else -value, 2), "details": details})
+                                    row.get("underlying") or "", format(strike, ",g"), kind)
+        line = {"title": " ".join(title.split()), "subtitle": str(row.get("instrument") or "")}
+        if row.get("valueUsd") is not None:
+            value = float(row["valueUsd"])
+            details = [{"label": "Expires", "value": str(row.get("expiresIn") or "")}]
+            if row.get("pnlUsd") is not None:
+                details.append({"label": "Up/down", "value": "$%s" % usd(row["pnlUsd"])})
+            line.update(valueUsd=round(value if size > 0 else -value, 2), details=details)
+        else:
+            line["details"] = unmarked(row, size, strike, kind)
+            if row.get("expiresIn") == "expired":
+                line["status"] = "Awaiting settlement"
+        rows.append(line)
     return rows[:20]
+
+
+def unmarked(row, size, strike, kind):
+    """Details for a position its venue puts no mark on, listed without a value.
+
+    The account's worth already counts it, at what it would settle to; the premium
+    shown as its value would read as owed when it was paid to the owner.
+    """
+    details = []
+    if row.get("expiresIn") and row["expiresIn"] != "expired":
+        details.append({"label": "Expires", "value": str(row["expiresIn"])})
+    if row.get("costUsd") is not None:
+        details.append({"label": "Received" if size < 0 else "Paid", "value": "$%s" % usd(row["costUsd"])})
+    if size < 0 and kind == "put" and strike:
+        details.append({"label": "Collateral", "value": "$%s" % usd(strike * abs(size))})
+    return details
 
 
 def landed(venue, usdc, held):

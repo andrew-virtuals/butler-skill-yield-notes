@@ -1,5 +1,17 @@
 # Changelog
 
+## 3
+
+- **A position with no mark is listed.** Rysk marks no position (`valueUsd: null`), so
+  every Rysk put was left off its row. It is now listed with no value, since the venue's
+  `worthUsd` already counts it at what it would settle to, and its details give the
+  premium received (`costUsd`, "Paid" for a bought one) and, for a sold put, the
+  collateral. An expired one not yet settled reads "Awaiting settlement". Seen on
+  mainnet: an agent forked `@2` to list the premium as the value, which the app showed as
+  "−$2.15", owed, for a premium the owner had been paid.
+- Supersedes `options-account@2`. A duty on `@1` or `@2`, or a fork of one, is updated in
+  place (`duty_update {"recipe": "options-account@3"}`, SKILL.md step 9).
+
 ## 2
 
 - **One row per subaccount.** A venue whose account is split into subaccounts

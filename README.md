@@ -6,7 +6,7 @@ selling cash-secured puts, buying calls and puts, and closing them on **Derive**
 people maintaining the repo. A butler receives only `SKILL.md` and `references/**/*.md`;
 the registry also serves the duty templates under `templates/`.
 
-- **Version:** 2.7.1 (`SKILL.md`), with `options-lifecycle` 9 and `options-account` 2.
+- **Version:** 2.7.2 (`SKILL.md`), with `options-lifecycle` 9 and `options-account` 3.
   What changed in each release: `CHANGELOG.md`.
 - **Registry name:** `options-trading`, listed in the hub's `skills.json` from this repo.
   The skill was `yield-notes` before 2.0.0, which is why the repository still has that
@@ -56,7 +56,7 @@ helper and `acp options` line for a trade then carries `--venue paradex` or
 | Outcome | `bevo-read request <key> --route options` | `approvalStatus`, then `approvalOutcome` (the fill) or `approvalFailureReason`. |
 | Withdrawing | `acp options withdraw` | One approval card. A Derive withdrawal also takes an `acp trade` home to Base. |
 | Watching to expiry | the `options-lifecycle@9` duty, `templates/options-lifecycle/` | Filed only after a confirmed open or buy, from the fill. Sends a heads-up the day before expiry and the outcome once the option settles. Deleted after a confirmed close. |
-| Platforms rows | the `options-account@2` duty, `templates/options-account/` | One per owner, filed unasked once any venue account exists. The only writer of the options rows on the wallet's Platforms tab: one row per venue, and one per Derive subaccount, each at the venue's own worth with its positions listed. |
+| Platforms rows | the `options-account@3` duty, `templates/options-account/` | One per owner, filed unasked once any venue account exists. The only writer of the options rows on the wallet's Platforms tab: one row per venue, and one per Derive subaccount, each at the venue's own worth with its positions listed. |
 
 ## Safety model
 
@@ -154,9 +154,9 @@ CI runs the same. Two limits to keep in mind:
   It supersedes `@1`–`@8`.
 - **`options-account`:** one per owner, writing the Platforms rows for every venue whose
   account exists. Each row's name, site and worth come from the account read, so a new
-  venue needs no new template and nothing refiled. It supersedes `options-account@1` and
+  venue needs no new template and nothing refiled. It supersedes `options-account@1`, `@2` and
   `derive-account@1`, so the registry resolves those refs to it, and `SKILL.md` step 9
-  moves a filed `@1` onto it.
+  moves a filed `@1` or `@2`, or a fork of one, onto it.
 
 A template's `version` is its own integer, separate from the skill's semver. A filed
 duty runs the code it was filed with, so any change to `duty.py` needs a version bump,
