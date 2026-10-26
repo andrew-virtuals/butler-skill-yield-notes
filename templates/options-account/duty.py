@@ -5,7 +5,10 @@ One read of the options rail answers for every venue bevo-server trades
 venue's site and the owner's wallet. The row's name, site and worth all come
 from that read: the worth is the venue's own (`worthUsd`), so no venue's
 accounting lives here, and a venue the server adds appears on the next check
-with nothing refiled.
+with nothing refiled. A venue that holds its USDC itself (`cashLine`: Paradex)
+lists that cash first on its row, so the row's lines add up to its worth; a
+venue whose USDC is the owner's own wallet (Rysk) does not, since the wallet's
+Tokens tab already counts it.
 
 A venue whose account is split into subaccounts (`accounts`: Derive's risk
 universes) gets one row per subaccount instead, keyed by its name ("PRIME",
@@ -126,6 +129,11 @@ def site_host(url):
     return host[4:] if host.startswith("www.") else host
 
 
+def cash_line(usdc):
+    """An account's USDC as its row's first line."""
+    return {"title": "Cash", "valueUsd": round(float(usdc or 0), 2)}
+
+
 def subaccount_rows(subs):
     """(account, worth, positions, open count) per subaccount, or None when one has no worth.
 
@@ -138,9 +146,8 @@ def subaccount_rows(subs):
             return None
         named = " ".join(str(sub.get("universe") or "").split())
         held = listed(sub)
-        cash = {"title": "Cash", "valueUsd": round(float(sub.get("usdc") or 0), 2)}
         rows.append((named or "Subaccount %s" % sub.get("subaccountId"), round(float(worth), 2),
-                     [cash] + held[:19], len(held)))
+                     [cash_line(sub.get("usdc"))] + held[:19], len(held)))
     return rows
 
 
@@ -208,9 +215,11 @@ def write(entry, wallet):
         held = sum(count for _, _, _, count in rows)
     else:
         positions = listed(account)
+        held = len(positions)
+        if entry.get("cashLine") is True:
+            positions = [cash_line(account.get("usdc"))] + positions[:19]
         bevo.platform_balance(site, name, value, account=entry.get("wallet") or wallet,
                               positions=positions)
-        held = len(positions)
     credit = landed(venue, float(account.get("usdc") or 0), holdings(account)) if late else 0.0
     if credit:
         bevo.notify("Your %s deposit landed: $%s USDC credited. The account is worth $%s now."

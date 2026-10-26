@@ -32,9 +32,9 @@ class EveryVenue(unittest.TestCase):
         self.assertEqual(rows(fake), [(DERIVE, "Derive", 4.54), (PARADEX, "Paradex", 13.93)])
         self.assertEqual({row["account"] for row in fake.rows}, {WALLET})
         self.assertEqual([p["title"] for p in fake.rows[1]["positions"]],
-                         ["Bought 0.1 ETH 2,500 call", "Sold 0.2 ETH 2,300 put"])
-        self.assertEqual([p["valueUsd"] for p in fake.rows[1]["positions"]], [5.82, -1.2])
-        self.assertEqual(fake.rows[1]["positions"][0]["details"],
+                         ["Cash", "Bought 0.1 ETH 2,500 call", "Sold 0.2 ETH 2,300 put"])
+        self.assertEqual([p["valueUsd"] for p in fake.rows[1]["positions"]], [8.11, 5.82, -1.2])
+        self.assertEqual(fake.rows[1]["positions"][1]["details"],
                          [{"label": "Expires", "value": "in 2 days"}, {"label": "Up/down", "value": "$0.07"}])
         self.assertEqual(fake.statuses, [("ok", {"value": 18.47, "positions": 3})])
 
@@ -53,7 +53,20 @@ class EveryVenue(unittest.TestCase):
 
     def test_an_empty_account_that_reads_fine_is_a_real_zero(self):
         fake = run([0], {"/options/account": accounts(paradex("0", 0))})
-        self.assertEqual((fake.rows[0]["usd"], fake.rows[0]["positions"]), (0, []))
+        self.assertEqual((fake.rows[0]["usd"], fake.rows[0]["positions"]),
+                         (0, [{"title": "Cash", "valueUsd": 0}]))
+
+    # Mainnet (2026-10-26): $9.26 on Paradex, $7.30 of it a call, so $1.96 free.
+    def test_a_venue_holding_its_cash_lists_it_first_and_counts_it_as_no_position(self):
+        fake = run([0], {"/options/account": accounts(paradex("1.964", 9.264, [position(CALL, 0.01, 7.3)]))})
+        self.assertEqual([(p["title"], p["valueUsd"]) for p in fake.rows[0]["positions"]],
+                         [("Cash", 1.96), ("Bought 0.01 ETH 2,500 call", 7.3)])
+        self.assertEqual(fake.statuses, [("ok", {"value": 9.26, "positions": 1})])
+
+    def test_cash_stays_inside_the_twenty_line_limit(self):
+        many = [position("ETH-USD-6NOV26-%d-C" % (2000 + i), 0.1, 1) for i in range(25)]
+        line = run([0], {"/options/account": accounts(paradex("3", 28, many))}).rows[0]["positions"]
+        self.assertEqual((len(line), line[0]["title"]), (20, "Cash"))
 
     def test_checks_at_start_and_on_every_tick(self):
         fake = run(every(10, 3), {"/options/account": accounts(paradex("5", 5))})

@@ -3,8 +3,8 @@
 ## 2.7.2
 
 - Files `options-account@3`: a Rysk put is listed on its Platforms row, with no value, the
-  premium received and its collateral. Step 9 updates a duty on `@1` or `@2`, or a fork of
-  one, in place, unasked.
+  premium received and its collateral, and a Paradex row lists its free USDC first as
+  `Cash`. Step 9 updates a duty on `@1` or `@2`, or a fork of one, in place, unasked.
 
 ## 2.7.1
 
