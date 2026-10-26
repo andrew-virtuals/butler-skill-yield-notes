@@ -10,10 +10,17 @@ hub's `skills.json` entry list it under the new name and repo. Until then this r
 serves it.
 
 **Paradex (2.6.0).** A second venue on the same rail: `--venue paradex` on every helper
-and `acp options` line, `references/paradex.md` for what differs, `options-lifecycle@7`
+and `acp options` line, `references/paradex.md` for what differs, `options-lifecycle@8`
 with `VENUE`. The helper reads Paradex's public API into Derive's field shapes, so one
 quote engine and one set of gates serve both. A Paradex withdrawal pays to the owner's
 wallet on Base through Layerswap, usually within a minute.
+
+**Rysk (2.7.0).** A third venue, folded in from the deprecated `butler-skill-rysk`:
+`--venue rysk` on the `acp options` lines, `references/rysk.md` for what differs. Rysk
+is RFQ (a quote lives seconds), so its quotes come from its own script
+(`references/rysk-helper.md`) in the Derive helper's field names, and the card approves
+a floor that Butler's server re-quotes against for 5 minutes. Puts only, on USDC in the
+owner's HyperEVM wallet, settled **physically**: an assigned put delivers the asset.
 
 **Status: v2.0.0, built for Derive v3 and the `acp options` rail.** Selling needs the
 hub validator that knows `acp options open|deposit|withdraw|account`; buying and
@@ -48,11 +55,12 @@ helper and gets back a quote object with every number fixed, including the bound
 | Account read | `acp options account` | The owner's Derive account: network, free USDC, positions (positive size = bought), USDC on Ethereum, signer readiness. |
 | Funding | `acp options deposit` | One approval card: bevo-server bridges Base USDC straight to the owner's own Derive deposit address (`--from 1` deposits USDC already on Ethereum). |
 | Selling | `acp options open` | Approval card; an IOC limit sell after approval. |
+| Rysk quotes | `references/rysk-helper.md`, with `python3` | Rysk V12's public RFQ socket (`inventory`, `request`, `assets`, `positions`) and `/api/gas`. Read-only; the server re-quotes and signs after approval. |
 | Buying | `acp options buy --max-cost` | Approval card; an IOC limit buy whose premium plus fee stays within `--max-cost`. |
 | Closing | `acp options close --min-proceeds` or `--max-cost` | Approval card; an IOC `reduce_only` limit sell of a bought position, or limit buy of a sold one. |
 | Outcome | `bevo-read request <key> --route options` | `approvalStatus`, plus `approvalOutcome` (`filledSize`, `netPremiumUsd` / `totalCostUsd` / `netProceedsUsd`, …) or `approvalFailureReason`. |
 | Withdrawing | `acp options withdraw`, then `acp trade` back to Base | Approval cards. |
-| Watching to expiry | the `options-lifecycle@6` duty template, `templates/options-lifecycle/` | Filed only when `approvalStatus` is `confirmed`, from `approvalOutcome`: `cash_secured_put`, `long_call` or `long_put`. Deleted after a confirmed close. |
+| Watching to expiry | the `options-lifecycle@8` duty template, `templates/options-lifecycle/` | Filed only when `approvalStatus` is `confirmed`, from `approvalOutcome`: `cash_secured_put`, `long_call` or `long_put`. Deleted after a confirmed close. |
 | Platforms rows | the `options-account@1` duty template, `templates/options-account/` | One per owner, filed once an account exists on any venue; it replaces an older `derive-account` duty. Sole writer of every venue's row on the wallet's Platforms tab, at the venue's own `worthUsd`, with its positions listed, and the only deposit-landed note (Derive's). A venue bevo-server adds needs no change here. |
 
 The rail contract is bevo-server's `docs/derive-options.md`. bevo-server is the only

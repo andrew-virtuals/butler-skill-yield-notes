@@ -1,13 +1,13 @@
 ---
 name: options-trading
-description: Trade options on Derive or Paradex - earn on idle USDC by selling cash-secured puts, buy a call or a put, close before expiry, and check or withdraw USDC and positions.
-version: 2.6.2
-metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","withdraw","withdraw my usdc","derive","my options","options account","options positions","free usdc","derive positions","my option positions","withdraw from derive","withdraw my free usdc","paradex","paradex options","paradex positions"],"requires":{"bins":["python3","bevo-read","acp"]}}}
+description: Trade options on Derive, Paradex or Rysk - earn on idle USDC by selling cash-secured puts, buy a call or a put, close before expiry, and check or withdraw USDC and positions.
+version: 2.7.0
+metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","withdraw","withdraw my usdc","derive","my options","options account","options positions","free usdc","derive positions","my option positions","withdraw from derive","withdraw my free usdc","paradex","paradex options","paradex positions","rysk","rysk options","rysk positions","physically settled","hyperevm"],"requires":{"bins":["python3","bevo-read","acp"]}}}
 ---
 
 ## When to use
 
-Your owner wants one of four things on Derive's or Paradex's options market:
+Your owner wants one of four things on Derive's, Paradex's or Rysk's options market:
 
 - **Earn** - "earn on my USDC", "get paid to buy the dip": **sell** one cash-secured
   put, fully collateralised in USDC. They keep the premium and may end up buying the
@@ -35,11 +35,11 @@ Not this skill: covered calls, spreads, leverage, or a trade the helper refuses.
    above $2,664 on 30 October, the $190 is gone."*
 4. **First time for that kind of trade:** the plain yes answers in
    `references/selling.md` or `references/buying.md`. A no or a vague answer stops it.
-5. **Derive figures come only from this turn's reads:** sizes, prices and positions
+5. **Figures come only from this turn's reads:** sizes, prices and positions
    from `acp options account` and quotes, never memory; a note that disagrees is wrong,
    so fix it. `bevo-read assets` has none.
-6. **Venue.** Derive, unless they name Paradex or hold it there: then `--venue paradex`
-   everywhere (`references/paradex.md`, also for withdrawing).
+6. **Venue.** Derive, unless they name Paradex or Rysk or hold it there: `--venue` it
+   everywhere, withdrawing too (`references/paradex.md` or `rysk.md`).
 
 ### Never file without all four
 
@@ -57,8 +57,8 @@ this chat. One missing: ask, and file nothing this turn.
 
 ## Procedure
 
-1. [ADAPT] Read the Derive account before answering or filing anything, and the
-   wallet only to fund (step 4):
+1. [ADAPT] Read the account before answering or filing, and the wallet only to
+   fund (step 4):
 
    ```sh
    acp options account
@@ -140,14 +140,14 @@ this chat. One missing: ask, and file nothing this turn.
    `approvalStatus: confirmed` - `approvalOutcome` holds the fill, maybe partial:
    `filledSize`, plus open `netPremiumUsd`, `collateral`; buy `totalCostUsd`; close
    `direction`, `netProceedsUsd` or `totalCostUsd`; `funding`: USDC moved first, say so.
-   `failed` or `rejected` - nothing traded;
-   give `approvalFailureReason` as written. `pending` or `signed` - still waiting.
+   `failed` or `rejected` - nothing traded; give `approvalFailureReason` as written.
+   `pending` or `signed` - still waiting.
 
 7. [FIXED] Only on `confirmed`, keep the lifecycle duty in step, numbers from
    `approvalOutcome`, never the quote. After an open or a buy, `duty_create`:
 
    ```json
-   {"recipe": "options-lifecycle@7", "title": "Watch {INSTRUMENT} to expiry",
+   {"recipe": "options-lifecycle@8", "title": "Watch {INSTRUMENT} to expiry",
     "triggers": [{"kind": "timer", "intervalSeconds": 900}],
     "params": {"VENUE": "<venue>", "INSTRUMENT": "<instrument>", "PRODUCT": "<product>", "UNDERLYING": "<prefix>",
     "STRIKE": <strike>, "SIZE": <filledSize>, "PREMIUM_USD": <usd>, "COLLATERAL_USD": <usd>}}
@@ -160,9 +160,8 @@ this chat. One missing: ask, and file nothing this turn.
    (`references/selling.md`). After a close, `duty_delete` that instrument's duty; if
    part is still open, file it again with SIZE from `positions` (positive) and
    PREMIUM_USD and COLLATERAL_USD scaled to it. Never file for an unknown or failed
-   trade. A second `options-lifecycle` duty in
-   one chat needs `"alongside": [<this chat's earlier ones' names>]`; step 9's needs
-   none.
+   trade. A second `options-lifecycle` duty in one chat needs
+   `"alongside": [<this chat's earlier ones' names>]`; step 9's needs none.
 
 8. [FIXED] Withdraw only when asked, only free USDC: at most this turn's
    `freeForNewPutsUsd`, rounded down to the cent. It lands on Ethereum in about 20
@@ -213,7 +212,7 @@ account` and wait. The `:home` leg is `acp trade`: look it up with `--route trad
 - Selling locks collateral until expiry or a buy-back; buying is paid in full, nothing
   borrowed. No rolling without a fresh yes.
 - **Monthly by default**; weeklies lose too much to fees and the spread.
-- **Cash settled** in USDC, never the asset; it stays on the venue until withdrawn.
+- **Cash settled** on Derive and Paradex, kept there till withdrawn; Rysk delivers the asset.
 - Not advice: never rank or recommend.
 
 ## Say to the owner

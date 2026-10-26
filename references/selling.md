@@ -116,7 +116,7 @@ premium has been told half of it.
 
 ## Settlement and delivery
 
-**Derive settles in cash.** An in-the-money put reduces USDC by (strike - settlement
+**Derive and Paradex settle in cash.** An in-the-money put reduces USDC by (strike - settlement
 price) x size; it does not deliver ETH. "You now own ETH at $2,300" is true only after
 a separate spot buy has filled. The lifecycle duty does that buy only when it is filed
 with `DELIVER_ASSET` on, which is only when the owner asked for it before the open.
@@ -125,6 +125,9 @@ verified, non-stock Base row of `bevo-read token-search BTC` as `<address>:8453`
 if two fit).
 
 The premium and the freed collateral stay in the Derive account until withdrawn.
+
+**Rysk settles physically**: an assigned put delivers the asset itself, so there is no
+delivery buy and no `DELIVER_ASSET` there (`references/rysk.md`).
 
 ## Buying back early
 

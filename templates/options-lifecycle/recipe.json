@@ -1,7 +1,7 @@
 {
   "id": "options-lifecycle",
-  "version": 7,
-  "description": "Watch one Derive or Paradex option to expiry, sold or bought: a heads-up the day before, the outcome once it settles, and, only if asked, buying the asset an assigned put agreed to.",
+  "version": 8,
+  "description": "Watch one Derive, Paradex or Rysk option to expiry, sold or bought: a heads-up the day before, the outcome once it settles, and, only if asked, buying the asset an assigned put agreed to.",
   "keywords": [
     "assigned",
     "bought option",
@@ -16,6 +16,7 @@
     "paradex",
     "put option",
     "roll",
+    "rysk",
     "settlement",
     "yield note"
   ],
@@ -28,7 +29,8 @@
     "options-lifecycle@3",
     "options-lifecycle@4",
     "options-lifecycle@5",
-    "options-lifecycle@6"
+    "options-lifecycle@6",
+    "options-lifecycle@7"
   ],
   "keys": [
     "note:<duty>:deliver"
@@ -49,14 +51,15 @@
         "type": "string",
         "enum": [
           "derive",
-          "paradex"
+          "paradex",
+          "rysk"
         ],
         "default": "derive",
-        "description": "The venue the option trades on: derive (the default) or paradex. Every options read the duty makes names it."
+        "description": "The venue the option trades on: derive (the default), paradex or rysk. Every options read the duty makes names it. On rysk only a sold put (cash_secured_put) is watched."
       },
       "INSTRUMENT": {
         "type": "string",
-        "description": "The venue's own name for the option, exactly as it was filled: ETH-20261030-2450-P on Derive, ETH-USD-30OCT26-2450-P on Paradex. The expiry and strike are read back out of this, so it must match the fill.",
+        "description": "The venue's own name for the option, exactly as it was filled: ETH-20261030-2450-P on Derive, ETH-USD-30OCT26-2450-P on Paradex, ETH-30OCT26-2450-P on Rysk. The expiry and strike are read back out of this, so it must match the fill.",
         "minLength": 8,
         "maxLength": 64
       },
@@ -106,7 +109,7 @@
       "DELIVER_ASSET": {
         "type": "boolean",
         "default": false,
-        "description": "Only for a sold put that settles in the money (cash_secured_put). Options settle in cash, so the owner holds the loss in cash and no asset. With this on, the duty spends SIZE x the settlement price of wallet USDC buying the TOKEN_ID token on its chain, so TOKEN_ID is required with it. Off by default: it spends money, so the owner has to have asked."
+        "description": "Only for a sold put that settles in the money (cash_secured_put). Derive and Paradex settle in cash, so the owner holds the loss in cash and no asset. With this on, the duty spends SIZE x the settlement price of wallet USDC buying the TOKEN_ID token on its chain, so TOKEN_ID is required with it. Off by default: it spends money, so the owner has to have asked. Not on Rysk, which delivers the asset itself."
       },
       "HEADS_UP_HOURS": {
         "type": "number",
@@ -126,6 +129,7 @@
     "closed": "Closed before expiry",
     "paused": "Paused: the settings need fixing",
     "done": "Settled at ${price}",
-    "soon": "Settles within 2 hours · next check {next}"
+    "soon": "Settles within 2 hours · next check {next}",
+    "paid": "Settled"
   }
 }
