@@ -85,7 +85,7 @@ this chat. One missing: ask, and file nothing this turn.
    instrument and size from `positions`; positive is `--side close`, negative is `--side buyback` with the size positive and `--premium-received`
    the note's `netPremiumUsd` (or its duty's PREMIUM_USD) scaled to it. **Offer only
    `tradeable: true`**; give the `reasons` as written. Listing: `chain`
-   alone; names as given, no company name.
+   alone; `name` as given, never a guess.
 
 3. [ADAPT] Offer it using **only** quote fields; never compute a number:
    - **Sell:** `bad_case` first, then `net_premium_usd`, `fee_usd`, the lock to

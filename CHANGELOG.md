@@ -5,6 +5,15 @@
 - Files `options-account@2`: one Platforms row per Derive subaccount (`PRIME`, `RWA`),
   each at its own worth with its cash and positions, replacing the one row that merged
   them. Step 9 updates a duty still on `@1` in place, unasked.
+- **The helper names what each ticker is.** `chain` with no `--underlying` now gives each
+  underlying a `name` and a `kind` (`crypto`, `stock`, `etf`, `index`, `commodity`) from a
+  list in the helper of every underlying Derive and Paradex list today. Neither venue's
+  API names a ticker, and Paradex tags its stocks, indices and commodities alike as
+  `RWA`. Seen in QA: told to say the ticker alone, the agent guessed instead - MU as
+  "e.g. MUFG", SPCX as "an SP/ETF index ticker", CL as a stock. They are Micron, SpaceX
+  and WTI crude oil. A ticker the list does not know comes back `null` and is said by
+  ticker alone; the list is never filled by searching a ticker (Pyth's CL is
+  Colgate-Palmolive).
 
 ## 2.7.0
 

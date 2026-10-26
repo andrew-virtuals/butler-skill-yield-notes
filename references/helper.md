@@ -31,10 +31,12 @@ unreachable, does not list that asset, or the option named is not active. Exit `
 command line was wrong (usage on stderr).
 
 `chain` with no `--underlying` lists what the venue trades: one row per underlying, its
-`underlying` ticker and its `expiries` (ISO, UTC), order-book markets only. It is the
-answer to "what can I trade on Derive or Paradex"; `chain --underlying <ticker>` then
-gives one expiry's strikes. Name each exactly as listed: the venue gives no company
-name, so add none.
+`underlying` ticker, `name`, `kind` (`crypto`, `stock`, `etf`, `index` or `commodity`)
+and `expiries` (ISO, UTC), order-book markets only. It is the answer to "what can I
+trade on Derive or Paradex"; `chain --underlying <ticker>` then gives one expiry's
+strikes. Group by `kind` and say each `name` as given. Neither venue names its tickers,
+so the helper carries a list: `null` means a ticker it does not know yet. Say that one
+by ticker alone, never a guess at what it is.
 
 `quote` is the sell side unless `--side buy`, `--side close` or `--side buyback` says
 otherwise. Every
@@ -216,6 +218,48 @@ CURRENCIES = ["ETH", "BTC", "SOL", "XRP", "ADA", "HYPE",
 # Paradex's crypto option underlyings, measured 2026-10-20 (it also lists
 # equity and index options, which a note on idle USDC does not screen).
 PARADEX_CURRENCIES = ["BTC", "ETH", "SOL", "HYPE", "NEAR", "ZEC"]
+
+# What each ticker is, since neither venue's API says (Paradex tags its stocks,
+# indices and commodities alike as "RWA"). Every underlying Derive or Paradex
+# listed on 2026-10-26, from Paradex's instrument docs and the Pyth feed each
+# one prices from. Never fill a gap by searching the ticker: Pyth's CL is
+# Colgate-Palmolive, where Paradex's CL is crude oil. Unknown: name and kind null.
+KNOWN = {
+    "AAVE": ("Aave", "crypto"), "ADA": ("Cardano", "crypto"),
+    "AERO": ("Aerodrome", "crypto"), "AVAX": ("Avalanche", "crypto"),
+    "BNB": ("BNB", "crypto"), "BTC": ("Bitcoin", "crypto"),
+    "CC": ("Canton", "crypto"), "DIME": ("DIME, Paradex's token", "crypto"),
+    "DOGE": ("Dogecoin", "crypto"), "ENA": ("Ethena", "crypto"),
+    "ETH": ("Ethereum", "crypto"), "ETHFI": ("ether.fi", "crypto"),
+    "GRAM": ("Gram (formerly Toncoin)", "crypto"), "HYPE": ("Hyperliquid", "crypto"),
+    "JTO": ("Jito", "crypto"), "JUP": ("Jupiter", "crypto"),
+    "KAITO": ("Kaito", "crypto"), "LDO": ("Lido DAO", "crypto"),
+    "LINK": ("Chainlink", "crypto"), "LIT": ("Lighter", "crypto"),
+    "LTC": ("Litecoin", "crypto"), "MON": ("Monad", "crypto"),
+    "MORPHO": ("Morpho", "crypto"), "NEAR": ("NEAR Protocol", "crypto"),
+    "ONDO": ("Ondo", "crypto"), "PAXG": ("PAX Gold, a gold-backed token", "crypto"),
+    "PENDLE": ("Pendle", "crypto"), "PUMP": ("Pump.fun", "crypto"),
+    "PYTH": ("Pyth Network", "crypto"), "SOL": ("Solana", "crypto"),
+    "STRK": ("Starknet", "crypto"), "SUI": ("Sui", "crypto"),
+    "TAO": ("Bittensor", "crypto"), "TRUMP": ("Official Trump", "crypto"),
+    "TRX": ("TRON", "crypto"), "UNI": ("Uniswap", "crypto"),
+    "VVV": ("Venice", "crypto"), "WLFI": ("World Liberty Financial", "crypto"),
+    "XAUT": ("Tether Gold, a gold-backed token", "crypto"), "XMR": ("Monero", "crypto"),
+    "XPL": ("Plasma", "crypto"), "XRP": ("XRP", "crypto"), "ZEC": ("Zcash", "crypto"),
+    "kPEPE": ("Pepe, per 1,000 PEPE", "crypto"), "kSHIB": ("Shiba Inu, per 1,000 SHIB", "crypto"),
+    "CRCL": ("Circle Internet Group", "stock"), "GOOGL": ("Alphabet, class A", "stock"),
+    "INTC": ("Intel", "stock"), "META": ("Meta Platforms", "stock"),
+    "MRVL": ("Marvell Technology", "stock"), "MSFT": ("Microsoft", "stock"),
+    "MSTR": ("Strategy (MicroStrategy)", "stock"), "MU": ("Micron Technology", "stock"),
+    "NVDA": ("NVIDIA", "stock"), "SNDK": ("Sandisk", "stock"),
+    "SPCX": ("SpaceX", "stock"), "TSLA": ("Tesla", "stock"),
+    "DRAM": ("Roundhill Memory ETF", "etf"), "EWY": ("iShares MSCI South Korea ETF", "etf"),
+    "US500": ("US 500, the S&P 500", "index"), "US100": ("US 100, the Nasdaq-100", "index"),
+    "CL": ("WTI crude oil", "commodity"), "BZ": ("Brent crude oil", "commodity"),
+    "NG": ("Henry Hub natural gas", "commodity"), "XAU": ("Gold", "commodity"),
+    "XAG": ("Silver", "commodity"), "XPT": ("Platinum", "commodity"),
+    "XCU": ("Copper", "commodity"),
+}
 
 TENOR_DAYS = {"weekly": 9, "monthly": 24, "quarterly": 80}
 
@@ -399,7 +443,7 @@ def active_options(currency, opt_type):
 
 def listed():
     """Every underlying the venue has order-book options on, and its expiries, by
-    the venue's own ticker. No venue gives a company name, so neither does this."""
+    the venue's own ticker, with what KNOWN says it is."""
     now = time.time()
     found = {}
     try:
@@ -418,7 +462,9 @@ def listed():
                         found.setdefault(c["currency"], set()).add(exp)
     except Exception as exc:  # noqa: BLE001 - transport or a malformed answer
         raise VenueError("could not list %s's options: %s" % (V["name"], exc))
-    return [{"underlying": u, "expiries": [iso(e) for e in sorted(es)]}
+    return [{"underlying": u, "name": KNOWN.get(u, (None, None))[0],
+             "kind": KNOWN.get(u, (None, None))[1],
+             "expiries": [iso(e) for e in sorted(es)]}
             for u, es in sorted(found.items()) if u]
 
 
