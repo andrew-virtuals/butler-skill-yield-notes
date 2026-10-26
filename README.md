@@ -1,162 +1,192 @@
-# butler-skill-yield-notes (now `options-trading`)
+# options-trading
 
-The `options-trading` skill for [Butler](https://github.com/Virtual-Protocol/butler-skills),
-formerly `yield-notes`. For the humans maintaining this repo - never published to a
-butler. Only `SKILL.md` and `references/**/*.md` reach one.
+The `options-trading` skill for [Butler](https://github.com/Virtual-Protocol/butler-skills):
+selling cash-secured puts, buying calls and puts, and closing them on **Derive**,
+**Paradex** and **Rysk**, through Butler's `acp options` rail. This README is for the
+people maintaining the repo. A butler receives only `SKILL.md` and `references/**/*.md`;
+the registry also serves the duty templates under `templates/`.
 
-**The repository name still says `yield-notes`.** The skill is `options-trading` from
-2.0.0; the repo should move to `Virtual-Protocol/butler-skill-options-trading`, and the
-hub's `skills.json` entry list it under the new name and repo. Until then this repo
-serves it.
-
-**Paradex (2.6.0).** A second venue on the same rail: `--venue paradex` on every helper
-and `acp options` line, `references/paradex.md` for what differs, `options-lifecycle@9`
-with `VENUE`. The helper reads Paradex's public API into Derive's field shapes, so one
-quote engine and one set of gates serve both. A Paradex withdrawal pays to the owner's
-wallet on Base through Layerswap, usually within a minute.
-
-**Rysk (2.7.0).** A third venue, folded in from the deprecated `butler-skill-rysk`:
-`--venue rysk` on the `acp options` lines, `references/rysk.md` for what differs. Rysk
-is RFQ (a quote lives seconds), so its quotes come from its own script
-(`references/rysk-helper.md`) in the Derive helper's field names, and the card approves
-a floor that Butler's server re-quotes against for 5 minutes. Puts only, on USDC in the
-owner's HyperEVM wallet, settled **physically**: an assigned put delivers the asset.
-
-**Status: v2.0.0, built for Derive v3 and the `acp options` rail.** Selling needs the
-hub validator that knows `acp options open|deposit|withdraw|account`; buying and
-closing need the one that also knows `acp options buy|close` (see "Validating a
-change").
+- **Version:** 2.7.1 (`SKILL.md`), with `options-lifecycle` 9 and `options-account` 2.
+  What changed in each release: `CHANGELOG.md`.
+- **Registry name:** `options-trading`, listed in the hub's `skills.json` from this repo.
+  The skill was `yield-notes` before 2.0.0, which is why the repository still has that
+  name.
 
 ## What it does
 
-Four intents on [Derive](https://derive.xyz)'s options market:
+An owner asks for one of four things, and the skill takes it from quote to approval card
+to outcome:
 
-- **Earn**: sell one fully collateralised cash-secured put on USDC, so idle money
-  earns while it waits to buy the asset lower. Behaviour unchanged from yield-notes
-  1.2.1. Covered calls come later: the rail accepts one only when the asset is already
-  in the Derive account, and deposits move USDC only.
-- **Buy**: buy one call or put outright. Not yield - the owner pays premium plus fee
-  and can lose all of it; the skill gets an explicit yes to that number.
-- **Close**: before expiry, sell back an option the owner bought, or buy back a note
-  they sold. Buying back frees the collateral and can cost more than the premium.
-- **Look or withdraw**: read the Derive account (free USDC and positions) from `acp
-  options account`, never from `bevo-read assets`, and withdraw free USDC to the owner's
-  wallet on Ethereum.
+- **Earn:** sell one fully collateralised cash-secured put on USDC. The owner keeps the
+  premium and may end up buying the asset at the strike.
+- **Buy:** buy one call or put outright. This is not yield: the owner pays premium plus
+  fee and can lose all of it, and the skill gets an explicit yes to that figure.
+- **Close:** before expiry, sell back an option the owner bought, or buy back a put they
+  sold. Buying back frees the collateral and can cost more than the premium.
+- **Look or withdraw:** read the venue account (free USDC, positions) and withdraw free
+  USDC to the owner's wallet.
 
-The model never picks an instrument, a strike or a price: it passes an intent to the
-helper and gets back a quote object with every number fixed, including the bound the
-`acp options` command takes (`--min-premium`, `--max-cost`, `--min-proceeds`).
+Not covered: covered calls, spreads, leverage, and any trade the helper refuses.
+
+## Venues
+
+| | Derive | Paradex | Rysk |
+| --- | --- | --- | --- |
+| Sell a put | yes | yes | yes |
+| Buy, close, buy back | yes | yes | no: the collateral is locked to expiry |
+| Underlyings | crypto, and XAUT (tokenized gold) | crypto, stocks, indices, commodities | per Rysk's live inventory |
+| Quotes from | `references/helper.md` (public order book) | `references/helper.md` with `--venue paradex` | `references/rysk-helper.md` (an RFQ) |
+| Deposit | from any chain, bridged (`--from 1` for USDC on Ethereum); credited a few minutes after its card | USDC on Base, usually credited within minutes | USDC on Base, into the owner's HyperEVM wallet |
+| Withdraw | to Ethereum (about 20 min), then `acp trade` to Base | to Base through Layerswap (about a minute) | from HyperEVM back to Base |
+| Settles | cash (USDC), 08:00 UTC | cash (USDC): crypto at 08:00 UTC, other options at their market's close | **physically**: an assigned put delivers the asset |
+| What differs | `references/venue.md`, `account.md` | `references/paradex.md` | `references/rysk.md` |
+
+Derive is used unless the owner names a venue or already holds the position there. Every
+helper and `acp options` line for a trade then carries `--venue paradex` or
+`--venue rysk`, as does its lifecycle duty's `VENUE` setting.
 
 ## How the pieces fit
 
 | Piece | Where | Does |
 | --- | --- | --- |
-| Screen and quote | `references/helper.md`, run in the container with `python3` | Reads Derive v3's public, keyless API (`public/get_all_instruments`, `public/get_tickers`). Sell, buy and close quotes. Read-only. |
-| Account read | `acp options account` | The owner's Derive account: network, free USDC, positions (positive size = bought), USDC on Ethereum, signer readiness. |
-| Funding | `acp options deposit` | One approval card: bevo-server bridges Base USDC straight to the owner's own Derive deposit address (`--from 1` deposits USDC already on Ethereum). |
-| Selling | `acp options open` | Approval card; an IOC limit sell after approval. |
-| Rysk quotes | `references/rysk-helper.md`, with `python3` | Rysk V12's public RFQ socket (`inventory`, `request`, `assets`, `positions`) and `/api/gas`. Read-only; the server re-quotes and signs after approval. |
-| Buying | `acp options buy --max-cost` | Approval card; an IOC limit buy whose premium plus fee stays within `--max-cost`. |
-| Closing | `acp options close --min-proceeds` or `--max-cost` | Approval card; an IOC `reduce_only` limit sell of a bought position, or limit buy of a sold one. |
-| Outcome | `bevo-read request <key> --route options` | `approvalStatus`, plus `approvalOutcome` (`filledSize`, `netPremiumUsd` / `totalCostUsd` / `netProceedsUsd`, …) or `approvalFailureReason`. |
-| Withdrawing | `acp options withdraw`, then `acp trade` back to Base | Approval cards. |
-| Watching to expiry | the `options-lifecycle@9` duty template, `templates/options-lifecycle/` | Filed only when `approvalStatus` is `confirmed`, from `approvalOutcome`: `cash_secured_put`, `long_call` or `long_put`. Deleted after a confirmed close. |
-| Platforms rows | the `options-account@2` duty template, `templates/options-account/` | One per owner, filed once an account exists on any venue; it replaces an older `derive-account` duty. Sole writer of every venue's row on the wallet's Platforms tab (one per Derive subaccount), at the venue's own `worthUsd`, with its positions listed, and the only deposit-landed note (Derive's). A venue bevo-server adds needs no change here. |
+| Quotes | `references/helper.md` (Derive, Paradex) and `references/rysk-helper.md` (Rysk), written to `/tmp` and run with `python3` | Read-only and keyless, against each venue's public API. Lists what a venue trades (`chain`, with each underlying's `name` and `kind`), and prices sells, buys, closes and buy-backs with every bound already worked out. |
+| Account | `acp options account` | Every venue at once, or one with `--venue`: free USDC, positions (positive size is bought), each account's worth, and whether Butler's signer is ready. |
+| Funding | `acp options deposit` | One approval card. |
+| Trading | `acp options open`, `buy`, `close` | One approval card each. After approval the order is an immediate-or-cancel limit order, inside the bound on the card (`--min-premium`, `--max-cost`, `--min-proceeds`). Rysk's card is good for 5 minutes and is re-quoted against its floor. |
+| Outcome | `bevo-read request <key> --route options` | `approvalStatus`, then `approvalOutcome` (the fill) or `approvalFailureReason`. |
+| Withdrawing | `acp options withdraw` | One approval card. A Derive withdrawal also takes an `acp trade` home to Base. |
+| Watching to expiry | the `options-lifecycle@9` duty, `templates/options-lifecycle/` | Filed only after a confirmed open or buy, from the fill. Sends a heads-up the day before expiry and the outcome once the option settles. Deleted after a confirmed close. |
+| Platforms rows | the `options-account@2` duty, `templates/options-account/` | One per owner, filed unasked once any venue account exists. The only writer of the options rows on the wallet's Platforms tab: one row per venue, and one per Derive subaccount, each at the venue's own worth with its positions listed. |
 
-The rail contract is bevo-server's `docs/derive-options.md`. bevo-server is the only
-thing that signs: there is no session key and nothing in this repo touches a key.
+## Safety model
 
-## The gates, and why they exist
+- **The model never picks a number.** It passes an intent (side, product, asset, money,
+  tenor or date, a strike rule) to the helper and offers only the fields of a quote that
+  is `tradeable: true`. A refused quote's `reasons` are told as written.
+- **Four checks before anything is filed** (`SKILL.md`): the owner chose it, they hold
+  what they are closing, they said yes to the dollar figure, and the quote was taken
+  after their last answer.
+- **Nothing here signs.** Butler's server builds every venue action, checks it against
+  the bound the owner approved on the card, and signs with the owner's wallet. The repo
+  has no session key and no secret.
+- **One idempotency key per trade**, never re-sent. An unclear answer is looked up with
+  `bevo-read request`.
+- **Full collateral.** A put's size is what the collateral fully covers; none of the
+  venues' margin is used.
 
-Derive lists options on twelve assets; on most days only a few have books a retail
-trade can cross. So the helper gates at quote time instead of carrying an allowlist.
-The sell gates are the same constants as bevo-server's reference quote engine
-(`deriveQuote.ts`); keep them, and the `reasons` strings, in step:
+## The gates
+
+The helper gates at quote time instead of keeping an allowlist, because on most days only
+a few books can be crossed by a retail-sized trade:
 
 | Gate | Default | Side | Why |
 | --- | --- | --- | --- |
-| `MAX_VOL_GAP_PTS` | 5.0 | both | Bid under mark (sell) or ask over mark (buy). ETH's and BTC's own spreads sit a few points wide; a 2-point guard rejects every fill. |
-| `MAX_FEE_DRAG` | 15% | both | The $0.50 base fee is per order and uncapped; it swamps small tickets and weeklies. |
+| `MAX_VOL_GAP_PTS` | 5.0 | both | Bid under mark (selling) or ask over mark (buying). ETH's and BTC's own spreads are a few points wide; a 2-point guard would reject every fill. |
+| `MAX_FEE_DRAG` | 15% | both | Derive's $0.50 base fee is charged per order and is uncapped, so it swamps small tickets and weeklies. Paradex charges no base fee. |
 | `MIN_PREMIUM_USD` | $1 | sell | Below it the premium rounds to nothing. |
-| depth >= size | - | both | Best bid (sell) or ask (buy) must cover the whole size, or it walks the book. |
+| depth ≥ size | - | both | The best bid (selling) or ask (buying) must cover the whole size, or the order walks the book. |
 | `MAX_COST_HEADROOM` | 1.05 | buy | `max_cost_usd` is the total cost plus 5%, and a budget buy is sized so that ceiling fits inside the budget. |
 
-A close is refused only with no bid, a bid thinner than the size, or a fee larger
-than the proceeds; a buy-back only with no ask or an ask thinner than the size. A wide
-market is a warning, since an owner cutting a loss may accept it.
+These match Butler's server's reference quote engine; keep the constants and the
+`reasons` strings in step with it. A close is refused only with no bid, a bid thinner
+than the size, or a fee larger than the proceeds; a buy-back only with no ask or an ask
+thinner than the size. A wide market is a warning there, since an owner cutting a loss
+may accept it. On Paradex a price outside the market's price band counts as no price.
+Rysk's helper has its own gates (`references/rysk-helper.md`).
 
-Live checks, mainnet:
+The worked examples in the references come from live mainnet captures; the figures are in
+`references/venue.md`.
 
-- Sell, 7 Oct 2026 13:22 UTC, $5,000 monthly put: ETH `ETH-20261030-2300-P`, 2.17
-  contracts, $61.20 net, 19.7% APR, edge -1.15 vol points; BTC `BTC-20261030-75000-P`,
-  $28.10 net, 9.0% APR. The 10:57 UTC capture ($55.76 net) is what the selling
-  examples use.
-- Buy, 9 Oct 2026 04:59 UTC, $200 monthly ETH call 5% out of the money:
-  `ETH-20261030-2600-C`, 2.95 contracts, $187.33 + $2.70 fee = $190.03, max cost
-  $199.54, breakeven $2,664.42 - the capture the buying examples use. More in
-  `references/venue.md`.
-
-## Testing the helper
+## Testing the helpers
 
 Extract the script from `references/helper.md` and run it against mainnet:
 
 ```sh
-python3 derive_helper.py screen --tenor monthly --collateral 5000
+python3 derive_helper.py chain                                    # what Derive lists
+python3 derive_helper.py chain --venue paradex                    # with name and kind
+python3 derive_helper.py screen --collateral 5000
 python3 derive_helper.py quote --product cash_secured_put --underlying ETH --collateral 5000
 python3 derive_helper.py quote --side buy --product call --underlying ETH --budget 200
-python3 derive_helper.py quote --side buy --product put --underlying BTC --budget 200 --delta 0.3
-python3 derive_helper.py quote --side close --instrument ETH-20261030-2600-C --size 1
-python3 derive_helper.py quote --side buyback --instrument ETH-20261030-2300-P --size 0.1 --premium-received 3
+python3 derive_helper.py quote --venue paradex --side buy --product call --underlying ETH --budget 10 --expiry 2026-11-27
+python3 derive_helper.py quote --side close --instrument ETH-20261127-2600-C --size 1
+python3 derive_helper.py quote --side buyback --instrument ETH-20261127-2300-P --size 0.1 --premium-received 3
 ```
 
-Against the reference fixture (`ETH-20261030-2300-P`, bid 26.7, mark 28.6, index
-2578.7, bid IV 0.4834, mark IV 0.4962) the sell quote must give size 2.17, collateral
-4991, gross 57.94, fee 2.18, net 55.76, edge -1.28, breakeven 2273.3, APR ~17.83.
-The sell quote's output is byte-for-byte what 1.2.1 printed (checked live against the
-old script for ETH and BTC).
+Check these by hand after any change to the helper:
+
+- `chain` with no `--underlying` has a `name` and `kind` for every underlying both
+  venues list. A `null` is a ticker missing from `KNOWN`. Add it from the venue's own
+  documentation, never from a search on the ticker: Pyth's `CL` is Colgate-Palmolive.
+- `--expiry` on a date the venue does not list is refused with the dates it does.
+- Against the reference fixture (`ETH-20261030-2300-P`, bid 26.7, mark 28.6, index
+  2578.7, bid IV 0.4834, mark IV 0.4962) the sell quote gives size 2.17, collateral 4991,
+  gross 57.94, fee 2.18, net 55.76, edge -1.28, breakeven 2273.3 and APR about 17.83.
+
+Rysk's script (`references/rysk-helper.md`) runs the same way: `inventory`,
+`screen --collateral <USD> --pay-with <address>`, `quote --asset <ASSET> ...`.
 
 ## Validating a change
 
 ```sh
 curl -sSLO https://virtual-protocol.github.io/butler-skills/tools/validate.py
 python3 validate.py --standalone .
-```
-
-This needs a hub validator that knows the `acp options` group, including `buy` and
-`close` as money commands (butler-skills branch `feat/options-buy-close` until it
-merges); an older one does not count them as money.
-
-The duty templates are checked one folder at a time, with their own unit tests:
-
-```sh
 python3 validate.py --standalone templates/options-lifecycle
 python3 validate.py --standalone templates/options-account
 python3 -m unittest discover -s templates/options-lifecycle/tests
 python3 -m unittest discover -s templates/options-account/tests
 ```
 
+CI runs the same. Two limits to keep in mind:
+
+- **`SKILL.md`:** the validator refuses a body over **12,000 characters**, and it is at
+  the limit. New detail goes into a reference file, with a pointer to it in `SKILL.md`.
+- **Template `README.md` files:** they are loaded into the model's context every time a
+  recipe is shown, and the validator warns past 4,096 bytes.
+
 ## Duty templates
 
-`templates/` holds the duty templates this skill files, each a complete template
-(`recipe.json`, `duty.py`, `README.md`, plus `CHANGELOG.md` and `tests/`):
+`templates/` holds the duties this skill files, each a complete template (`recipe.json`,
+`duty.py`, `README.md`, `CHANGELOG.md`, `tests/`):
 
-- `templates/options-lifecycle/`: one per option, from the fill to the outcome. It
-  moved here from `butler-skill-options-lifecycle`, which is deprecated; its history
-  up to `@6` is in that repo.
-- `templates/options-account/`: one per owner, a row on the Platforms tab for every
-  venue whose account exists. Each row's name, site and worth come from bevo-server's
-  account read, so a new venue needs no new template and no refiling. It supersedes
-  `derive-account@1` (removed in 2.6.0; its last copy is at `v2.4.0`), so the registry
-  resolves that ref to it.
+- **`options-lifecycle`:** one per option, from the fill to the outcome, on any of the
+  three venues. A Rysk put's outcome is what Rysk paid out. A Paradex option's expiry is
+  the one the venue states, since a stock or index option expires at its market's close.
+  It supersedes `@1`–`@8`.
+- **`options-account`:** one per owner, writing the Platforms rows for every venue whose
+  account exists. Each row's name, site and worth come from the account read, so a new
+  venue needs no new template and nothing refiled. It supersedes `options-account@1` and
+  `derive-account@1`, so the registry resolves those refs to it, and `SKILL.md` step 9
+  moves a filed `@1` onto it.
 
-The hub lists each in `templates.json` with this repo, a ref and a `path` to its folder.
-A template's `version` is its own integer, separate from the skill's semver; a changed
-template needs a bump and a `CHANGELOG.md` entry in its folder.
+A template's `version` is its own integer, separate from the skill's semver. A filed
+duty runs the code it was filed with, so any change to `duty.py` needs a version bump,
+the old version added to `supersedes`, a `CHANGELOG.md` entry in the template's folder,
+and `SKILL.md` updated to file the new version.
 
 ## Releasing
 
-Bump `version` in `SKILL.md`, add the `CHANGELOG.md` entry, merge to `main`. A
-published `name@version` is immutable. Listing a skill is maintainer-only; 2.0.0 is a
-new name, so it is a new listing, and `yield-notes` should be de-listed with it.
-The templates are released from the same tag as the skill: their `templates.json`
-entries follow it with their `path`.
+1. Bump `version` in `SKILL.md` and add the `CHANGELOG.md` entry; bump any template
+   whose code changed, as above.
+2. Merge to `main` and tag `vX.Y.Z`. A published `name@version` is immutable.
+3. In `butler-skills`, point `skills.json` (`options-trading`) and `templates.json`
+   (`options-lifecycle`, `options-account`, each with its `path`) at the new tag.
+
+When a release depends on a change in Butler's server (a new `acp options` field or
+venue behaviour), ship the server change first, or make the skill and duties fall back
+safely without it, as `options-lifecycle@9` does for Paradex expiries.
+
+## Layout
+
+```
+SKILL.md                    the procedure a butler follows
+references/
+  helper.md                 the Derive and Paradex quote script and its fields
+  rysk-helper.md            Rysk's quote script
+  selling.md, buying.md     what to say and ask for each kind of trade
+  account.md                the account read, subaccounts, withdrawals
+  venue.md                  Derive's facts: fees, sizes, spreads, settlement
+  paradex.md, rysk.md       what differs on each of those venues
+templates/
+  options-lifecycle/        watch one option to its outcome
+  options-account/          the owner's Platforms rows
+```
