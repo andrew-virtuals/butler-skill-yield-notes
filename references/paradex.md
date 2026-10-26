@@ -37,7 +37,9 @@ python3 /tmp/derive_helper.py quote --venue paradex --side buy --product call --
   quotes `tradeable: false`; never chase it with a higher bound.
 - **Only order-book markets.** Some Paradex options trade only by RFQ; the helper never
   offers one, and Butler's server refuses one.
-- **Expiries** settle at 08:00 UTC, in cash (USDC), into the Paradex account.
+- **Expiries** settle in cash (USDC), into the Paradex account: crypto at 08:00 UTC, a
+  stock, index or commodity option at its market's close (META 20:00 or 21:00 UTC, CL
+  18:30 or 19:30). Say the time the quote's `expiry` gives, never 08:00 for those.
 - Spreads outside ETH are often wide: the helper's gates apply unchanged, so expect
   more `tradeable: false` there. Say so; never loosen a gate.
 

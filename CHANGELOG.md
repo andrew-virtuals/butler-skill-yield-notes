@@ -14,6 +14,12 @@
   and WTI crude oil. A ticker the list does not know comes back `null` and is said by
   ticker alone; the list is never filled by searching a ticker (Pyth's CL is
   Colgate-Palmolive).
+- **A Paradex option's expiry is the market's, not its name's.** A Paradex name gives only
+  the day, and everything read 08:00 UTC into it; a stock, index or commodity option
+  expires at its market's close instead (META 20:00 or 21:00 UTC, CL 18:30 or 19:30).
+  `references/paradex.md`, `helper.md` and `buying.md` now say so, and step 7 files
+  `options-lifecycle@9`, which takes the expiry Paradex states. Butler's server states it
+  on the card, the account's positions and the ticker.
 
 ## 2.7.0
 

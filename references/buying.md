@@ -50,7 +50,7 @@ Every number is a **field on the buy quote**. Never compute one.
 | fees | `fee_usd`, its own line |
 | where it starts paying at expiry | `breakeven` |
 | the price it turns on | `strike` |
-| the date | `expiry` (08:00 UTC) |
+| the date | `expiry`, its time as given (not always 08:00 UTC on Paradex) |
 | how much | `size`, in units of the asset |
 | how good the price is | `overpay_vs_fair_vol_pts` |
 
@@ -133,7 +133,7 @@ the money pays automatically into the Derive account: (settle - strike) x size f
 call, (strike - settle) x size for a put. Nothing has to be done to collect it. It
 stays in the account until withdrawn. One that ends out of the money pays nothing.
 
-The `options-lifecycle@8` duty, filed after a confirmed buy, tells the owner the day
+The `options-lifecycle@9` duty, filed after a confirmed buy, tells the owner the day
 before and again with the outcome. It is filed with:
 
 | Param | From |

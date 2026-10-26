@@ -147,7 +147,7 @@ this chat. One missing: ask, and file nothing this turn.
    `approvalOutcome`, never the quote. After an open or a buy, `duty_create`:
 
    ```json
-   {"recipe": "options-lifecycle@8", "title": "Watch {INSTRUMENT} to expiry",
+   {"recipe": "options-lifecycle@9", "title": "Watch {INSTRUMENT} to expiry",
     "triggers": [{"kind": "timer", "intervalSeconds": 900}],
     "params": {"VENUE": "<venue>", "INSTRUMENT": "<instrument>", "PRODUCT": "<product>", "UNDERLYING": "<prefix>",
     "STRIKE": <strike>, "SIZE": <filledSize>, "PREMIUM_USD": <usd>, "COLLATERAL_USD": <usd>}}

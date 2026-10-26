@@ -49,7 +49,7 @@ softer - they are already written for an owner.
 | Field | Means |
 | --- | --- |
 | `instrument` | Derive's name, e.g. `ETH-20261030-2300-P`; passed to `--instrument` as is |
-| `strike`, `expiry`, `days_to_expiry` | the price and the date (08:00 UTC) the note turns on |
+| `strike`, `expiry`, `days_to_expiry` | the price and the instant the note turns on: 08:00 UTC, or a Paradex stock, index or commodity market's close |
 | `size` | contracts, which are units of the asset; passed to `--size` as is |
 | `collateral.amount` | what the note locks: USDC for a put, units of the asset for a call; passed to `--max-collateral` |
 | `collateral.usd` | the same in dollars |

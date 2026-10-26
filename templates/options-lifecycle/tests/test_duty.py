@@ -346,6 +346,37 @@ class Paradex(unittest.TestCase):
         self.assertIn("free cash in your Paradex account", fake.dones[0])
         self.assertNotIn("Derive", fake.dones[0])
 
+    # META's options expire at the New York close: 2026-10-30T20:00:00Z, 12 hours
+    # after the 08:00 UTC its name implies (EXPIRY is that 08:00).
+    META = dict(LONG_CALL, VENUE="paradex", INSTRUMENT="META-USD-30OCT26-650-C", UNDERLYING="META",
+                TOKEN_ID="", STRIKE=650, SIZE=0.1)
+    META_CLOSE = EXPIRY + hours(12)
+
+    def meta_ticker(self, expiry):
+        return {"/options/ticker": {"instrument": "META-USD-30OCT26-650-C", "index": "641.6", "mark": "9.9",
+                                    "expirySec": expiry},
+                "/options/account": {"venue": "paradex", "account": {"positions": [
+                    {"instrument": "META-USD-30OCT26-650-C", "size": 0.1}]}}}
+
+    def test_a_stock_option_expires_when_paradex_says_not_at_the_names_08_utc(self):
+        fake = run(self.META, [EXPIRY + hours(1)], self.meta_ticker(self.META_CLOSE))
+        self.assertEqual(fake.state["expiry_sec"], self.META_CLOSE)
+        self.assertNotIn("/options/settlement", [path for path, _ in fake.read_calls])
+        self.assertEqual(fake.lines[-1][0], "hours")
+        self.assertEqual(fake.dones, [])
+
+    def test_the_stated_expiry_is_kept_once_read(self):
+        reads = dict(self.meta_ticker(None), **{"/options/ticker": BevoError("market gone")})
+        fake = run(self.META, [EXPIRY + hours(1)], reads, state={"expiry_sec": self.META_CLOSE})
+        self.assertEqual(fake.lines[-1][0], "hours")
+        self.assertNotIn("/options/settlement", [path for path, _ in fake.read_calls])
+
+    def test_without_a_stated_expiry_the_names_08_utc_stands(self):
+        for stated in (None, EXPIRY + hours(30), EXPIRY - hours(1)):
+            fake = run(self.META, [EXPIRY + hours(1)], self.meta_ticker(stated))
+            self.assertNotIn("expiry_sec", fake.state)
+            self.assertEqual(fake.lines[-1][0], "settling")
+
     def test_a_derive_name_on_paradex_does_nothing(self):
         fake = run(dict(self.PUT, INSTRUMENT="ETH-20261030-2450-P"), [EXPIRY - hours(20)], PRICE)
         self.assertEqual(fake.read_calls, [])

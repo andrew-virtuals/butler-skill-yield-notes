@@ -4,18 +4,18 @@ Watches one option on Derive, Paradex or Rysk from the fill to the outcome: a no
 
 ## How it is filed
 
-Filed with `recipe: "options-lifecycle@8"` only once `bevo-read request <key> --route options` reads `approvalStatus: confirmed`, with settings from its `approvalOutcome`, never the quote: `INSTRUMENT` and `STRIKE` as filled, `SIZE` = `filledSize`, `PREMIUM_USD` = `netPremiumUsd` (sold) or `totalCostUsd` (bought), `COLLATERAL_USD` = `collateral` (0 if bought). `TOKEN_ID` only with `DELIVER_ASSET`: the token the delivery buy trades, from its `/token-search` row (`native:8453` for ETH on Base). An unknown, refused or pending open gets no duty.
+Filed with `recipe: "options-lifecycle@9"` only once `bevo-read request <key> --route options` reads `approvalStatus: confirmed`, with settings from its `approvalOutcome`, never the quote: `INSTRUMENT` and `STRIKE` as filled, `SIZE` = `filledSize`, `PREMIUM_USD` = `netPremiumUsd` (sold) or `totalCostUsd` (bought), `COLLATERAL_USD` = `collateral` (0 if bought). `TOKEN_ID` only with `DELIVER_ASSET`: the token the delivery buy trades, from its `/token-search` row (`native:8453` for ETH on Base). An unknown, refused or pending open gets no duty.
 
 ## What it does
 
 | When | The owner gets |
 | --- | --- |
 | `HEADS_UP_HOURS` before expiry, once | where the asset is on the venue's own index, and which way the note is leaning |
-| after the 08:00 UTC expiry, once the venue publishes the price | a sold note: what they kept, or what they agreed to buy or sell; a bought option: what it paid out against what it cost, or that it expired worthless; then the duty finishes |
+| after expiry, once the venue publishes the price | a sold note: what they kept, or what they agreed to buy or sell; a bought option: what it paid out against what it cost, or that it expired worthless; then the duty finishes |
 | after an assigned put, only with `DELIVER_ASSET` on | a spot buy of the underlying, through `acp trade`, keyed `note:<duty>:deliver` |
 | on Rysk, once paid out | the asset or the USDC (`settled` in `/options/account`) |
 
-Expiry and option type are read out of `INSTRUMENT` (08:00 UTC on its date) and checked against `PRODUCT` and `UNDERLYING`; a mismatch stops the duty.
+Expiry and option type are read out of `INSTRUMENT` (08:00 UTC; Paradex: its ticker's `expirySec`) and checked against `PRODUCT` and `UNDERLYING`; a mismatch stops the duty.
 
 ## What it will not do
 
@@ -45,4 +45,4 @@ Expiry and option type are read out of `INSTRUMENT` (08:00 UTC on its date) and 
 
 ## Trigger
 
-`{"kind": "timer", "intervalSeconds": 900}`. Settlement is usually published within minutes of 08:00 UTC, so a 15-minute timer reports it within the half hour.
+`{"kind": "timer", "intervalSeconds": 900}`. Settlement is usually published within minutes of expiry, so a 15-minute timer reports it within the half hour.

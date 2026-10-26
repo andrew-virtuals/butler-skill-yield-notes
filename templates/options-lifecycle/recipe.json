@@ -1,6 +1,6 @@
 {
   "id": "options-lifecycle",
-  "version": 8,
+  "version": 9,
   "description": "Watch one Derive, Paradex or Rysk option to expiry, sold or bought: a heads-up the day before, the outcome once it settles, and, only if asked, buying the asset an assigned put agreed to.",
   "keywords": [
     "assigned",
@@ -30,7 +30,8 @@
     "options-lifecycle@4",
     "options-lifecycle@5",
     "options-lifecycle@6",
-    "options-lifecycle@7"
+    "options-lifecycle@7",
+    "options-lifecycle@8"
   ],
   "keys": [
     "note:<duty>:deliver"
