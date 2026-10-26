@@ -20,6 +20,12 @@
   `references/paradex.md`, `helper.md` and `buying.md` now say so, and step 7 files
   `options-lifecycle@9`, which takes the expiry Paradex states. Butler's server states it
   on the card, the account's positions and the ticker.
+- **A day the owner names is quoted on that day.** `quote` and `chain` take
+  `--expiry YYYY-MM-DD`, and each `chain` row names its `expiry`. Seen in QA: asked for
+  an ETH call "expiring this Friday", the agent read `chain --underlying ETH`, which shows
+  only the tenor's one expiry (13 November), and told the owner Paradex had no 30 October
+  expiry, though its own listing showed one. "Weekly" aims 9 days out, so a Friday 4 days
+  away could not be reached at all.
 
 ## 2.7.0
 
