@@ -1,5 +1,23 @@
 # Changelog
 
+## 3
+
+- **A position with no mark is listed.** Rysk marks no position (`valueUsd: null`), so
+  every Rysk put was left off its row. It is now listed with no value, since the venue's
+  `worthUsd` already counts it at what it would settle to, and its details give the
+  premium received (`costUsd`, "Paid" for a bought one) and, for a sold put, the
+  collateral. An expired one not yet settled reads "Awaiting settlement". Seen on
+  mainnet: an agent forked `@2` to list the premium as the value, which the app showed as
+  "−$2.15", owed, for a premium the owner had been paid.
+- **A venue that holds its own cash lists it.** With `cashLine` on its entry (Paradex),
+  the row's first line is `Cash`, the account's `usdc`, as a Derive subaccount's row
+  already was. Seen on mainnet: a Paradex row read $9.26 over a single $7.30 call, and
+  the $1.96 free to trade or withdraw appeared nowhere. Rysk lists none: its USDC is the
+  owner's own wallet, which the Tokens tab already counts. Butler's server writes the
+  same line when it rewrites the row after an options card.
+- Supersedes `options-account@2`. A duty on `@1` or `@2`, or a fork of one, is updated in
+  place (`duty_update {"recipe": "options-account@3"}`, SKILL.md step 9).
+
 ## 2
 
 - **One row per subaccount.** A venue whose account is split into subaccounts

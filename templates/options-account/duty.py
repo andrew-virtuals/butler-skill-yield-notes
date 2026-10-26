@@ -5,7 +5,10 @@ One read of the options rail answers for every venue bevo-server trades
 venue's site and the owner's wallet. The row's name, site and worth all come
 from that read: the worth is the venue's own (`worthUsd`), so no venue's
 accounting lives here, and a venue the server adds appears on the next check
-with nothing refiled.
+with nothing refiled. A venue that holds its USDC itself (`cashLine`: Paradex)
+lists that cash first on its row, so the row's lines add up to its worth; a
+venue whose USDC is the owner's own wallet (Rysk) does not, since the wallet's
+Tokens tab already counts it.
 
 A venue whose account is split into subaccounts (`accounts`: Derive's risk
 universes) gets one row per subaccount instead, keyed by its name ("PRIME",
@@ -61,18 +64,41 @@ def listed(account):
     rows = []
     for row in account.get("positions") or []:
         size = float(row.get("size") or 0)
-        if not size or row.get("valueUsd") is None:
+        if not size:
             continue
         kind = "call" if row.get("type") == "C" else "put"
+        strike = float(row.get("strike") or 0)
         title = "%s %s %s %s %s" % ("Bought" if size > 0 else "Sold", format(abs(size), "g"),
-                                    row.get("underlying") or "", format(float(row.get("strike") or 0), ",g"), kind)
-        value = float(row["valueUsd"])
-        details = [{"label": "Expires", "value": str(row.get("expiresIn") or "")}]
-        if row.get("pnlUsd") is not None:
-            details.append({"label": "Up/down", "value": "$%s" % format(round(float(row["pnlUsd"]), 2), ",.2f")})
-        rows.append({"title": " ".join(title.split()), "subtitle": str(row.get("instrument") or ""),
-                     "valueUsd": round(value if size > 0 else -value, 2), "details": details})
+                                    row.get("underlying") or "", format(strike, ",g"), kind)
+        line = {"title": " ".join(title.split()), "subtitle": str(row.get("instrument") or "")}
+        if row.get("valueUsd") is not None:
+            value = float(row["valueUsd"])
+            details = [{"label": "Expires", "value": str(row.get("expiresIn") or "")}]
+            if row.get("pnlUsd") is not None:
+                details.append({"label": "Up/down", "value": "$%s" % usd(row["pnlUsd"])})
+            line.update(valueUsd=round(value if size > 0 else -value, 2), details=details)
+        else:
+            line["details"] = unmarked(row, size, strike, kind)
+            if row.get("expiresIn") == "expired":
+                line["status"] = "Awaiting settlement"
+        rows.append(line)
     return rows[:20]
+
+
+def unmarked(row, size, strike, kind):
+    """Details for a position its venue puts no mark on, listed without a value.
+
+    The account's worth already counts it, at what it would settle to; the premium
+    shown as its value would read as owed when it was paid to the owner.
+    """
+    details = []
+    if row.get("expiresIn") and row["expiresIn"] != "expired":
+        details.append({"label": "Expires", "value": str(row["expiresIn"])})
+    if row.get("costUsd") is not None:
+        details.append({"label": "Received" if size < 0 else "Paid", "value": "$%s" % usd(row["costUsd"])})
+    if size < 0 and kind == "put" and strike:
+        details.append({"label": "Collateral", "value": "$%s" % usd(strike * abs(size))})
+    return details
 
 
 def landed(venue, usdc, held):
@@ -103,6 +129,11 @@ def site_host(url):
     return host[4:] if host.startswith("www.") else host
 
 
+def cash_line(usdc):
+    """An account's USDC as its row's first line."""
+    return {"title": "Cash", "valueUsd": round(float(usdc or 0), 2)}
+
+
 def subaccount_rows(subs):
     """(account, worth, positions, open count) per subaccount, or None when one has no worth.
 
@@ -115,9 +146,8 @@ def subaccount_rows(subs):
             return None
         named = " ".join(str(sub.get("universe") or "").split())
         held = listed(sub)
-        cash = {"title": "Cash", "valueUsd": round(float(sub.get("usdc") or 0), 2)}
         rows.append((named or "Subaccount %s" % sub.get("subaccountId"), round(float(worth), 2),
-                     [cash] + held[:19], len(held)))
+                     [cash_line(sub.get("usdc"))] + held[:19], len(held)))
     return rows
 
 
@@ -185,9 +215,11 @@ def write(entry, wallet):
         held = sum(count for _, _, _, count in rows)
     else:
         positions = listed(account)
+        held = len(positions)
+        if entry.get("cashLine") is True:
+            positions = [cash_line(account.get("usdc"))] + positions[:19]
         bevo.platform_balance(site, name, value, account=entry.get("wallet") or wallet,
                               positions=positions)
-        held = len(positions)
     credit = landed(venue, float(account.get("usdc") or 0), holdings(account)) if late else 0.0
     if credit:
         bevo.notify("Your %s deposit landed: $%s USDC credited. The account is worth $%s now."

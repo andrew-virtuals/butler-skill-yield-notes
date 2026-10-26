@@ -1,10 +1,11 @@
 {
   "id": "options-account",
-  "version": 2,
+  "version": 3,
   "description": "Keep every options venue's account on the wallet's Platforms tab.",
   "supersedes": [
     "derive-account@1",
-    "options-account@1"
+    "options-account@1",
+    "options-account@2"
   ],
   "keywords": [
     "derive",

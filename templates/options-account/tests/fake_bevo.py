@@ -110,9 +110,10 @@ DERIVE = "https://www.derive.xyz"
 PARADEX = "https://www.paradex.trade"
 
 
-def venue(vid, name, site, usdc="0", worth=None, positions=(), exists=True, late=False):
+def venue(vid, name, site, usdc="0", worth=None, positions=(), exists=True, late=False, cash=False):
     """One entry of `venues` in bevo-server's bare `/options/account` answer."""
-    return {"venue": vid, "name": name, "site": site, "depositsLandLater": late, "available": True,
+    return {"venue": vid, "name": name, "site": site, "depositsLandLater": late, "cashLine": cash,
+            "available": True,
             "wallet": WALLET, "signerReady": True,
             "account": {"exists": exists, "usdc": usdc, "positions": list(positions),
                         "worthUsd": worth},
@@ -140,7 +141,7 @@ def platform(row_id, site, account):
 
 
 def paradex(usdc="0", worth=None, positions=(), exists=True):
-    return venue("paradex", "Paradex", PARADEX, usdc, worth, positions, exists)
+    return venue("paradex", "Paradex", PARADEX, usdc, worth, positions, exists, cash=True)
 
 
 def accounts(*venues):
