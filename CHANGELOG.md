@@ -1,5 +1,28 @@
 # Changelog
 
+## 2.7.0
+
+- **Rysk, as a third venue.** Selling a cash-secured put on Rysk is the same procedure as
+  on Derive and Paradex with `--venue rysk`: the checks, the
+  bad case first, one key, the card, the lifecycle duty. `references/rysk.md` is only
+  what differs - puts only, no buy-back, USDC in the owner's HyperEVM wallet, a card good
+  for 5 minutes that the server re-quotes against the floor, and **physical
+  settlement**: an assigned put delivers the asset, which is never sold unless the owner
+  asks. Replaces the separate `rysk` skill (`mamamatcha/butler-skill-rysk`, deprecated),
+  so an owner installs one skill for all three venues.
+- `references/rysk-helper.md`: Rysk's quote script, now speaking the Derive helper's
+  field names (`net_premium_usd`, `fee_usd` from Rysk's `/api/gas`, `min_premium_usd`,
+  `bad_case`), so `SKILL.md` steps 3 and 5 read either. Rysk names no stablecoin and a
+  skill may carry no address, so the collateral comes from the account read
+  (`collateral.address`, passed as `--pay-with`).
+- Files `options-lifecycle@8`, which reads exactly as @7 for Derive and Paradex and adds
+  `VENUE: rysk`, reporting what Rysk actually paid out.
+- `templates/options-lifecycle` 8: Rysk names, no early-close check or delivery buy on
+  Rysk, and the outcome from `settled` in `/options/account` rather than from the price,
+  since near the strike the maker chooses whether to exercise.
+- CI validates `templates/options-account`; it still named `derive-account`, removed in
+  2.6.0, so every run since failed.
+
 ## 2.6.2
 
 - **What a venue lists comes from the helper.** `chain` with no `--underlying` lists every

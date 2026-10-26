@@ -15,8 +15,8 @@ jobs:
           params: '{"INSTRUMENT":"ETH-20261030-2450-P","PRODUCT":"cash_secured_put","UNDERLYING":"ETH","TOKEN_ID":"native:8453","STRIKE":2450,"SIZE":2.04,"PREMIUM_USD":55.17,"COLLATERAL_USD":4998}'
       - uses: Virtual-Protocol/butler-skills/.github/actions/validate@main
         with:
-          path: templates/derive-account
+          path: templates/options-account
       - name: Template unit tests
         run: |
           python3 -m unittest discover -s templates/options-lifecycle/tests -v
-          python3 -m unittest discover -s templates/derive-account/tests -v
+          python3 -m unittest discover -s templates/options-account/tests -v

@@ -352,6 +352,89 @@ class Paradex(unittest.TestCase):
         self.assertTrue(any("Paradex option name" in f for f in fake.fails + fake.logs))
 
 
+class Rysk(unittest.TestCase):
+    """VENUE rysk: Rysk's names, physical settlement, and the outcome from what Rysk paid out."""
+
+    PUT = dict(PUT, VENUE="rysk", INSTRUMENT="ETH-30OCT26-2450-P", TOKEN_ID="")
+
+    @staticmethod
+    def paid(*rows, price="2600"):
+        return {"/options/settlement": {"price": price},
+                "/options/account": {"venue": "rysk", "account": {"positions": [], "settled": list(rows)}}}
+
+    @staticmethod
+    def row(assigned, *legs, size=2.04, instrument="ETH-30OCT26-2450-P"):
+        return {"instrument": instrument, "expirySec": EXPIRY, "size": size, "assigned": assigned,
+                "received": [{"amount": a, "symbol": s, "address": "0x" + s} for a, s in legs]}
+
+    def test_reads_rysk_and_never_checks_for_an_early_close(self):
+        fake = run(self.PUT, [EXPIRY - hours(20)], dict(PRICE))
+        self.assertEqual(fake.read_calls, [("/options/ticker", {"instrument": "ETH-30OCT26-2450-P", "venue": "rysk"})])
+        self.assertIn("looks set to pay out in full", fake.notes[0])
+
+    def test_waits_for_rysk_to_pay_out_even_with_a_price(self):
+        fake = run(self.PUT, [SETTLED_AT], self.paid())
+        self.assertEqual(fake.dones, [])
+        self.assertIn(("/options/settlement", {"instrument": "ETH-30OCT26-2450-P", "venue": "rysk"}), fake.read_calls)
+        self.assertIn(("/options/account", {"venue": "rysk"}), fake.read_calls)
+        self.assertEqual(fake.lines[-1], ("settling", {}))
+
+    def test_expired_worthless_says_the_usdc_came_back(self):
+        fake = run(self.PUT, [SETTLED_AT], self.paid(self.row(False, (4998, "USDC"))))
+        text = fake.dones[0]
+        self.assertIn("ETH settled at $2,600, at or above your $2,450", text)
+        self.assertIn("expired worthless: Rysk returned 4998 USDC to your HyperEVM wallet", text)
+        self.assertIn("keep the $55.17 premium", text)
+        self.assertEqual(fake.lines[-1], ("done", {"price": 2600.0}))
+
+    def test_assigned_says_the_asset_was_delivered_never_a_cash_loss(self):
+        fake = run(self.PUT, [SETTLED_AT], self.paid(self.row(True, (2.04, "UETH")), price="2200"))
+        text = fake.dones[0]
+        self.assertIn("Your put was assigned: Rysk delivered 2.04 UETH to your HyperEVM wallet, bought at $2,450 each", text)
+        self.assertIn("$510.00 more than they were worth", text)
+        self.assertIn("you are down $454.83", text)
+        self.assertIn("yours to keep", text)
+        self.assertNotIn("in cash", text)
+        self.assertEqual(fake.acp_calls, [])
+
+    def test_under_the_strike_but_not_exercised_reads_what_came_back(self):
+        fake = run(self.PUT, [SETTLED_AT], self.paid(self.row(False, (4998, "USDC")), price="2440"))
+        self.assertIn("under your $2,450. Your put was not exercised: Rysk returned 4998 USDC", fake.dones[0])
+
+    def test_finds_its_own_sale_of_the_same_put(self):
+        rows = [self.row(False, (2450, "USDC"), size=1, instrument="ETH-30OCT26-2450.0-P"),
+                self.row(False, (4998, "USDC"))]
+        fake = run(self.PUT, [SETTLED_AT], self.paid(*rows))
+        self.assertIn("returned 4998 USDC", fake.dones[0])
+
+    def test_a_payout_with_no_price_yet_still_finishes(self):
+        fake = run(self.PUT, [SETTLED_AT], self.paid(self.row(False, (4998, "USDC")), price=None))
+        self.assertIn("ETH settled. Your put expired worthless", fake.dones[0])
+        self.assertEqual(fake.lines[-1], ("paid", {}))
+
+    def test_says_once_when_rysk_has_not_paid_out_for_hours(self):
+        fake = run(self.PUT, [SETTLED_AT, EXPIRY + hours(7), EXPIRY + hours(8)], self.paid())
+        self.assertEqual(len(fake.notes), 1)
+        self.assertIn("Rysk has not paid it out yet", fake.notes[0])
+        self.assertEqual(fake.dones, [])
+
+    def test_only_a_sold_put_without_a_delivery_buy(self):
+        for params, why in [(dict(self.PUT, DELIVER_ASSET=True, TOKEN_ID="native:8453"), "delivers the asset itself"),
+                            (dict(LONG_CALL, VENUE="rysk", INSTRUMENT="ETH-30OCT26-2800-C"), "only a sold put"),
+                            (dict(self.PUT, INSTRUMENT="ETH-20261030-2450-P"), "not a Rysk option name")]:
+            fake = run(params, [SETTLED_AT], self.paid())
+            self.assertIn(why, fake.notes[0])
+            self.assertEqual(fake.read_calls, [])
+
+    def test_no_note_asks_the_owner_anything(self):
+        worlds = [run(self.PUT, [SETTLED_AT], self.paid(self.row(True, (2.04, "UETH")), price="2200")),
+                  run(self.PUT, [SETTLED_AT], self.paid(self.row(False, (4998, "USDC")))),
+                  run(self.PUT, [SETTLED_AT, EXPIRY + hours(7)], self.paid())]
+        for fake in worlds:
+            for text in fake.notes + [d for d in fake.dones if d]:
+                self.assertIsNone(ASKS.search(text), text)
+
+
 class StatusLine(unittest.TestCase):
     def test_counts_down_in_days_then_hours(self):
         fake = run(PUT, [EXPIRY - hours(72), EXPIRY - hours(30), EXPIRY - hours(1)], PRICE)

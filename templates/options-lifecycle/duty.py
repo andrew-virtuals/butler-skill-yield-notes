@@ -1,6 +1,6 @@
 """Watch one yield note from open to outcome, and say what happened.
 
-A note is one option the owner sold on Derive or Paradex (VENUE), fully
+A note is one option the owner sold on Derive, Paradex or Rysk (VENUE), fully
 collateralised; a bought option is one they paid a premium for. The options-trading skill opens either
 and files this duty with the fill's own numbers.
 Three moments matter and the owner should never have to ask about any of them:
@@ -16,10 +16,15 @@ settlement comes from `bevo.read("/options/settlement")`. That works for every
 currency Derive lists options on. TOKEN_ID pins the underlying to a token only
 for the delivery buy, which trades that pin on its own chain.
 
-Derive settles options in **cash**. An in-the-money put reduces USDC; it does
-not hand over ETH. So "you now own 2.04 ETH" is only true when DELIVER_ASSET is
-on and the spot buy actually executed. Until then the duty says the owner is
-holding the loss in cash, because that is what has happened.
+Derive and Paradex settle options in **cash**. An in-the-money put reduces
+USDC; it does not hand over ETH. So "you now own 2.04 ETH" is only true when
+DELIVER_ASSET is on and the spot buy actually executed. Until then the duty
+says the owner is holding the loss in cash, because that is what has happened.
+
+Rysk settles **physically**: an assigned put delivers the asset to the owner's
+HyperEVM wallet, so there is no delivery buy. Near the strike the maker holding
+the option chooses whether to exercise it, so the outcome is what Rysk paid out
+(the account read's `settled`), never inferred from the price.
 
 Settings: VENUE, INSTRUMENT, PRODUCT, UNDERLYING, TOKEN_ID, STRIKE, SIZE,
 PREMIUM_USD, COLLATERAL_USD, DELIVER_ASSET, HEADS_UP_HOURS.
@@ -37,7 +42,7 @@ import time
 PARAMS = json.loads(os.environ.get("PARAMS", "{}"))
 
 VENUE = str(PARAMS.get("VENUE") or "derive").strip().lower()
-VENUE_NAME = {"derive": "Derive", "paradex": "Paradex"}.get(VENUE, VENUE)
+VENUE_NAME = {"derive": "Derive", "paradex": "Paradex", "rysk": "Rysk"}.get(VENUE, VENUE)
 #: Every options read names the venue, except Derive's: a Derive duty reads exactly
 #: what it read before venues existed.
 VENUE_QUERY = {} if VENUE == "derive" else {"venue": VENUE}
@@ -104,14 +109,17 @@ def answer_of(text):
 
 
 def parse_instrument(name):
-    """Pull expiry and option type back out of ETH-20261030-2450-P (Derive) or
-    ETH-USD-30OCT26-2450-P (Paradex).
+    """Pull expiry and option type back out of ETH-20261030-2450-P (Derive),
+    ETH-USD-30OCT26-2450-P (Paradex) or ETH-30OCT26-2450-P (Rysk).
 
-    Both write a decimal strike with an underscore (ADA-...-0_25-P), so the
-    strike is parsed but never trusted over the STRIKE setting. Both expire at
-    08:00 UTC.
+    Derive and Paradex write a decimal strike with an underscore
+    (ADA-...-0_25-P), Rysk with a point (HYPE-6NOV26-56.5-P), so the strike is
+    parsed but never trusted over the STRIKE setting. All expire at 08:00 UTC.
     """
-    if VENUE == "paradex":
+    if VENUE == "rysk":
+        m = re.match(r"^([A-Z0-9]+)-(\d{1,2}[A-Z]{3}\d{2})-(\d+(?:\.\d+)?)-([PC])$", name)
+        day_format = "%d%b%y"
+    elif VENUE == "paradex":
         m = re.match(r"^([A-Z0-9]+)-USD-(\d{1,2}[A-Z]{3}\d{2})-([0-9_]+)-([PC])$", name)
         day_format = "%d%b%y"
     else:
@@ -135,11 +143,14 @@ DETAIL = parse_instrument(INSTRUMENT) if INSTRUMENT else None
 #: Sold notes (income) and bought options, by the option type each must be.
 PRODUCT_KIND = {"cash_secured_put": "P", "covered_call": "C", "long_call": "C", "long_put": "P"}
 
-if VENUE not in ("derive", "paradex"):
-    PROBLEM = "VENUE must be derive or paradex, not %r" % VENUE
+EXAMPLE = {"paradex": "ETH-USD-30OCT26-2450-P", "rysk": "ETH-30OCT26-2450-P"}.get(VENUE, "ETH-20261030-2450-P")
+
+if VENUE not in ("derive", "paradex", "rysk"):
+    PROBLEM = "VENUE must be derive, paradex or rysk, not %r" % VENUE
 elif not DETAIL:
-    PROBLEM = "INSTRUMENT %r is not a %s option name like %s" % (
-        INSTRUMENT, VENUE_NAME, "ETH-USD-30OCT26-2450-P" if VENUE == "paradex" else "ETH-20261030-2450-P")
+    PROBLEM = "INSTRUMENT %r is not a %s option name like %s" % (INSTRUMENT, VENUE_NAME, EXAMPLE)
+elif VENUE == "rysk" and PRODUCT != "cash_secured_put":
+    PROBLEM = "on Rysk only a sold put (cash_secured_put) is watched, not %r" % PRODUCT
 elif PRODUCT not in PRODUCT_KIND:
     PROBLEM = "PRODUCT must be one of %s, not %r" % (", ".join(sorted(PRODUCT_KIND)), PRODUCT)
 elif DETAIL["kind"] != PRODUCT_KIND[PRODUCT]:
@@ -169,6 +180,8 @@ PIN = parse_pin(TOKEN_ID) if TOKEN_ID else None
 if not PROBLEM and TOKEN_ID and not PIN:
     PROBLEM = ("TOKEN_ID %r is not a pinned token like native:8453 or <address>:<chainId>"
                % TOKEN_ID)
+elif not PROBLEM and DELIVER_ASSET and VENUE == "rysk":
+    PROBLEM = "DELIVER_ASSET is not for Rysk: an assigned Rysk put delivers the asset itself"
 elif not PROBLEM and DELIVER_ASSET and not PIN:
     PROBLEM = "DELIVER_ASSET needs TOKEN_ID, the token to buy, like native:8453"
 
@@ -254,6 +267,47 @@ def settlement_price():
         return None
     settled = float(value)
     return settled if settled > 0 else None
+
+
+def option_key(name):
+    """A Rysk name as (underlying, expiry, strike, type), so 95 and 95.0 are one strike."""
+    m = re.match(r"^([A-Z0-9]+)-(\d{1,2}[A-Z]{3}\d{2})-(\d+(?:\.\d+)?)-([PC])$", str(name or ""))
+    return (m.group(1), m.group(2), float(m.group(3)), m.group(4)) if m else None
+
+
+def rysk_payout():
+    """This put's row in the account's `settled` once Rysk has paid it out, else None.
+
+    A BevoError means the account cannot be read, which settle() reports as such.
+    """
+    body = bevo.read("/options/account", VENUE_QUERY) or {}
+    rows = [r for r in ((body.get("account") or {}).get("settled") or [])
+            if option_key(r.get("instrument")) == option_key(INSTRUMENT)]
+    # One owner can sell the same put twice; this duty is the one of this size.
+    sized = [r for r in rows if abs(float(r.get("size") or 0) - SIZE) < 1e-9]
+    return (sized or rows or [None])[0]
+
+
+def rysk_outcome(row, settled):
+    """What Rysk paid out, in the owner's terms. `settled` may still be None."""
+    back = " + ".join("%s %s" % (fmt(leg["amount"]), leg["symbol"]) for leg in row.get("received") or [])
+    at = ""
+    if settled:
+        at = " at %s, %s your %s" % (price(settled), "under" if settled < STRIKE else "at or above",
+                                     price(STRIKE))
+    if row.get("assigned"):
+        text = ("%s settled%s. Your put was assigned: Rysk delivered %s to your HyperEVM wallet, "
+                "bought at %s each." % (UNDERLYING, at, back, price(STRIKE)))
+        if settled:
+            shortfall = max(0.0, STRIKE - settled) * SIZE
+            net = PREMIUM_USD - shortfall
+            text += (" That is %s more than they were worth at settlement; after the %s premium "
+                     "you are %s %s." % (usd(shortfall), usd(PREMIUM_USD),
+                                         "down" if net < 0 else "up", usd(abs(net))))
+        return text + " The %s is yours to keep; selling it is a separate trade." % UNDERLYING
+    ended = "was not exercised" if settled and settled < STRIKE else "expired worthless"
+    return ("%s settled%s. Your put %s: Rysk returned %s to your HyperEVM wallet, and you keep "
+            "the %s premium." % (UNDERLYING, at, ended, back or "your collateral", usd(PREMIUM_USD)))
 
 
 def heads_up():
@@ -391,6 +445,10 @@ def settle():
         bevo.fail("settlement unreadable: %s" % exc)
         return
 
+    if VENUE == "rysk":
+        settle_rysk(late, settled)
+        return
+
     if settled is None:
         if late > SETTLE_ALARM_SECONDS and not bevo.state.get("settle_alarm"):
             bevo.state["settle_alarm"] = True
@@ -436,12 +494,37 @@ def settle():
     bevo.done("%s: %s%s" % (NAME, headline, tail))
 
 
+def settle_rysk(late, settled):
+    """Finish once Rysk has paid out; until then wait, as for a missing price."""
+    try:
+        row = rysk_payout()
+    except bevo.BevoError as exc:
+        say("could not read the Rysk account: %s" % exc)
+        row = None
+    if row is None:
+        if late > SETTLE_ALARM_SECONDS and not bevo.state.get("settle_alarm"):
+            bevo.state["settle_alarm"] = True
+            bevo.notify("%s: your put expired %d hours ago and Rysk has not paid it out yet. "
+                        "Nothing is lost and I am still watching." % (NAME, round(late / 3600)))
+        else:
+            say("Rysk has not paid out %s yet (%d min past expiry)" % (INSTRUMENT, round(late / 60)))
+        bevo.status("settling")
+        return
+    if settled:
+        bevo.state["settled_price"] = settled
+        bevo.status("done", price=settled)
+    else:
+        bevo.status("paid")
+    bevo.done("%s: %s" % (NAME, rysk_outcome(row, settled)))
+
+
 def fire():
     left = EXPIRY - time.time()
 
     # Every tick until expiry, so a close the skill forgot to clean up still ends
     # the duty. After expiry the position is gone either way and says nothing.
-    if left > 0:
+    # A Rysk put cannot be closed early.
+    if left > 0 and VENUE != "rysk":
         seen = closed_early()
         if seen == "closed":
             bevo.status("closed")
