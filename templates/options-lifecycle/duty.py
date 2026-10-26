@@ -59,8 +59,7 @@ HEADS_UP_HOURS = float(PARAMS.get("HEADS_UP_HOURS") or 24)
 
 NAME = os.environ.get("BEVO_SERVICE_NAME") or "your note"
 
-#: Settlement is published shortly after the 08:00 UTC expiry, not at the
-#: stroke of it. Below this the duty waits quietly rather than reporting a
+#: Settlement is published shortly after expiry, not at the stroke of it. Below this the duty waits quietly rather than reporting a
 #: missing price as a problem.
 SETTLE_GRACE_SECONDS = 20 * 60
 
@@ -114,7 +113,10 @@ def parse_instrument(name):
 
     Derive and Paradex write a decimal strike with an underscore
     (ADA-...-0_25-P), Rysk with a point (HYPE-6NOV26-56.5-P), so the strike is
-    parsed but never trusted over the STRIKE setting. All expire at 08:00 UTC.
+    parsed but never trusted over the STRIKE setting. The name gives the day at
+    08:00 UTC, when every Derive, Rysk and Paradex crypto option expires; a
+    Paradex stock, index or commodity option expires later that day, which
+    `stated_expiry()` reads.
     """
     if VENUE == "rysk":
         m = re.match(r"^([A-Z0-9]+)-(\d{1,2}[A-Z]{3}\d{2})-(\d+(?:\.\d+)?)-([PC])$", name)
@@ -187,6 +189,40 @@ elif not PROBLEM and DELIVER_ASSET and not PIN:
 
 EXPIRY = DETAIL["expiry"] if DETAIL else 0
 IS_PUT = PRODUCT == "cash_secured_put"
+
+
+def stated_expiry():
+    """Moves EXPIRY to the instant Paradex states, once it has been read.
+
+    A Paradex stock, index or commodity option expires at its market's close
+    (META at 20:00 or 21:00 UTC, CL at 18:30 or 19:30), not at the name's 08:00
+    UTC. The ticker states it (`expirySec`), and it is kept, since an expired
+    market may no longer be listed. Until it is read the name's 08:00 stands,
+    which can only be early: the heads-up comes sooner and the duty waits
+    longer for the settlement price, which it says it is doing.
+    """
+    global EXPIRY
+    if VENUE != "paradex" or not DETAIL:
+        return
+    kept = bevo.state.get("expiry_sec")
+    if kept:
+        EXPIRY = int(kept)
+        return
+    try:
+        body = bevo.read("/options/ticker", {"instrument": INSTRUMENT, **VENUE_QUERY}) or {}
+    except bevo.BevoError as exc:
+        if not bevo.state.get("expiry_unread"):
+            bevo.state["expiry_unread"] = True
+            say("could not read when %s expires, so its name's 08:00 UTC stands: %s" % (INSTRUMENT, exc))
+        return
+    try:
+        stated = int(body.get("expirySec") or 0)
+    except (TypeError, ValueError):
+        stated = 0
+    # The same day as the name, or it is not this option's.
+    if 0 <= stated - DETAIL["expiry"] < 86400:
+        bevo.state["expiry_sec"] = stated
+        EXPIRY = stated
 IS_LONG = PRODUCT in ("long_call", "long_put")
 IS_CALL = PRODUCT_KIND.get(PRODUCT) == "C"
 
@@ -519,6 +555,7 @@ def settle_rysk(late, settled):
 
 
 def fire():
+    stated_expiry()
     left = EXPIRY - time.time()
 
     # Every tick until expiry, so a close the skill forgot to clean up still ends

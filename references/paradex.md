@@ -20,8 +20,10 @@ python3 /tmp/derive_helper.py quote --venue paradex --side buy --product call --
 ## The market
 
 - **What it lists**: `chain --venue paradex` with no `--underlying` - crypto, stocks,
-  indices and commodities alike, each by ticker (`MU`, `US500`). Paradex gives no company
-  name, so say the ticker alone; an asset not listed there has no options on Paradex.
+  indices and commodities alike, each by ticker with the helper's `name` and `kind`
+  (`MU` is Micron Technology, a stock; `CL` is WTI crude oil, a commodity). Say those as
+  given; a `null` one by its ticker alone, never a guess. An asset not listed there has
+  no options on Paradex.
 - **Names** are `ETH-USD-27NOV26-2600-C`; a decimal strike is written with `_`
   (`HYPE-USD-6NOV26-72_5-P`). Pass them exactly as the quote gives them.
 - **Sizes** are in the asset, on a 0.1 step for ETH (0.001 for BTC), and an order must
@@ -35,7 +37,9 @@ python3 /tmp/derive_helper.py quote --venue paradex --side buy --product call --
   quotes `tradeable: false`; never chase it with a higher bound.
 - **Only order-book markets.** Some Paradex options trade only by RFQ; the helper never
   offers one, and Butler's server refuses one.
-- **Expiries** settle at 08:00 UTC, in cash (USDC), into the Paradex account.
+- **Expiries** settle in cash (USDC), into the Paradex account: crypto at 08:00 UTC, a
+  stock, index or commodity option at its market's close (META 20:00 or 21:00 UTC, CL
+  18:30 or 19:30). Say the time the quote's `expiry` gives, never 08:00 for those.
 - Spreads outside ETH are often wide: the helper's gates apply unchanged, so expect
   more `tradeable: false` there. Say so; never loosen a gate.
 

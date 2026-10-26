@@ -7,6 +7,13 @@ from that read: the worth is the venue's own (`worthUsd`), so no venue's
 accounting lives here, and a venue the server adds appears on the next check
 with nothing refiled.
 
+A venue whose account is split into subaccounts (`accounts`: Derive's risk
+universes) gets one row per subaccount instead, keyed by its name ("PRIME",
+"RWA"), at the subaccount's own worth, listing its cash first and then its
+positions. Once every one of them is written, the venue's other rows (the
+single row it had before, a subaccount it no longer has) are removed, so the
+wallet never counts an account twice.
+
 A venue that fails to read, or reads with no worth, writes nothing, so its row
 keeps its last good value; the other venues are written regardless. Zero is
 written only for an account that read fine and holds nothing.
@@ -19,6 +26,7 @@ withdrawal, and the options-lifecycle duty reports expiries and settlements.
 
 import bevo
 import random
+import subprocess
 import time
 
 #: A smaller rise in USDC is noise, not a deposit.
@@ -89,6 +97,51 @@ def landed(venue, usdc, held):
     return 0.0
 
 
+def site_host(url):
+    """The host a Platforms row is keyed by, as the server derives it: lowercased, no "www."."""
+    host = str(url).split("://", 1)[-1].split("/", 1)[0].split("@")[-1].split(":")[0].lower()
+    return host[4:] if host.startswith("www.") else host
+
+
+def subaccount_rows(subs):
+    """(account, worth, positions, open count) per subaccount, or None when one has no worth.
+
+    A subaccount's cash is part of its worth, so it is listed as the row's first line.
+    """
+    rows = []
+    for sub in subs:
+        worth = sub.get("worthUsd")
+        if worth is None or float(worth) < 0:
+            return None
+        named = " ".join(str(sub.get("universe") or "").split())
+        held = listed(sub)
+        cash = {"title": "Cash", "valueUsd": round(float(sub.get("usdc") or 0), 2)}
+        rows.append((named or "Subaccount %s" % sub.get("subaccountId"), round(float(worth), 2),
+                     [cash] + held[:19], len(held)))
+    return rows
+
+
+def retire(site, keep):
+    """Remove the site's rows whose account is not in `keep`."""
+    host = site_host(site)
+    try:
+        rows = bevo.platform_balances()
+    except bevo.BevoError as exc:
+        say("could not list the Platforms rows, so none was retired: %s" % exc)
+        return
+    for row in rows:
+        if row.get("siteHost") != host or row.get("account") in keep or not row.get("id"):
+            continue
+        try:
+            done = subprocess.run(["bevo-platforms", "remove", str(row["id"])],
+                                  capture_output=True, text=True, timeout=30)
+        except (OSError, subprocess.SubprocessError) as exc:
+            done = None
+            say("could not retire the %s row: %s" % (row.get("account") or host, exc))
+        if done is not None and done.returncode != 0:
+            say("could not retire the %s row: %s" % (row.get("account") or host, done.stderr[:200]))
+
+
 def write(entry, wallet):
     """One venue's row. Answers (outcome, worth, open positions, USDC credited)."""
     name, site, venue = entry.get("name"), entry.get("site"), str(entry.get("venue") or "")
@@ -118,14 +171,28 @@ def write(entry, wallet):
         say("the %s account has no worth this run; the row keeps its last value" % name)
         return "unpriced", 0, 0, 0
     value = round(float(worth), 2)
-    positions = listed(account)
-    bevo.platform_balance(site, name, value, account=entry.get("wallet") or wallet,
-                          positions=positions)
+    subs = [sub for sub in account.get("accounts") or [] if isinstance(sub, dict)]
+    if subs:
+        rows = subaccount_rows(subs)
+        if rows is None:
+            say("a %s subaccount has no worth this run; its rows keep their last value" % name)
+            return "unpriced", 0, 0, 0
+        saved = [bevo.platform_balance(site, name, sub_worth, account=named, positions=positions)
+                 for named, sub_worth, positions, _ in rows]
+        # Only once every subaccount row is in place, or the venue could vanish for a check.
+        if all(saved):
+            retire(site, {named for named, _, _, _ in rows})
+        held = sum(count for _, _, _, count in rows)
+    else:
+        positions = listed(account)
+        bevo.platform_balance(site, name, value, account=entry.get("wallet") or wallet,
+                              positions=positions)
+        held = len(positions)
     credit = landed(venue, float(account.get("usdc") or 0), holdings(account)) if late else 0.0
     if credit:
         bevo.notify("Your %s deposit landed: $%s USDC credited. The account is worth $%s now."
                     % (name, usd(credit), usd(value)), push="%s deposit credited" % name)
-    return "ok", value, len(positions), credit
+    return "ok", value, held, credit
 
 
 def check():

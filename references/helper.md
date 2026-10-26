@@ -15,6 +15,7 @@ python3 /tmp/derive_helper.py quote --side close --instrument ETH-20261030-2600-
 python3 /tmp/derive_helper.py quote --side buyback --instrument ETH-20261030-2300-P --size 2 --premium-received 61.40
 python3 /tmp/derive_helper.py chain --underlying ETH --tenor monthly --type C
 python3 /tmp/derive_helper.py chain --venue paradex
+python3 /tmp/derive_helper.py quote --venue paradex --side buy --product call --underlying ETH --budget 10 --expiry 2026-10-30
 python3 /tmp/derive_helper.py quote --venue paradex --side buy --product call --underlying ETH --budget 50
 python3 /tmp/derive_helper.py quote --venue paradex --side close --instrument ETH-USD-27NOV26-2600-C --size 0.1
 ```
@@ -31,10 +32,16 @@ unreachable, does not list that asset, or the option named is not active. Exit `
 command line was wrong (usage on stderr).
 
 `chain` with no `--underlying` lists what the venue trades: one row per underlying, its
-`underlying` ticker and its `expiries` (ISO, UTC), order-book markets only. It is the
-answer to "what can I trade on Derive or Paradex"; `chain --underlying <ticker>` then
-gives one expiry's strikes. Name each exactly as listed: the venue gives no company
-name, so add none.
+`underlying` ticker, `name`, `kind` (`crypto`, `stock`, `etf`, `index` or `commodity`)
+and `expiries` (ISO, UTC), order-book markets only. It is the answer to "what can I
+trade on Derive or Paradex"; `chain --underlying <ticker>` then gives **one** expiry's
+strikes, each row naming its `expiry`: the tenor's (monthly by default), so a date it
+does not show is not missing from the venue; the list above has every expiry. When the
+owner names a day ("this Friday", "30 October"), pass it as `--expiry 2026-10-30` to
+`chain` and to `quote`; a day the venue does not list is refused with the days it does.
+Group by `kind` and say each `name` as given. Neither venue names its tickers,
+so the helper carries a list: `null` means a ticker it does not know yet. Say that one
+by ticker alone, never a guess at what it is.
 
 `quote` is the sell side unless `--side buy`, `--side close` or `--side buyback` says
 otherwise. Every
@@ -47,7 +54,7 @@ softer - they are already written for an owner.
 | Field | Means |
 | --- | --- |
 | `instrument` | Derive's name, e.g. `ETH-20261030-2300-P`; passed to `--instrument` as is |
-| `strike`, `expiry`, `days_to_expiry` | the price and the date (08:00 UTC) the note turns on |
+| `strike`, `expiry`, `days_to_expiry` | the price and the instant the note turns on: 08:00 UTC, or a Paradex stock, index or commodity market's close |
 | `size` | contracts, which are units of the asset; passed to `--size` as is |
 | `collateral.amount` | what the note locks: USDC for a put, units of the asset for a call; passed to `--max-collateral` |
 | `collateral.usd` | the same in dollars |
@@ -168,10 +175,11 @@ Usage:
     derive_helper.py quote --side close --instrument ETH-20261030-2750-C --size 0.5
     derive_helper.py quote --side buyback --instrument ETH-20261030-2300-P --size 2 \
         [--premium-received 61.40]
-    derive_helper.py chain --underlying ETH [--tenor monthly] [--type P]
+    derive_helper.py chain --underlying ETH [--tenor monthly | --expiry 2026-10-30] [--type P]
     derive_helper.py chain
 
-Every command takes --venue derive (the default) or --venue paradex.
+Every command takes --venue derive (the default) or --venue paradex. A buy or
+sell quote and chain take --expiry YYYY-MM-DD for the day the owner named.
 """
 
 import argparse
@@ -216,6 +224,48 @@ CURRENCIES = ["ETH", "BTC", "SOL", "XRP", "ADA", "HYPE",
 # Paradex's crypto option underlyings, measured 2026-10-20 (it also lists
 # equity and index options, which a note on idle USDC does not screen).
 PARADEX_CURRENCIES = ["BTC", "ETH", "SOL", "HYPE", "NEAR", "ZEC"]
+
+# What each ticker is, since neither venue's API says (Paradex tags its stocks,
+# indices and commodities alike as "RWA"). Every underlying Derive or Paradex
+# listed on 2026-10-26, from Paradex's instrument docs and the Pyth feed each
+# one prices from. Never fill a gap by searching the ticker: Pyth's CL is
+# Colgate-Palmolive, where Paradex's CL is crude oil. Unknown: name and kind null.
+KNOWN = {
+    "AAVE": ("Aave", "crypto"), "ADA": ("Cardano", "crypto"),
+    "AERO": ("Aerodrome", "crypto"), "AVAX": ("Avalanche", "crypto"),
+    "BNB": ("BNB", "crypto"), "BTC": ("Bitcoin", "crypto"),
+    "CC": ("Canton", "crypto"), "DIME": ("DIME, Paradex's token", "crypto"),
+    "DOGE": ("Dogecoin", "crypto"), "ENA": ("Ethena", "crypto"),
+    "ETH": ("Ethereum", "crypto"), "ETHFI": ("ether.fi", "crypto"),
+    "GRAM": ("Gram (formerly Toncoin)", "crypto"), "HYPE": ("Hyperliquid", "crypto"),
+    "JTO": ("Jito", "crypto"), "JUP": ("Jupiter", "crypto"),
+    "KAITO": ("Kaito", "crypto"), "LDO": ("Lido DAO", "crypto"),
+    "LINK": ("Chainlink", "crypto"), "LIT": ("Lighter", "crypto"),
+    "LTC": ("Litecoin", "crypto"), "MON": ("Monad", "crypto"),
+    "MORPHO": ("Morpho", "crypto"), "NEAR": ("NEAR Protocol", "crypto"),
+    "ONDO": ("Ondo", "crypto"), "PAXG": ("PAX Gold, a gold-backed token", "crypto"),
+    "PENDLE": ("Pendle", "crypto"), "PUMP": ("Pump.fun", "crypto"),
+    "PYTH": ("Pyth Network", "crypto"), "SOL": ("Solana", "crypto"),
+    "STRK": ("Starknet", "crypto"), "SUI": ("Sui", "crypto"),
+    "TAO": ("Bittensor", "crypto"), "TRUMP": ("Official Trump", "crypto"),
+    "TRX": ("TRON", "crypto"), "UNI": ("Uniswap", "crypto"),
+    "VVV": ("Venice", "crypto"), "WLFI": ("World Liberty Financial", "crypto"),
+    "XAUT": ("Tether Gold, a gold-backed token", "crypto"), "XMR": ("Monero", "crypto"),
+    "XPL": ("Plasma", "crypto"), "XRP": ("XRP", "crypto"), "ZEC": ("Zcash", "crypto"),
+    "kPEPE": ("Pepe, per 1,000 PEPE", "crypto"), "kSHIB": ("Shiba Inu, per 1,000 SHIB", "crypto"),
+    "CRCL": ("Circle Internet Group", "stock"), "GOOGL": ("Alphabet, class A", "stock"),
+    "INTC": ("Intel", "stock"), "META": ("Meta Platforms", "stock"),
+    "MRVL": ("Marvell Technology", "stock"), "MSFT": ("Microsoft", "stock"),
+    "MSTR": ("Strategy (MicroStrategy)", "stock"), "MU": ("Micron Technology", "stock"),
+    "NVDA": ("NVIDIA", "stock"), "SNDK": ("Sandisk", "stock"),
+    "SPCX": ("SpaceX", "stock"), "TSLA": ("Tesla", "stock"),
+    "DRAM": ("Roundhill Memory ETF", "etf"), "EWY": ("iShares MSCI South Korea ETF", "etf"),
+    "US500": ("US 500, the S&P 500", "index"), "US100": ("US 100, the Nasdaq-100", "index"),
+    "CL": ("WTI crude oil", "commodity"), "BZ": ("Brent crude oil", "commodity"),
+    "NG": ("Henry Hub natural gas", "commodity"), "XAU": ("Gold", "commodity"),
+    "XAG": ("Silver", "commodity"), "XPT": ("Platinum", "commodity"),
+    "XCU": ("Copper", "commodity"),
+}
 
 TENOR_DAYS = {"weekly": 9, "monthly": 24, "quarterly": 80}
 
@@ -399,7 +449,7 @@ def active_options(currency, opt_type):
 
 def listed():
     """Every underlying the venue has order-book options on, and its expiries, by
-    the venue's own ticker. No venue gives a company name, so neither does this."""
+    the venue's own ticker, with what KNOWN says it is."""
     now = time.time()
     found = {}
     try:
@@ -418,14 +468,25 @@ def listed():
                         found.setdefault(c["currency"], set()).add(exp)
     except Exception as exc:  # noqa: BLE001 - transport or a malformed answer
         raise VenueError("could not list %s's options: %s" % (V["name"], exc))
-    return [{"underlying": u, "expiries": [iso(e) for e in sorted(es)]}
+    return [{"underlying": u, "name": KNOWN.get(u, (None, None))[0],
+             "kind": KNOWN.get(u, (None, None))[1],
+             "expiries": [iso(e) for e in sorted(es)]}
             for u, es in sorted(found.items()) if u]
 
 
-def pick_expiry(insts, tenor, now):
-    """The listed expiry nearest the tenor's target, never one inside 24 hours."""
-    want = TENOR_DAYS.get(tenor, TENOR_DAYS["monthly"])
+def pick_expiry(insts, tenor, now, on=None):
+    """The listed expiry nearest the tenor's target, never one inside 24 hours, or
+    the one on the day the owner named (`on`, YYYY-MM-DD, UTC), never one inside the hour."""
     exps = sorted({i["option_details"]["expiry"] for i in insts})
+    if on:
+        day = lambda e: datetime.datetime.fromtimestamp(int(e), datetime.timezone.utc).strftime("%Y-%m-%d")
+        hit = [e for e in exps if day(e) == on and e - now >= 3600]
+        if hit:
+            return hit[0]
+        listed = sorted({day(e) for e in exps if e - now >= 3600})
+        raise VenueError("%s lists no expiry on %s; it lists %s"
+                         % (V["name"], on, ", ".join(listed) or "none"))
+    want = TENOR_DAYS.get(tenor, TENOR_DAYS["monthly"])
     exps = [e for e in exps if (e - now) / 86400.0 >= 1.0]
     if not exps:
         raise VenueError("no expiry more than a day out")
@@ -447,13 +508,13 @@ def taker_fee(inst, index, size, mark):
         num(inst.get("mark_price_fee_rate_cap")) * mark * size)
 
 
-def load_chain(underlying, opt_type, tenor, now):
+def load_chain(underlying, opt_type, tenor, now, on=None):
     try:
         insts = active_options(underlying, opt_type)
         if not insts:
             raise VenueError("%s has no active %s options on %s"
                              % (underlying, "put" if opt_type == "P" else "call", V["name"]))
-        expiry = pick_expiry(insts, tenor, now)
+        expiry = pick_expiry(insts, tenor, now, on)
         if V["id"] == "paradex":
             sums = pdx_summaries()
             tickers = {i["instrument_name"]: pdx_ticker(sums[i["instrument_name"]], i) for i in insts
@@ -475,14 +536,14 @@ def load_chain(underlying, opt_type, tenor, now):
 
 
 def build_quote(product, underlying, collateral_usd, tenor="monthly",
-                otm_pct=10.0, target_delta=None):
+                otm_pct=10.0, target_delta=None, on=None):
     if product not in ("cash_secured_put", "covered_call"):
         raise VenueError("unknown product %r" % product)
     opt_type = "P" if product == "cash_secured_put" else "C"
     underlying = underlying.strip().upper()
     now = time.time()
 
-    expiry, chain, tickers = load_chain(underlying, opt_type, tenor, now)
+    expiry, chain, tickers = load_chain(underlying, opt_type, tenor, now, on)
     spot = num(tickers[chain[0]["instrument_name"]].get("I"))
 
     inst = strike_for(chain, tickers, opt_type, spot, otm_pct, target_delta)
@@ -603,7 +664,7 @@ def strike_for(chain, tickers, opt_type, spot, otm_pct, target_delta):
 
 
 def build_buy_quote(product, underlying, budget_usd=None, tenor="monthly",
-                    otm_pct=5.0, target_delta=None, want_size=None):
+                    otm_pct=5.0, target_delta=None, want_size=None, on=None):
     """Price buying one call or put. Sized from the budget (premium + fee, with
     room for the price to move), or exactly want_size contracts for a hedge."""
     if product not in ("call", "put"):
@@ -612,7 +673,7 @@ def build_buy_quote(product, underlying, budget_usd=None, tenor="monthly",
     underlying = underlying.strip().upper()
     now = time.time()
 
-    expiry, chain, tickers = load_chain(underlying, opt_type, tenor, now)
+    expiry, chain, tickers = load_chain(underlying, opt_type, tenor, now, on)
     spot = num(tickers[chain[0]["instrument_name"]].get("I"))
     inst = strike_for(chain, tickers, opt_type, spot, otm_pct, target_delta)
 
@@ -912,14 +973,16 @@ def screen(tenor="monthly", collateral_usd=5000.0, otm_pct=10.0):
     return out
 
 
-def chain_rows(underlying, tenor, opt_type):
-    expiry, chain, tickers = load_chain(underlying.strip().upper(), opt_type, tenor, time.time())
+def chain_rows(underlying, tenor, opt_type, on=None):
+    """One expiry's strikes, each row naming it: never the venue's whole list of expiries."""
+    expiry, chain, tickers = load_chain(underlying.strip().upper(), opt_type, tenor, time.time(), on)
     rows = []
     for i in sorted(chain, key=lambda x: num(x["option_details"]["strike"])):
         t = tickers[i["instrument_name"]]
         op = t.get("option_pricing") or {}
         rows.append({
             "instrument": i["instrument_name"],
+            "expiry": iso(expiry),
             "strike": num(i["option_details"]["strike"]),
             "bid": num(t.get("b")), "bid_size": num(t.get("B")),
             "ask": num(t.get("a")), "ask_size": num(t.get("A")), "mark": num(t.get("M")),
@@ -942,6 +1005,13 @@ def tidy(v):
     return v
 
 
+def utc_day(text):
+    try:
+        return datetime.datetime.strptime(text.strip(), "%Y-%m-%d").strftime("%Y-%m-%d")
+    except ValueError:
+        raise argparse.ArgumentTypeError("%r is not a date like 2026-10-30" % text)
+
+
 def run_quote(p, a):
     def need(*flags):
         missing = [f for f in flags if getattr(a, f) is None]
@@ -962,12 +1032,12 @@ def run_quote(p, a):
         if a.product not in ("call", "put"):
             p.error("quote --side buy takes --product call or put")
         otm = 5.0 if a.otm_pct is None else a.otm_pct
-        return build_buy_quote(a.product, a.underlying, a.budget, a.tenor, otm, a.delta, a.size)
+        return build_buy_quote(a.product, a.underlying, a.budget, a.tenor, otm, a.delta, a.size, a.expiry)
     need("collateral")
     if a.product not in ("cash_secured_put", "covered_call"):
         p.error("quote --side sell takes --product cash_secured_put or covered_call")
     otm = 10.0 if a.otm_pct is None else a.otm_pct
-    return build_quote(a.product, a.underlying, a.collateral, a.tenor, otm, a.delta)
+    return build_quote(a.product, a.underlying, a.collateral, a.tenor, otm, a.delta, a.expiry)
 
 
 def main():
@@ -1003,6 +1073,9 @@ def main():
     c.add_argument("--underlying")
     c.add_argument("--tenor", default="monthly", choices=sorted(TENOR_DAYS))
     c.add_argument("--type", default="P", choices=["P", "C"])
+    for sp in (q, c):
+        sp.add_argument("--expiry", type=utc_day, default=None,
+                        help="YYYY-MM-DD (UTC): that day's expiry instead of the tenor's")
 
     for sp in (s, q, c):
         sp.add_argument("--venue", default="derive", choices=sorted(VENUES))
@@ -1014,7 +1087,7 @@ def main():
     elif a.cmd == "quote":
         out = run_quote(p, a)
     elif a.underlying:
-        out = chain_rows(a.underlying, a.tenor, a.type)
+        out = chain_rows(a.underlying, a.tenor, a.type, a.expiry)
     else:
         out = listed()
     print(json.dumps(tidy(out), indent=2))

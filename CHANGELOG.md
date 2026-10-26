@@ -1,5 +1,32 @@
 # Changelog
 
+## 2.7.1
+
+- Files `options-account@2`: one Platforms row per Derive subaccount (`PRIME`, `RWA`),
+  each at its own worth with its cash and positions, replacing the one row that merged
+  them. Step 9 updates a duty still on `@1` in place, unasked.
+- **The helper names what each ticker is.** `chain` with no `--underlying` now gives each
+  underlying a `name` and a `kind` (`crypto`, `stock`, `etf`, `index`, `commodity`) from a
+  list in the helper of every underlying Derive and Paradex list today. Neither venue's
+  API names a ticker, and Paradex tags its stocks, indices and commodities alike as
+  `RWA`. Seen in QA: told to say the ticker alone, the agent guessed instead - MU as
+  "e.g. MUFG", SPCX as "an SP/ETF index ticker", CL as a stock. They are Micron, SpaceX
+  and WTI crude oil. A ticker the list does not know comes back `null` and is said by
+  ticker alone; the list is never filled by searching a ticker (Pyth's CL is
+  Colgate-Palmolive).
+- **A Paradex option's expiry is the market's, not its name's.** A Paradex name gives only
+  the day, and everything read 08:00 UTC into it; a stock, index or commodity option
+  expires at its market's close instead (META 20:00 or 21:00 UTC, CL 18:30 or 19:30).
+  `references/paradex.md`, `helper.md` and `buying.md` now say so, and step 7 files
+  `options-lifecycle@9`, which takes the expiry Paradex states. Butler's server states it
+  on the card, the account's positions and the ticker.
+- **A day the owner names is quoted on that day.** `quote` and `chain` take
+  `--expiry YYYY-MM-DD`, and each `chain` row names its `expiry`. Seen in QA: asked for
+  an ETH call "expiring this Friday", the agent read `chain --underlying ETH`, which shows
+  only the tenor's one expiry (13 November), and told the owner Paradex had no 30 October
+  expiry, though its own listing showed one. "Weekly" aims 9 days out, so a Friday 4 days
+  away could not be reached at all.
+
 ## 2.7.0
 
 - **Rysk, as a third venue.** Selling a cash-secured put on Rysk is the same procedure as

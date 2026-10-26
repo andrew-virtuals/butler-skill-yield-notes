@@ -1,10 +1,10 @@
 # options-account
 
-Keeps the owner's account on every options venue on the wallet page's Platforms tab: one row per venue whose account exists (**Derive**, **Paradex**), kept at what that account is worth, listing each open position. The options-trading skill files it once per owner, as soon as an account exists on any venue. It is the only writer of those rows, and replaces `derive-account`.
+Keeps the owner's account on every options venue on the wallet page's Platforms tab: one row per venue whose account exists (**Paradex**, **Rysk**), or one per subaccount where the venue splits it (**Derive**: `PRIME`, `RWA`…), kept at what that account is worth, listing each open position. The options-trading skill files it once per owner, as soon as an account exists on any venue. It is the only writer of those rows, and replaces `derive-account`.
 
 ## How it is filed
 
-`{"recipe": "options-account@1", "title": "Options accounts", "triggers": [{"kind": "timer", "intervalSeconds": 600}]}`. No settings. One per owner: a second one adds nothing, because both write the same rows. An owner still running `derive-account` has it removed when this one is filed, so each row has one writer.
+`{"recipe": "options-account@2", "title": "Options accounts", "triggers": [{"kind": "timer", "intervalSeconds": 600}]}`. No settings. One per owner: a second one adds nothing, because both write the same rows. An owner still running `derive-account` has it removed when this one is filed, so each row has one writer. A duty filed from `options-account@1` is updated in place with `duty_update {"recipe": "options-account@2"}`.
 
 ## What it does
 
@@ -19,7 +19,11 @@ It checks once when it starts, then on every tick, a random 0 to 60 seconds afte
 | `available: false` with a `reason` (not traded here) | none | not counted |
 | `account: null` (Butler's signer is off) | untouched | Butler's signer is off |
 
-The worth is the venue's own `worthUsd`, written as it stands: Derive's is the sum of its subaccounts' `subaccount_value`, Paradex's its `account_value`. Each position is listed as `Bought 0.1 ETH 2,550 call`, with its instrument, its signed value, when it expires and how far up or down it is.
+The worth is the venue's own `worthUsd`, written as it stands: Paradex's is its `account_value`. Each position is listed as `Bought 0.1 ETH 2,550 call`, with its instrument, its signed value (a sold option is negative: what buying it back costs), when it expires and how far up or down it is.
+
+## Subaccounts
+
+A venue that splits the account (`account.accounts`, Derive's risk universes) gets one row per subaccount instead, under the venue's name and site, with the subaccount's name (`PRIME`) as the row's account and its own `worthUsd` (Derive's `subaccount_value`) as the row's value. The first line is `Cash`, the subaccount's `usdc`, then its positions. Every subaccount is priced or none is written. Once all of them are saved, the venue's other rows on that site are removed: the single row keyed by the wallet that `@1` wrote, and any subaccount that is gone. A check where a row was not saved, or the rows could not be listed, removes nothing.
 
 ## The one note
 
@@ -30,7 +34,7 @@ On a venue with `depositsLandLater` (Derive, whose deposit is bridged after its 
 - **Write 0 for "could not read".** Every failed or unvalued read leaves that venue's row at its last good value.
 - **Do a venue's accounting.** It never adds up cash and positions itself.
 - **Call `bevo.fail()` because a venue is down.** Each check catches its own errors and logs them.
-- **Move money or touch a position.** It makes no `acp` call. It only reads.
+- **Move money or touch a position.** It makes no `acp` call. It only reads, and removes only its own venues' superseded rows.
 
 ## Trigger
 

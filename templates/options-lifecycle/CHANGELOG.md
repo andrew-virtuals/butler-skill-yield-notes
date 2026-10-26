@@ -1,5 +1,15 @@
 # Changelog
 
+## 9
+
+- **A Paradex option expires when Paradex says.** Its name gives only the day, and the
+  duty took 08:00 UTC, which is right for crypto but 12 or 13 hours early for a stock,
+  index or commodity option (META settles at the New York close). On Paradex the duty
+  reads the expiry the ticker states (`expirySec`) and keeps it, so the heads-up, the
+  countdown and the wait for settlement use the real time. Until the ticker states it,
+  the name's 08:00 UTC stands. Derive and Rysk read exactly as before. Supersedes
+  `options-lifecycle@8`.
+
 ## 8
 
 - **Rysk.** `VENUE` `rysk`, sold puts only, named as Rysk's fields (`SOL-30OCT26-95-P`,
