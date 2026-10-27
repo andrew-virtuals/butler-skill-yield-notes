@@ -3,40 +3,39 @@
 A note is one option the owner sold on Derive, Paradex or Rysk (VENUE), fully
 collateralised; a bought option is one they paid a premium for. The options-trading skill opens either
 and files this duty with the fill's own numbers.
-Three moments matter and the owner should never have to ask about any of them:
+Two moments matter and the owner should never have to ask about either:
 
     the day before   where the asset is, and which way the note is leaning
     settlement       what they kept, or what they agreed to buy or sell
-    after that       the asset itself, if they asked to actually own it
+
+It only watches and reports: it runs no command, so it files as a duty that
+moves no money and gets no pocket. A sold put whose owner asked to end up
+owning the asset is filed as `options-put-delivery` instead, which buys it.
 
 A duty has no network of its own, so both prices come through the options
 rail: the heads-up reads Derive's own index for this option
 (`bevo.read("/options/ticker")`), the price it will settle against, and the
 settlement comes from `bevo.read("/options/settlement")`. That works for every
-currency Derive lists options on. TOKEN_ID pins the underlying to a token only
-for the delivery buy, which trades that pin on its own chain.
+currency Derive lists options on.
 
 Derive and Paradex settle options in **cash**. An in-the-money put reduces
-USDC; it does not hand over ETH. So "you now own 2.04 ETH" is only true when
-DELIVER_ASSET is on and the spot buy actually executed. Until then the duty
-says the owner is holding the loss in cash, because that is what has happened.
+USDC; it does not hand over ETH. So the duty never says "you now own 2.04 ETH":
+it says the owner is holding the loss in cash, because that is what has happened.
 
 Rysk settles **physically**: an assigned put delivers the asset to the owner's
 HyperEVM wallet, so there is no delivery buy. Near the strike the maker holding
 the option chooses whether to exercise it, so the outcome is what Rysk paid out
 (the account read's `settled`), never inferred from the price.
 
-Settings: VENUE, INSTRUMENT, PRODUCT, UNDERLYING, TOKEN_ID, STRIKE, SIZE,
-PREMIUM_USD, COLLATERAL_USD, DELIVER_ASSET, HEADS_UP_HOURS.
+Settings: VENUE, INSTRUMENT, PRODUCT, UNDERLYING, STRIKE, SIZE,
+PREMIUM_USD, COLLATERAL_USD, HEADS_UP_HOURS.
 """
 
 import bevo
 import datetime
 import json
-import math
 import os
 import re
-import subprocess
 import time
 
 PARAMS = json.loads(os.environ.get("PARAMS", "{}"))
@@ -53,8 +52,6 @@ STRIKE = float(PARAMS.get("STRIKE") or 0)
 SIZE = float(PARAMS.get("SIZE") or 0)
 PREMIUM_USD = float(PARAMS.get("PREMIUM_USD") or 0)
 COLLATERAL_USD = float(PARAMS.get("COLLATERAL_USD") or 0)
-DELIVER_ASSET = bool(PARAMS.get("DELIVER_ASSET") or False)
-TOKEN_ID = str(PARAMS.get("TOKEN_ID") or "").strip()
 HEADS_UP_HOURS = float(PARAMS.get("HEADS_UP_HOURS") or 24)
 
 NAME = os.environ.get("BEVO_SERVICE_NAME") or "your note"
@@ -87,24 +84,6 @@ def price(number):
     """Prices are read aloud, so trim them to something a person says."""
     n = float(number)
     return "$%s" % format(round(n, 2 if n < 100 else 0), ",.2f" if n < 100 else ",.0f")
-
-
-def answer_of(text):
-    """The JSON `acp` printed, or None. None is NOT a refusal."""
-    text = (text or "").strip()
-    if not text:
-        return None
-    try:
-        value = json.loads(text)
-    except ValueError:
-        start = text.find("{")
-        if start < 0:
-            return None
-        try:
-            value, _ = json.JSONDecoder().raw_decode(text, start)
-        except ValueError:
-            return None
-    return value if isinstance(value, dict) else None
 
 
 def parse_instrument(name):
@@ -162,30 +141,6 @@ elif not INSTRUMENT.startswith(UNDERLYING + "-"):
     PROBLEM = "%s is not an option on UNDERLYING %s" % (INSTRUMENT, UNDERLYING)
 elif SIZE <= 0 or STRIKE <= 0:
     PROBLEM = "SIZE and STRIKE must both be above zero"
-
-def parse_pin(pin):
-    """`native:<chainId>` or `<address>:<chainId>` → (token-out, chain id). None otherwise.
-
-    A tokenized stock (`stock:<TICKER>:0`) is no option's underlying, so it is
-    not accepted here.
-    """
-    m = re.match(r"^(native|0x[0-9a-fA-F]{40}):([0-9]+)$", pin)
-    if not m:
-        return None
-    token, chain = m.groups()
-    return ("eth" if token == "native" else token), int(chain)
-
-
-PIN = parse_pin(TOKEN_ID) if TOKEN_ID else None
-
-# The pin is only ever traded, so it is only needed when a trade can happen.
-if not PROBLEM and TOKEN_ID and not PIN:
-    PROBLEM = ("TOKEN_ID %r is not a pinned token like native:8453 or <address>:<chainId>"
-               % TOKEN_ID)
-elif not PROBLEM and DELIVER_ASSET and VENUE == "rysk":
-    PROBLEM = "DELIVER_ASSET is not for Rysk: an assigned Rysk put delivers the asset itself"
-elif not PROBLEM and DELIVER_ASSET and not PIN:
-    PROBLEM = "DELIVER_ASSET needs TOKEN_ID, the token to buy, like native:8453"
 
 EXPIRY = DETAIL["expiry"] if DETAIL else 0
 IS_PUT = PRODUCT == "cash_secured_put"
@@ -388,9 +343,8 @@ def heads_up():
 def outcome_sentences(settled):
     """What actually happened, in the owner's terms. Returns (headline, assigned).
 
-    The assigned-put headline says "agreed to buy", not "have bought". Derive
-    settles in cash, so until the delivery buy executes the owner owns no
-    asset — and settle() is the only thing that knows whether it did.
+    The assigned-put headline says "agreed to buy", not "have bought": Derive
+    and Paradex settle in cash, so the owner owns no asset.
     """
     if IS_LONG:
         kind = "call" if IS_CALL else "put"
@@ -428,45 +382,8 @@ def outcome_sentences(settled):
                price(STRIKE), usd(given_up), usd(PREMIUM_USD)), True)
 
 
-def deliver(settled):
-    """Buy the asset the owner has just agreed to buy. One key, never retried.
-
-    It buys the pinned token (TOKEN_ID) on the pin's own chain, never a bare
-    ticker. `acp trade` spends USDC, so SIZE of the asset is bought as SIZE x
-    the settlement price in USDC, rounded up to the cent: roughly SIZE units,
-    since the market has moved on since 08:00 UTC.
-
-    Returns "done", "pending", "refused" or "unknown". An unparseable answer
-    is "unknown", never "refused": the request may have landed, and only
-    `bevo.exec_status(key)` can say.
-    """
-    key = "note:%s:deliver" % bevo.SERVICE_ID
-    token_out, chain = PIN
-    spend = math.ceil(SIZE * settled * 100) / 100.0
-    done = subprocess.run(
-        ["acp", "trade", "--token-in", "usdc", "--chain-in", str(chain),
-         "--amount-in", "%.2f" % spend, "--token-out", token_out,
-         "--chain-out", str(chain), "--idempotency-key", key],
-        capture_output=True, text=True, timeout=180, check=False,
-    )
-    answer = answer_of(done.stdout)
-    if answer is None:
-        state = (bevo.exec_status(key) or {}).get("state")
-        say("delivery buy outcome UNKNOWN (exec_status: %s) - not retried" % state)
-        return "unknown"
-    if answer.get("executed"):
-        return "done"
-    if answer.get("asked") or answer.get("ok"):
-        return "pending"
-    if answer.get("unrecognized"):
-        say("delivery buy: unrecognised answer %r - treated as unknown" % answer.get("status"))
-        return "unknown"
-    say("delivery buy refused: %s" % (answer.get("error") or answer.get("status")))
-    return "refused"
-
-
 def settle():
-    """Read the settlement, say what happened, deliver if asked, and finish."""
+    """Read the settlement, say what happened, and finish."""
     late = time.time() - EXPIRY
     try:
         settled = settlement_price()
@@ -501,22 +418,8 @@ def settle():
 
     tail = ""
     if assigned and IS_PUT:
-        if DELIVER_ASSET:
-            result = deliver(settled)
-            if result == "done":
-                tail = " I have bought the %s for you, so you now own about %s %s." % (
-                    UNDERLYING, fmt(SIZE), UNDERLYING)
-            elif result == "pending":
-                tail = (" Buying the %s is waiting on your approval; until it goes through "
-                        "you are holding the loss in cash, not the %s." % (UNDERLYING, UNDERLYING))
-            elif result == "refused":
-                tail = " I could not buy the %s, so you are holding the loss in cash." % UNDERLYING
-            else:
-                tail = (" I am not certain whether the %s purchase went through; check before "
-                        "buying again." % UNDERLYING)
-        else:
-            tail = (" %s settles in cash, so you are holding the loss in cash, not the %s."
-                    % (VENUE_NAME, UNDERLYING))
+        tail = (" %s settles in cash, so you are holding the loss in cash, not the %s."
+                % (VENUE_NAME, UNDERLYING))
     if IS_LONG:
         if intrinsic(settled) > 0:
             tail += " The payout is free cash in your %s account." % VENUE_NAME

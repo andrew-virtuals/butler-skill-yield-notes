@@ -1,5 +1,28 @@
 # Changelog
 
+## 2.8.0
+
+- **A duty that only watches no longer asks for a spending limit.** Seen in QA: a bought
+  BTC call's lifecycle duty came with a "Set spending limit" card proposing $50, while
+  the butler said it never spends. `options-lifecycle@9` carried the delivery buy for
+  assigned puts (`DELIVER_ASSET`), and Butler marks a duty as spending from any `acp`
+  money command in its code, reachable or not. Step 7 now files `options-lifecycle@10`,
+  which runs no command, with `movesFunds: false`: no pocket and no card, for every
+  bought option and every sold put without delivery.
+- **Owning the asset after an assigned put is its own template.** When the owner asked
+  for it in step 3, step 7 files `options-put-delivery@1` instead (`references/selling.md`):
+  the same watch, plus the buy, with its pocket card opening on the collateral rather
+  than $50. It never buys for a put missing from the account at the last check before
+  expiry.
+- **"What can I trade on Rysk" uses the listing, not the Rysk helper.** Seen in QA on
+  2.7.3: the agent followed `rysk.md`'s command block, which still showed
+  `python3 /tmp/rysk.py inventory`, began writing the 29 KB Rysk helper, and ended the
+  turn after 1m41s without an answer; the line saying a listing is `listing.md` sat in
+  the prose under it. No command block in `rysk.md`, `rysk-helper.md` or `helper.md`
+  shows a whole-venue listing any more (`rysk.py inventory`, `derive_helper.py chain
+  --venue paradex`), and `rysk.md` and `rysk-helper.md` say first that a listing is
+  `listing.md`.
+
 ## 2.7.3
 
 - **"Buy the 2100 put" buys the 2100 put.** Seen in QA: the agent quoted and offered

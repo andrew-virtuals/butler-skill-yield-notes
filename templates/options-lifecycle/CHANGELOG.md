@@ -1,5 +1,16 @@
 # Changelog
 
+## 10
+
+- **Watch-only: the delivery buy moved to `options-put-delivery`.** `DELIVER_ASSET`,
+  `TOKEN_ID` and the `acp trade` behind them are gone. Butler's lint marks a duty as
+  spending from any `acp` money command in its code, reachable or not, so every
+  lifecycle duty (a bought call included) was filed with a "Set spending limit" card
+  for a buy only an assigned put with delivery on could ever make. This version runs
+  no command and is filed with `movesFunds: false`: no pocket, no card. An assigned
+  put is reported as the loss held in cash, as before with delivery off. Supersedes
+  `options-lifecycle@9`.
+
 ## 9
 
 - **A Paradex option expires when Paradex says.** Its name gives only the day, and the
