@@ -1,8 +1,8 @@
 ---
 name: options-trading
 description: Trade options on Derive, Paradex or Rysk - earn on idle USDC by selling cash-secured puts, buy a call or a put, close before expiry, and check or withdraw USDC and positions.
-version: 2.7.2
-metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","withdraw","withdraw my usdc","derive","my options","options account","options positions","free usdc","derive positions","my option positions","withdraw from derive","withdraw my free usdc","paradex","paradex options","paradex positions","rysk","rysk options","rysk positions","physically settled","hyperevm"],"requires":{"bins":["python3","bevo-read","acp"]}}}
+version: 2.7.3
+metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","withdraw","withdraw my usdc","derive","my options","options account","options positions","free usdc","derive positions","my option positions","withdraw from derive","withdraw my free usdc","paradex","paradex options","paradex positions","rysk","rysk options","rysk positions","physically settled","hyperevm"],"requires":{"bins":["python3","cat","bevo-read","acp"]}}}
 ---
 
 ## When to use
@@ -19,7 +19,7 @@ Your owner wants one of four things on Derive's, Paradex's or Rysk's options mar
   **sold**.
 - **Look or withdraw** - "my free USDC in Derive" (`freeForNewPutsUsd`, not wallet
   cash), "my positions": step 1, then stop. "Withdraw my free USDC": step 8, never an
-  `acp trade` (`references/account.md`).
+  `acp trade` (`references/account.md`). Listing: `references/listing.md`.
 
 Not this skill: covered calls, spreads, leverage, or a trade the helper refuses.
 
@@ -28,13 +28,12 @@ Not this skill: covered calls, spreads, leverage, or a trade the helper refuses.
 1. **Which of the four.** Earning and buying are different promises; never blur them.
    Selling fits only USDC whose owner would happily buy the asset lower; a no to that
    ends selling, every put on it.
-2. **Sizes are in the asset.** 1 contract is 1 ETH: 0.16 is 0.16 ETH, and Derive's 0.1
+2. **Sizes are in the asset.** 1 contract is 1 ETH: 0.16 is 0.16 ETH, and `min_size`
    is only its minimum. Say "0.16 ETH", never "contracts", and never convert.
-3. **The bad case first, in their words, before any upside number.** Selling, from
-   `bad_case`: *"If ETH falls 25% to $1,844, you pay $2,200: down $44."* Buying: *"If ETH is not
-   above $2,664 on 30 October, the $190 is gone."*
+3. **The bad case first, in their words, before any upside number:** selling, from
+   `bad_case`; buying, that what it costs is gone.
 4. **First time for that kind of trade:** the plain yes answers in
-   `references/selling.md` or `references/buying.md`. A no or a vague answer stops it.
+   `references/selling.md` or `buying.md`. A no or a vague answer stops it.
 5. **Figures come only from this turn's reads:** sizes, prices and positions
    from `acp options account` and quotes, never memory; a note that disagrees is wrong,
    so fix it. `bevo-read assets` has none.
@@ -70,12 +69,12 @@ this chat. One missing: ask, and file nothing this turn.
    `exists: true` on any venue, step 9.
 
 2. [FIXED] Write the script in `references/helper.md` to `/tmp/derive_helper.py`.
-   Quote with the line for the intent; the strike is a rule, never your number:
+   Quote with the line for the intent; the strike is a rule or theirs, never yours:
 
    ```sh
    python3 /tmp/derive_helper.py screen --collateral <USD>
-   python3 /tmp/derive_helper.py quote --product cash_secured_put --underlying <ASSET> --collateral <USD>
-   python3 /tmp/derive_helper.py quote --side buy --product <PRODUCT> --underlying <ASSET> --budget <USD>
+   python3 /tmp/derive_helper.py quote --product cash_secured_put --underlying <ASSET> --collateral <USD> [--expiry <DAY>] [--strike <N>]
+   python3 /tmp/derive_helper.py quote --side buy --product <PRODUCT> --underlying <ASSET> --budget <USD> [--expiry <DAY>] [--strike <N>]
    python3 /tmp/derive_helper.py quote --side close --instrument <INSTRUMENT> --size <SIZE>
    python3 /tmp/derive_helper.py quote --side buyback --instrument <INSTRUMENT> --size <SIZE> --premium-received <USD>
    ```
@@ -84,8 +83,8 @@ this chat. One missing: ask, and file nothing this turn.
    `<PRODUCT>` is `call` or `put`, `--budget` the most they will spend. Closing:
    instrument and size from `positions`; positive is `--side close`, negative is `--side buyback` with the size positive and `--premium-received`
    the note's `netPremiumUsd` (or its duty's PREMIUM_USD) scaled to it. **Offer only
-   `tradeable: true`**; give the `reasons` as written. Listing: `chain`
-   alone; `name` as given, never a guess.
+   `tradeable: true`**; give the `reasons` as written. A strike or day they named:
+   `buying.md`.
 
 3. [ADAPT] Offer it using **only** quote fields; never compute a number:
    - **Sell:** `bad_case` first, then `net_premium_usd`, `fee_usd`, the lock to
@@ -164,8 +163,8 @@ this chat. One missing: ask, and file nothing this turn.
    `"alongside": [<this chat's earlier ones' names>]`; step 9's needs none.
 
 8. [FIXED] Withdraw only when asked, only free USDC: at most this turn's
-   `freeForNewPutsUsd`, rounded down to the cent. It lands on Ethereum in about 20
-   minutes, less up to $1 (say so first); `:home` brings it to Base once it shows in
+   `freeForNewPutsUsd`, rounded down to the cent. It lands on Ethereum in its card's
+   window, less Derive's fee (say so first); `:home` brings it to Base once it shows in
    `ethereum.usdc`:
 
    ```sh

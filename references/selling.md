@@ -17,6 +17,10 @@ and keeping the fee. The premium is certain. What they own at expiry is not.
   name them and ask which they would happily own lower, then quote that one.
 - **How much, in one asset.** The collateral is locked until expiry. Getting out
   early means buying the note back, which can cost more than it brought in.
+- **A strike or day they named** goes in as `--strike` and `--expiry` (`YYYY-MM-DD`),
+  never a rule that lands near it. A quote whose `strike` or `expiry` is not what they
+  named is not offered; an expiry without that strike is refused with the strikes it
+  lists, so say those and ask.
 
 ## The first-time check
 
@@ -162,8 +166,9 @@ Never auto-roll without a fresh yes.
 
 ## Sizes
 
-The smallest note is Derive's minimum size x the strike: about $230 on ETH at
-today's strikes, about $750 on BTC. Fees make anything near that poor value.
+The smallest note is the quote's `min_size` x the strike, so it moves with the strike; a
+smaller one is refused with what the minimum needs (`collateral too small`). Fees make
+anything near it poor value.
 Monthly by default: weeklies lose far more of the premium to fees and the spread,
 and the fee gate refuses them on small notes.
 

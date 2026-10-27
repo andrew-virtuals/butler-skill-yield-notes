@@ -25,7 +25,7 @@ Named as the Derive helper names them, so `SKILL.md` reads both the same way:
 | Field | Means |
 | --- | --- |
 | `instrument` | Rysk's fields as one name, e.g. `SOL-30OCT26-95-P`; passed to `--instrument` as is |
-| `strike`, `expiry`, `days_to_expiry` | the price and the date (08:00 UTC) the put turns on |
+| `strike`, `expiry`, `days_to_expiry` | the price and the instant the put turns on, as Rysk states it |
 | `size` | units of the asset; passed to `--size` as is |
 | `collateral.amount` | the USDC the put locks; passed to `--max-collateral` |
 | `premium_usd` | `premium_per_unit` times the size, before Rysk's fee |
