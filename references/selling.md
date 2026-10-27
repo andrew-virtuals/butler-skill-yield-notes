@@ -122,16 +122,32 @@ premium has been told half of it.
 
 **Derive and Paradex settle in cash.** An in-the-money put reduces USDC by (strike - settlement
 price) x size; it does not deliver ETH. "You now own ETH at $2,300" is true only after
-a separate spot buy has filled. The lifecycle duty does that buy only when it is filed
-with `DELIVER_ASSET` on, which is only when the owner asked for it before the open.
-The duty then needs `TOKEN_ID`, the token it buys: ETH is `native:8453`; BTC is the
-verified, non-stock Base row of `bevo-read token-search BTC` as `<address>:8453` (ask
-if two fit).
+a separate spot buy has filled. `options-lifecycle` never buys: it only reports, and
+is filed with `movesFunds: false`, so the owner gets no spending-limit card.
+
+Only when the owner asked before the open to end up owning the asset, file
+`options-put-delivery@1` instead of `options-lifecycle` (never both), in SKILL.md step
+7. It watches the same way and buys the asset if the put is assigned:
+
+```json
+{"recipe": "options-put-delivery@1", "title": "Watch {INSTRUMENT}, buy {UNDERLYING} if assigned",
+ "triggers": [{"kind": "timer", "intervalSeconds": 900}],
+ "spendBasis": {"perTrade": "COLLATERAL_USD", "times": 1},
+ "params": {"VENUE": "<venue>", "INSTRUMENT": "<instrument>", "UNDERLYING": "<prefix>",
+ "TOKEN_ID": "<pin>", "STRIKE": <strike>, "SIZE": <filledSize>,
+ "PREMIUM_USD": <netPremiumUsd>, "COLLATERAL_USD": <collateral>}}
+```
+
+`TOKEN_ID` is the token it buys: ETH is `native:8453`; BTC is the verified, non-stock
+Base row of `bevo-read token-search BTC` as `<address>:8453` (ask if two fit). It
+spends, so a spending-limit card opens on the collateral: tell the owner that holding
+it lets the buy go through at settlement, and that without it the buy waits for their
+approval then.
 
 The premium and the freed collateral stay in the Derive account until withdrawn.
 
 **Rysk settles physically**: an assigned put delivers the asset itself, so there is no
-delivery buy and no `DELIVER_ASSET` there (`references/rysk.md`).
+delivery buy there: always `options-lifecycle` (`references/rysk.md`).
 
 ## Buying back early
 

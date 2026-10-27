@@ -1,0 +1,104 @@
+{
+  "id": "options-put-delivery",
+  "version": 1,
+  "description": "Watch one sold Derive or Paradex put to expiry and, if it is assigned, buy the asset it agreed to buy.",
+  "keywords": [
+    "assigned",
+    "buy the dip",
+    "cash secured put",
+    "delivery",
+    "derive",
+    "expiry",
+    "own the asset",
+    "paradex",
+    "put option",
+    "settlement",
+    "yield note"
+  ],
+  "triggers": [
+    "timer"
+  ],
+  "keys": [
+    "note:<duty>:deliver"
+  ],
+  "params": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "INSTRUMENT",
+      "UNDERLYING",
+      "TOKEN_ID",
+      "STRIKE",
+      "SIZE",
+      "PREMIUM_USD",
+      "COLLATERAL_USD"
+    ],
+    "properties": {
+      "VENUE": {
+        "type": "string",
+        "enum": [
+          "derive",
+          "paradex"
+        ],
+        "default": "derive",
+        "description": "The venue the put trades on: derive (the default) or paradex. Both settle in cash, which is why the asset has to be bought. Not rysk: an assigned Rysk put delivers the asset itself, so options-lifecycle watches it."
+      },
+      "INSTRUMENT": {
+        "type": "string",
+        "description": "The venue's own name for the put, exactly as it was filled: ETH-20261030-2450-P on Derive, ETH-USD-30OCT26-2450-P on Paradex. The expiry is read back out of this, so it must match the fill.",
+        "minLength": 8,
+        "maxLength": 64
+      },
+      "UNDERLYING": {
+        "type": "string",
+        "description": "The asset ticker, the prefix of INSTRUMENT: ETH, BTC, SOL, HYPE or any other currency the venue lists options on. Used for the settlement read on Derive.",
+        "minLength": 2,
+        "maxLength": 12
+      },
+      "TOKEN_ID": {
+        "type": "string",
+        "minLength": 8,
+        "maxLength": 80,
+        "description": "The token the delivery buy trades, pinned from the /token-search row for UNDERLYING when the duty is filed: native:<chainId> for a chain's coin (ETH on Base is native:8453), <address>:<chainId> for a token such as cbBTC."
+      },
+      "STRIKE": {
+        "type": "number",
+        "description": "The price the owner agreed to buy at.",
+        "minimum": 1e-08
+      },
+      "SIZE": {
+        "type": "number",
+        "description": "Contracts sold, in units of the underlying.",
+        "minimum": 1e-08
+      },
+      "PREMIUM_USD": {
+        "type": "number",
+        "minimum": 0,
+        "description": "What the owner kept at open, net of the venue's fee (the open's netPremiumUsd). Quoted back at expiry."
+      },
+      "COLLATERAL_USD": {
+        "type": "number",
+        "minimum": 0,
+        "description": "USDC locked behind the put, as the open reported it (collateral). The most an assigned buy can cost, so the pocket is sized from it."
+      },
+      "HEADS_UP_HOURS": {
+        "type": "number",
+        "minimum": 1,
+        "maximum": 168,
+        "default": 24,
+        "description": "How long before expiry to send the heads-up. Sent once."
+      }
+    }
+  },
+  "status": {
+    "starting": "First check {next}",
+    "days": "Settles in {days} days · next check {next}",
+    "hours": "Settles in {hours} hours · next check {next}",
+    "unseen": "Position not found · next check {next}",
+    "settling": "Waiting for settlement · next check {next}",
+    "closed": "Bought back before expiry",
+    "paused": "Paused: the settings need fixing",
+    "done": "Settled at ${price}",
+    "soon": "Settles within 2 hours · next check {next}"
+  }
+}

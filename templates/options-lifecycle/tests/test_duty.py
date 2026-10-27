@@ -116,49 +116,6 @@ class Settlement(unittest.TestCase):
         self.assertEqual(fake.dones, [])
 
 
-class Delivery(unittest.TestCase):
-    DELIVER = dict(PUT, DELIVER_ASSET=True)
-
-    def test_buys_size_times_settlement_of_the_pinned_token_with_one_literal_key(self):
-        fake = run(self.DELIVER, [SETTLED_AT], settled("2200"), acp=[answer(executed=True)])
-        self.assertEqual(fake.acp_calls, [[
-            "acp", "trade", "--token-in", "usdc", "--chain-in", "8453",
-            "--amount-in", "4488.00", "--token-out", "eth", "--chain-out", "8453",
-            "--idempotency-key", "note:svc-1:deliver",
-        ]])
-        self.assertIn("you now own about 2.04 ETH", fake.dones[0])
-
-    def test_an_approval_card_is_pending_not_owned(self):
-        fake = run(self.DELIVER, [SETTLED_AT], settled("2200"), acp=[answer(asked=True, status="manual")])
-        self.assertIn("waiting on your approval", fake.dones[0])
-        self.assertNotIn("you now own", fake.dones[0])
-
-    def test_an_unreadable_answer_is_unknown_and_checked_not_retried(self):
-        fake = run(self.DELIVER, [SETTLED_AT], settled("2200"), acp=["Error: socket hang up"],
-                   statuses={"note:svc-1:deliver": {"state": "in_flight"}})
-        self.assertEqual(len(fake.acp_calls), 1)
-        self.assertIn("not certain whether the ETH purchase went through", fake.dones[0])
-        self.assertTrue(any("exec_status: in_flight" in line for line in fake.logs))
-
-    def test_a_refusal_holds_the_loss_in_cash(self):
-        fake = run(self.DELIVER, [SETTLED_AT], settled("2200"), acp=[answer(error="wallet_short")])
-        self.assertIn("could not buy the ETH", fake.dones[0])
-
-    def test_a_token_pin_is_bought_by_its_address_on_its_own_chain(self):
-        cbbtc = "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf"
-        btc = dict(self.DELIVER, INSTRUMENT="BTC-20261030-75000-P", UNDERLYING="BTC",
-                   TOKEN_ID=cbbtc + ":8453", STRIKE=75000, SIZE=0.06)
-        fake = run(btc, [SETTLED_AT], settled("70000"), acp=[answer(executed=True)])
-        argv = fake.acp_calls[0]
-        self.assertEqual(argv[argv.index("--token-out") + 1], cbbtc)
-        self.assertEqual(argv[argv.index("--chain-out") + 1], "8453")
-        self.assertEqual(argv[argv.index("--amount-in") + 1], "4200.00")  # 0.06 x 70,000
-
-    def test_never_buys_after_a_put_that_kept_its_collateral(self):
-        fake = run(self.DELIVER, [SETTLED_AT], settled("2600"), acp=[answer(executed=True)])
-        self.assertEqual(fake.acp_calls, [])
-
-
 def held(*rows):
     return {"/options/account": {"network": "mainnet", "account": {"exists": True, "positions": list(rows)}}}
 
@@ -189,11 +146,6 @@ class BoughtOptions(unittest.TestCase):
         fake = run(LONG_PUT, [SETTLED_AT], settled("2200"))
         self.assertIn("at or above your $2,200: the put expired worthless, so the $30.00 you paid is lost",
                       fake.dones[0])
-
-    def test_a_bought_option_never_triggers_a_delivery_buy(self):
-        fake = run(dict(LONG_PUT, DELIVER_ASSET=True), [SETTLED_AT], settled("2000"), acp=[answer(executed=True)])
-        self.assertEqual(fake.acp_calls, [])
-        self.assertIn("your put paid $200.00", fake.dones[0])
 
     def test_a_note_still_sold_gets_its_heads_up(self):
         reads = dict(priced("2900"), **held({"instrument": PUT["INSTRUMENT"], "size": -1}))
@@ -282,21 +234,7 @@ class Settings(unittest.TestCase):
         fake = run(dict(LONG_CALL, PRODUCT="long_put"), [SETTLED_AT], settled("3000"))
         self.assertIn("is a call but PRODUCT says long_put", fake.notes[0])
 
-    def test_a_malformed_pin_stops_the_duty(self):
-        for pin in ["ETH", "stock:ETH:0", "native:base"]:
-            fake = run(dict(PUT, TOKEN_ID=pin), [SETTLED_AT], settled("2200"))
-            self.assertIn("is not a pinned token", fake.notes[0], pin)
-            self.assertEqual(fake.read_calls, [])
-
-    def test_delivery_needs_a_pin_but_watching_does_not(self):
-        fake = run(dict(PUT, TOKEN_ID="", DELIVER_ASSET=True), [SETTLED_AT], settled("2200"))
-        self.assertIn("DELIVER_ASSET needs TOKEN_ID", fake.notes[0])
-        self.assertEqual(fake.read_calls, [])
-        fake = run(dict(PUT, TOKEN_ID=""), [SETTLED_AT], settled("2200"))
-        self.assertIn("agreed to buy", fake.dones[0])
-        self.assertIn("holding the loss in cash", fake.dones[0])
-
-    def test_any_derive_currency_is_watched_without_a_token_pin(self):
+    def test_any_derive_currency_is_watched(self):
         sol = {"INSTRUMENT": "SOL-20261030-150-C", "PRODUCT": "long_call", "UNDERLYING": "SOL",
                "STRIKE": 150, "SIZE": 2, "PREMIUM_USD": 18.4}
         ticker = {"/options/ticker": {"instrument": "SOL-20261030-150-C", "index": "162.4", "mark": "14.1"}}
@@ -349,7 +287,7 @@ class Paradex(unittest.TestCase):
     # META's options expire at the New York close: 2026-10-30T20:00:00Z, 12 hours
     # after the 08:00 UTC its name implies (EXPIRY is that 08:00).
     META = dict(LONG_CALL, VENUE="paradex", INSTRUMENT="META-USD-30OCT26-650-C", UNDERLYING="META",
-                TOKEN_ID="", STRIKE=650, SIZE=0.1)
+                STRIKE=650, SIZE=0.1)
     META_CLOSE = EXPIRY + hours(12)
 
     def meta_ticker(self, expiry):
@@ -386,7 +324,7 @@ class Paradex(unittest.TestCase):
 class Rysk(unittest.TestCase):
     """VENUE rysk: Rysk's names, physical settlement, and the outcome from what Rysk paid out."""
 
-    PUT = dict(PUT, VENUE="rysk", INSTRUMENT="ETH-30OCT26-2450-P", TOKEN_ID="")
+    PUT = dict(PUT, VENUE="rysk", INSTRUMENT="ETH-30OCT26-2450-P")
 
     @staticmethod
     def paid(*rows, price="2600"):
@@ -449,9 +387,8 @@ class Rysk(unittest.TestCase):
         self.assertIn("Rysk has not paid it out yet", fake.notes[0])
         self.assertEqual(fake.dones, [])
 
-    def test_only_a_sold_put_without_a_delivery_buy(self):
-        for params, why in [(dict(self.PUT, DELIVER_ASSET=True, TOKEN_ID="native:8453"), "delivers the asset itself"),
-                            (dict(LONG_CALL, VENUE="rysk", INSTRUMENT="ETH-30OCT26-2800-C"), "only a sold put"),
+    def test_only_a_sold_put(self):
+        for params, why in [(dict(LONG_CALL, VENUE="rysk", INSTRUMENT="ETH-30OCT26-2800-C"), "only a sold put"),
                             (dict(self.PUT, INSTRUMENT="ETH-20261030-2450-P"), "not a Rysk option name")]:
             fake = run(params, [SETTLED_AT], self.paid())
             self.assertIn(why, fake.notes[0])
@@ -481,15 +418,23 @@ class StatusLine(unittest.TestCase):
 
 
 class Boundary(unittest.TestCase):
-    def test_every_acp_call_carries_a_literal_idempotency_key(self):
-        calls = [n for n in ast.walk(ast.parse(SOURCE))
-                 if isinstance(n, ast.Call) and ast.unparse(n.func) == "subprocess.run"]
-        self.assertTrue(calls)
-        for call in calls:
-            argv = call.args[0]
-            literals = [e.value for e in argv.elts if isinstance(e, ast.Constant)]
-            self.assertEqual(literals[0], "acp")
-            self.assertIn("--idempotency-key", literals)
+    def test_runs_no_command_so_it_files_as_moving_no_money(self):
+        # Butler's lint marks a duty as spending from any `acp` it runs, and a
+        # spending duty is filed with a pocket card. This one only reports.
+        tree = ast.parse(SOURCE)
+        imported = {alias.name for node in ast.walk(tree) if isinstance(node, (ast.Import, ast.ImportFrom))
+                    for alias in node.names} | {node.module for node in ast.walk(tree)
+                                                if isinstance(node, ast.ImportFrom)}
+        self.assertFalse(imported & {"subprocess", "shlex"})
+        self.assertNotIn('"acp"', SOURCE)
+        self.assertNotIn("os.system", SOURCE)
+        self.assertNotIn("os.popen", SOURCE)
+
+    def test_an_assigned_put_never_buys(self):
+        fake = run(dict(PUT, DELIVER_ASSET=True, TOKEN_ID="native:8453"), [SETTLED_AT], settled("2200"),
+                   acp=[answer(executed=True)])
+        self.assertEqual(fake.acp_calls, [])
+        self.assertIn("holding the loss in cash, not the ETH", fake.dones[0])
 
     def test_no_note_asks_the_owner_anything(self):
         worlds = [
@@ -499,7 +444,6 @@ class Boundary(unittest.TestCase):
             run(CALL, [SETTLED_AT], settled("3200")),
             run(PUT, [SETTLED_AT, EXPIRY + hours(7)], settled(None)),
             run(PUT, [SETTLED_AT, EXPIRY + hours(7)], {"/options/settlement": BevoError("x")}),
-            run(dict(PUT, DELIVER_ASSET=True), [SETTLED_AT], settled("2200"), acp=[answer(asked=True)]),
         ]
         for fake in worlds:
             for text in fake.notes + [d for d in fake.dones if d]:

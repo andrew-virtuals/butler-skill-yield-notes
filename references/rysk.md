@@ -26,6 +26,9 @@ wallet**. Nothing else:
 Add `--venue rysk` to every `acp options` line of `SKILL.md` for that trade, and
 `"VENUE": "rysk"` to its lifecycle duty's `params`.
 
+A listing ("what can I trade on Rysk") is `references/listing.md` with `--venue rysk`:
+never this helper, which is for quotes only.
+
 Quotes come from Rysk's own helper, not the Derive one: write the script in
 `references/rysk-helper.md` to `/tmp/rysk.py` and use it where step 2 uses
 `/tmp/derive_helper.py`:
@@ -33,13 +36,11 @@ Quotes come from Rysk's own helper, not the Derive one: write the script in
 ```sh
 python3 /tmp/rysk.py screen --collateral <USD> --pay-with <collateral.address>
 python3 /tmp/rysk.py quote --asset <ASSET> --collateral <USD> --pay-with <collateral.address>
-python3 /tmp/rysk.py inventory
 ```
 
 `<collateral.address>` is the USDC Butler sells on, from step 1's
 `acp options account --venue rysk --json`; Rysk names no stablecoin, so the helper
-takes it from there. A listing ("what can I sell on Rysk") is `references/listing.md`
-with `--venue rysk`, never this helper. Its quote carries the Derive helper's field names
+takes it from there. Its quote carries the Derive helper's field names
 (`instrument`, `size`, `collateral.amount`, `net_premium_usd`, `fee_usd`,
 `min_premium_usd`, `apr_pct`, `bad_case`), so steps 3 and 5 read it unchanged. Offer
 only `tradeable: true`, and always say its `notes`. Use `--delta 0.20` instead when
@@ -108,8 +109,8 @@ USDC from the HyperEVM wallet back to Base within minutes - at most this turn's
   there.
 - **Near the strike, the maker holding the option chooses whether to exercise it**, so
   the price alone does not say which came back. What came back is `settled[].received`.
-- The lifecycle duty (step 7) says it once Rysk has paid out. On Rysk it takes no
-  `DELIVER_ASSET` and no `TOKEN_ID`: Rysk delivers the asset itself.
+- The lifecycle duty (step 7) says it once Rysk has paid out. On Rysk it is always
+  `options-lifecycle`, never `options-put-delivery`: Rysk delivers the asset itself.
 - **Never sell a delivered asset unless the owner asks.** Owning it is what they agreed
   to. When they do ask, it is an ordinary sale with its own card - the `acp-cli`
   skill's "Sell a token" row, with the token's `address` from `received` - never

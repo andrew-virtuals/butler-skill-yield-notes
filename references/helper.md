@@ -17,7 +17,6 @@ python3 /tmp/derive_helper.py quote --side buy --product put --underlying ETH --
 python3 /tmp/derive_helper.py quote --side close --instrument ETH-20261030-2600-C --size 2.95
 python3 /tmp/derive_helper.py quote --side buyback --instrument ETH-20261030-2300-P --size 2 --premium-received 61.40
 python3 /tmp/derive_helper.py chain --underlying ETH --tenor monthly --type C
-python3 /tmp/derive_helper.py chain --venue paradex
 python3 /tmp/derive_helper.py quote --venue paradex --side buy --product call --underlying ETH --budget 10 --expiry 2026-10-30
 python3 /tmp/derive_helper.py quote --venue paradex --side buy --product call --underlying ETH --budget 50
 python3 /tmp/derive_helper.py quote --venue paradex --side buy --product put --underlying ETH --budget 5 --expiry 2026-11-13 --strike 2100

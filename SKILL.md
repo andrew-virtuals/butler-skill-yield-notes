@@ -1,7 +1,7 @@
 ---
 name: options-trading
 description: Trade options on Derive, Paradex or Rysk - earn on idle USDC by selling cash-secured puts, buy a call or a put, close before expiry, and check or withdraw USDC and positions.
-version: 2.7.3
+version: 2.8.0
 metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","withdraw","withdraw my usdc","derive","my options","options account","options positions","free usdc","derive positions","my option positions","withdraw from derive","withdraw my free usdc","paradex","paradex options","paradex positions","rysk","rysk options","rysk positions","physically settled","hyperevm"],"requires":{"bins":["python3","cat","bevo-read","acp"]}}}
 ---
 
@@ -146,7 +146,7 @@ this chat. One missing: ask, and file nothing this turn.
    `approvalOutcome`, never the quote. After an open or a buy, `duty_create`:
 
    ```json
-   {"recipe": "options-lifecycle@9", "title": "Watch {INSTRUMENT} to expiry",
+   {"recipe": "options-lifecycle@10", "movesFunds": false, "title": "Watch {INSTRUMENT} to expiry",
     "triggers": [{"kind": "timer", "intervalSeconds": 900}],
     "params": {"VENUE": "<venue>", "INSTRUMENT": "<instrument>", "PRODUCT": "<product>", "UNDERLYING": "<prefix>",
     "STRIKE": <strike>, "SIZE": <filledSize>, "PREMIUM_USD": <usd>, "COLLATERAL_USD": <usd>}}
@@ -155,11 +155,11 @@ this chat. One missing: ask, and file nothing this turn.
    Sold put: PRODUCT `cash_secured_put`, PREMIUM_USD `netPremiumUsd`, COLLATERAL_USD
    `collateral`. Bought: PRODUCT `long_call` or `long_put`, PREMIUM_USD `totalCostUsd`,
    COLLATERAL_USD 0. Always SIZE `filledSize`, STRIKE `strike`, UNDERLYING the
-   instrument's prefix. `DELIVER_ASSET` and its TOKEN_ID only if they asked in step 3
+   instrument's prefix. Asked in step 3 to own the asset: `options-put-delivery@1`
    (`references/selling.md`). After a close, `duty_delete` that instrument's duty; if
    part is still open, file it again with SIZE from `positions` (positive) and
    PREMIUM_USD and COLLATERAL_USD scaled to it. Never file for an unknown or failed
-   trade. A second `options-lifecycle` duty in one chat needs
+   trade. A second options duty in one chat needs
    `"alongside": [<this chat's earlier ones' names>]`; step 9's needs none.
 
 8. [FIXED] Withdraw only when asked, only free USDC: at most this turn's

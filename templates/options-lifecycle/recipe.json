@@ -1,7 +1,7 @@
 {
   "id": "options-lifecycle",
-  "version": 9,
-  "description": "Watch one Derive, Paradex or Rysk option to expiry, sold or bought: a heads-up the day before, the outcome once it settles, and, only if asked, buying the asset an assigned put agreed to.",
+  "version": 10,
+  "description": "Watch one Derive, Paradex or Rysk option to expiry, sold or bought: a heads-up the day before and the outcome once it settles. It only reports.",
   "keywords": [
     "assigned",
     "bought option",
@@ -31,10 +31,8 @@
     "options-lifecycle@5",
     "options-lifecycle@6",
     "options-lifecycle@7",
-    "options-lifecycle@8"
-  ],
-  "keys": [
-    "note:<duty>:deliver"
+    "options-lifecycle@8",
+    "options-lifecycle@9"
   ],
   "params": {
     "type": "object",
@@ -80,12 +78,6 @@
         "minLength": 2,
         "maxLength": 12
       },
-      "TOKEN_ID": {
-        "type": "string",
-        "minLength": 8,
-        "maxLength": 80,
-        "description": "Only with DELIVER_ASSET: the token the delivery buy trades, pinned from the /token-search row for UNDERLYING when the duty is filed. native:<chainId> for a chain's coin (ETH on Base is native:8453), <address>:<chainId> for a token such as cbBTC. The heads-up does not need it: it reads Derive's own index for the option."
-      },
       "STRIKE": {
         "type": "number",
         "description": "The price the owner agreed to buy at (put) or sell at (call).",
@@ -106,11 +98,6 @@
         "minimum": 0,
         "default": 0,
         "description": "USDC locked behind a sold put, as the open reported it. 0 for a covered call and for any bought option."
-      },
-      "DELIVER_ASSET": {
-        "type": "boolean",
-        "default": false,
-        "description": "Only for a sold put that settles in the money (cash_secured_put). Derive and Paradex settle in cash, so the owner holds the loss in cash and no asset. With this on, the duty spends SIZE x the settlement price of wallet USDC buying the TOKEN_ID token on its chain, so TOKEN_ID is required with it. Off by default: it spends money, so the owner has to have asked. Not on Rysk, which delivers the asset itself."
       },
       "HEADS_UP_HOURS": {
         "type": "number",

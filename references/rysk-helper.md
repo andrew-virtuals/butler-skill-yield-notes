@@ -2,9 +2,9 @@
 
 Write this to `/tmp/rysk.py` and run it with `python3` (`references/rysk.md` says when).
 Stdlib only - no key, no account, no signature. Inventory and quotes are public reads.
+A listing ("what can I trade on Rysk") is `references/listing.md`, never this helper.
 
 ```sh
-python3 /tmp/rysk.py inventory
 python3 /tmp/rysk.py screen --collateral 5000 --pay-with <collateral.address>
 python3 /tmp/rysk.py quote --asset ETH --collateral 5000 --pay-with <collateral.address>
 python3 /tmp/rysk.py quote --asset ETH --collateral 5000 --pay-with <collateral.address> --delta 0.20

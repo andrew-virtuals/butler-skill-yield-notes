@@ -137,7 +137,7 @@ the money pays automatically into the Derive account: (settle - strike) x size f
 call, (strike - settle) x size for a put. Nothing has to be done to collect it. It
 stays in the account until withdrawn. One that ends out of the money pays nothing.
 
-The `options-lifecycle@9` duty, filed after a confirmed buy, tells the owner the day
+The `options-lifecycle@10` duty, filed after a confirmed buy, tells the owner the day
 before and again with the outcome. It is filed with:
 
 | Param | From |
@@ -150,7 +150,7 @@ before and again with the outcome. It is filed with:
 | `PREMIUM_USD` | `approvalOutcome.totalCostUsd` |
 | `COLLATERAL_USD` | 0 |
 
-No `DELIVER_ASSET`: a bought option pays cash and buys nothing.
+A bought option pays cash and buys nothing, so it is never `options-put-delivery`.
 
 ## Say to the owner
 

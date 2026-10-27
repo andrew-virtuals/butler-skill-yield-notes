@@ -6,7 +6,8 @@ selling cash-secured puts, buying calls and puts, and closing them on **Derive**
 people maintaining the repo. A butler receives only `SKILL.md` and `references/**/*.md`;
 the registry also serves the duty templates under `templates/`.
 
-- **Version:** 2.7.3 (`SKILL.md`), with `options-lifecycle` 9 and `options-account` 3.
+- **Version:** 2.8.0 (`SKILL.md`), with `options-lifecycle` 10, `options-put-delivery` 1
+  and `options-account` 3.
   What changed in each release: `CHANGELOG.md`.
 - **Registry name:** `options-trading`, listed in the hub's `skills.json` from this repo.
   The skill was `yield-notes` before 2.0.0, which is why the repository still has that
@@ -55,7 +56,8 @@ helper and `acp options` line for a trade then carries `--venue paradex` or
 | Trading | `acp options open`, `buy`, `close` | One approval card each. After approval the order is an immediate-or-cancel limit order, inside the bound on the card (`--min-premium`, `--max-cost`, `--min-proceeds`). Rysk's card is good for 5 minutes and is re-quoted against its floor. |
 | Outcome | `bevo-read request <key> --route options` | `approvalStatus`, then `approvalOutcome` (the fill) or `approvalFailureReason`. |
 | Withdrawing | `acp options withdraw` | One approval card. A Derive withdrawal also takes an `acp trade` home to Base. |
-| Watching to expiry | the `options-lifecycle@9` duty, `templates/options-lifecycle/` | Filed only after a confirmed open or buy, from the fill. Sends a heads-up the day before expiry and the outcome once the option settles. Deleted after a confirmed close. |
+| Watching to expiry | the `options-lifecycle@10` duty, `templates/options-lifecycle/` | Filed only after a confirmed open or buy, from the fill. Sends a heads-up the day before expiry and the outcome once the option settles. Runs no command, so it is filed with `movesFunds: false` and no pocket. Deleted after a confirmed close. |
+| Owning the asset after an assigned put | the `options-put-delivery@1` duty, `templates/options-put-delivery/` | Filed instead of `options-lifecycle`, for a sold Derive or Paradex put, only when the owner asked before the open to end up owning the asset. Watches the same way, then buys the asset with `acp trade` if the put is assigned. The only options duty with a pocket. |
 | Platforms rows | the `options-account@3` duty, `templates/options-account/` | One per owner, filed unasked once any venue account exists. The only writer of the options rows on the wallet's Platforms tab: one row per venue, and one per Derive subaccount, each at the venue's own worth with its positions listed. |
 
 ## Safety model
@@ -166,8 +168,10 @@ Rysk's script (`references/rysk-helper.md`) runs the same way: `inventory`,
 curl -sSLO https://virtual-protocol.github.io/butler-skills/tools/validate.py
 python3 validate.py --standalone .
 python3 validate.py --standalone templates/options-lifecycle
+python3 validate.py --standalone templates/options-put-delivery
 python3 validate.py --standalone templates/options-account
 python3 -m unittest discover -s templates/options-lifecycle/tests
+python3 -m unittest discover -s templates/options-put-delivery/tests
 python3 -m unittest discover -s templates/options-account/tests
 ```
 
@@ -186,7 +190,13 @@ CI runs the same. Two limits to keep in mind:
 - **`options-lifecycle`:** one per option, from the fill to the outcome, on any of the
   three venues. A Rysk put's outcome is what Rysk paid out. A Paradex option's expiry is
   the one the venue states, since a stock or index option expires at its market's close.
-  It supersedes `@1`–`@8`.
+  It only reports and runs no command, so it never asks for a pocket. It supersedes
+  `@1`–`@9`.
+- **`options-put-delivery`:** one per sold Derive or Paradex put whose owner asked to end
+  up owning the asset. The lifecycle watch plus the delivery buy, which `options-lifecycle`
+  carried as `DELIVER_ASSET` until `@9`. Kept a separate template because Butler marks a
+  duty as spending from any `acp` money command in its code, reachable or not: one file
+  with both would put a spending-limit card on every option duty.
 - **`options-account`:** one per owner, writing the Platforms rows for every venue whose
   account exists. Each row's name, site and worth come from the account read, so a new
   venue needs no new template and nothing refiled. It supersedes `options-account@1`, `@2` and
@@ -204,11 +214,12 @@ and `SKILL.md` updated to file the new version.
    whose code changed, as above.
 2. Merge to `main` and tag `vX.Y.Z`. A published `name@version` is immutable.
 3. In `butler-skills`, point `skills.json` (`options-trading`) and `templates.json`
-   (`options-lifecycle`, `options-account`, each with its `path`) at the new tag.
+   (`options-lifecycle`, `options-put-delivery`, `options-account`, each with its
+   `path`) at the new tag.
 
 When a release depends on a change in Butler's server (a new `acp options` field or
 venue behaviour), ship the server change first, or make the skill and duties fall back
-safely without it, as `options-lifecycle@9` does for Paradex expiries.
+safely without it, as `options-lifecycle@9` and later do for Paradex expiries.
 
 ## Layout
 
@@ -223,5 +234,6 @@ references/
   paradex.md, rysk.md       what differs on each of those venues
 templates/
   options-lifecycle/        watch one option to its outcome
+  options-put-delivery/     the same for a sold put, buying the asset if assigned
   options-account/          the owner's Platforms rows
 ```
