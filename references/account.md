@@ -51,15 +51,15 @@ bought back.
 ## More than one Derive account
 
 Derive keeps its markets in separate groups ("risk universes"), and an account trades only
-its own group: **PRIME** (ETH, BTC), **ALT** (SOL, XRP, ADA, ZEC and others), **MIDCAP**
-(HYPE), **RWA** (gold). Deposits land in PRIME. A SOL option needs the owner's ALT account.
+its own group. Deposits land in **PRIME**. Which group an option needs is Derive's call,
+and the card names it under `Account` when it is not PRIME: say the name it gives, never
+one from memory.
 
 Butler's server handles this after the owner approves the card, never you:
 
 - If that account holds less free USDC than the trade needs, the server moves **only the
   gap** into it from their other Derive accounts, then trades. The first time, it opens
-  the account: at least $5 moves, and Derive charges a $1 fee for opening it. Moves
-  between accounts that already exist are free.
+  the account; the outcome's `funding` says what moved and whether it opened one.
 - What is left over stays where it is; the next trade, or a withdrawal, moves it again.
   So free USDC is the total across accounts: never ask the owner to move it, and never
   deposit just because one account is short while the total covers the trade.
@@ -90,9 +90,9 @@ moves nothing and still costs a fee. Out of Paradex it pays to Base instead
   server gathers it into one before paying out), rounded down to the cent. "All
   of it" is that figure. Butler's server refuses more with `only $N is free; the rest
   backs open notes until they settle`.
-- It pays to the owner's wallet on **Ethereum**, about 20 minutes later, less a fee of up
-  to $1. Say that before filing, so a small withdrawal is not a surprise: from $1.61, as
-  little as $0.61 may arrive.
+- It pays to the owner's wallet on **Ethereum**, in the window its card gives, less a fee
+  Derive does not state in advance. Say that before filing, so a small withdrawal is not
+  a surprise: on a small amount the fee can be most of it. The outcome says what arrived.
 - Bringing it to Base is the `:home` card, filed once it shows in `ethereum.usdc`, for the
   amount that arrived. The trade has its own minimum and fee (`references/venue.md`); if
   it refuses a small amount, the USDC stays on Ethereum. Give the reason as written.
@@ -106,7 +106,8 @@ Nothing free: "All $250 on Derive is backing your ETH put until it settles on 30
 Buying it back would free it now."
 
 Moved first: "To buy the SOL call, $45 moved from your main Derive account into a new SOL
-account (Derive charged $1 to open it). Bought 0.5 SOL-20261106-116-C for $5.63."
+account. Bought 0.5 SOL-20261106-116-C for $5.63."
 
-Withdraw: "Withdrawing $1.61 from Derive: it reaches your wallet on Ethereum in about 20
-minutes, less a fee of up to $1, so as little as $0.61 may arrive."
+Withdraw: "Withdrawing $<amount> from Derive: it reaches your wallet on Ethereum in <the
+card's window>, less Derive's fee, which it does not say in advance and can be most of a
+small amount."

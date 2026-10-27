@@ -38,7 +38,8 @@ python3 /tmp/rysk.py inventory
 
 `<collateral.address>` is the USDC Butler sells on, from step 1's
 `acp options account --venue rysk --json`; Rysk names no stablecoin, so the helper
-takes it from there. `inventory` is the listing. Its quote carries the Derive helper's field names
+takes it from there. A listing ("what can I sell on Rysk") is `references/listing.md`
+with `--venue rysk`, never this helper. Its quote carries the Derive helper's field names
 (`instrument`, `size`, `collateral.amount`, `net_premium_usd`, `fee_usd`,
 `min_premium_usd`, `apr_pct`, `bad_case`), so steps 3 and 5 read it unchanged. Offer
 only `tradeable: true`, and always say its `notes`. Use `--delta 0.20` instead when
@@ -52,7 +53,7 @@ the owner wants the odds of assignment held steady rather than the distance from
   A round amount rarely lands exactly (a `note` says how much goes to work), and a
   small one can be under the minimum: the helper's reason says so. Never guess a size.
 - **Names** are Rysk's fields: `SOL-30OCT26-95-P`, a decimal strike with a point
-  (`HYPE-6NOV26-56.5-P`). Expiries settle at 08:00 UTC.
+  (`HYPE-6NOV26-56.5-P`). Each settles at the time its quote's `expiry` gives.
 - **Quotes live seconds**, at a time each maker sets (`valid_for_seconds`). A quote is
   for choosing, never for acting on.
 
@@ -77,7 +78,7 @@ purchase. The outcome lands in the chat; read it as step 6 says.
 | `account.usdc`, `freeForNewPutsUsd` | the USDC in that wallet. All of it is free: an open put's collateral already sits with Rysk |
 | `lockedForPutsUsd` | collateral behind puts Rysk has not settled yet |
 | `positions` | puts not settled yet - open, or expired and waiting for Rysk; each `summary` is relayed as written |
-| `settled` | puts settled in the last 14 days: what came back (`received`) and whether the asset was delivered (`assigned`) |
+| `settled` | puts settled recently: what came back (`received`) and whether the asset was delivered (`assigned`) |
 | `worthUsd` | what sits at Rysk: each unsettled put at what it would settle to at today's price |
 
 There is no `ethereum` and no `accounts` on Rysk. Its USDC is separate from Derive's
@@ -103,8 +104,8 @@ USDC from the HyperEVM wallet back to Base within minutes - at most this turn's
 ## Settlement: the asset arrives
 
 - A put that settles below its strike delivers the asset to the HyperEVM wallet, as
-  Rysk's token for it (`UETH` for ETH, `USOL` for SOL, `WHYPE` for HYPE). Otherwise the
-  USDC comes back there.
+  Rysk's token for it, which `settled[].received` names. Otherwise the USDC comes back
+  there.
 - **Near the strike, the maker holding the option chooses whether to exercise it**, so
   the price alone does not say which came back. What came back is `settled[].received`.
 - The lifecycle duty (step 7) says it once Rysk has paid out. On Rysk it takes no
@@ -114,7 +115,10 @@ USDC from the HyperEVM wallet back to Base within minutes - at most this turn's
   skill's "Sell a token" row, with the token's `address` from `received` - never
   folded into anything else.
 
-How every put ended, when they ask or an expiry has passed:
+How every put ended, when they ask or an expiry has passed: first
+`acp options account --venue rysk --json`, whose `positions` (not settled yet) and
+`settled` (recent settlements, with `received` and `assigned`) answer it with no script.
+Only for a put in neither, write the helper and read every one:
 
 ```sh
 bevo-read me

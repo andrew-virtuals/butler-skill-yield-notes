@@ -1,5 +1,40 @@
 # Changelog
 
+## 2.7.3
+
+- **"Buy the 2100 put" buys the 2100 put.** Seen in QA: the agent quoted and offered
+  `ETH-USD-13NOV26-2200-P`, the helper's 5%-OTM rule, because a quote had no way to name
+  a strike; it then filed the 2100 with a `--max-cost` it worked out itself. A buy or
+  sell quote takes `--strike`, refused with the listed strikes when the expiry has no
+  such strike. `SKILL.md` step 2's sell and buy lines carry `--expiry` and `--strike`, and
+  `buying.md` and `selling.md` pass a strike or day the owner named that way and offer no
+  quote that differs from it.
+- **"What can I trade on Paradex" no longer writes the quote helper.** Seen in QA: the
+  answer took about 3.7 minutes, of which the API call was 1 second. The agent read the
+  51 KB `helper.md` and wrote its 42 KB script out twice (a file tool that cannot write
+  `/tmp`, then a heredoc), about 178 seconds of output. `references/listing.md` is the
+  same list from a small script, in one shell command; `SKILL.md` sends a listing there
+  and nowhere else.
+- **Rysk too.** "What can I sell on Rysk" is `listing.md` with `--venue rysk` (the puts
+  Rysk takes, by asset and expiry), not the 29 KB Rysk helper; and "how did my puts end"
+  reads `acp options account --venue rysk` first, whose `settled` lists recent
+  settlements, writing the helper only for a put in neither list.
+- **No venue figure in what a butler reads.** Fees, minimums, size steps, the price
+  band, expiry times, withdrawal times and fees, and which assets clear were written
+  into the references as measured on 7-9 October, and one was already wrong (Derive
+  charges nothing to open a subaccount, not $1). Each now points at the quote, account
+  read, card or outcome that gives it live, except Derive's $10 minimum deposit and the
+  ~$0.10 Base bridge, kept in `venue.md`; the measurements are in `README.md`, for
+  maintainers. `screen` screens what each venue lists now instead of a fixed list, and
+  the listing's example answer names no asset.
+- **The helper ships as a ready-to-run block.** `helper.md`'s script is one
+  `cat > /tmp/derive_helper.py <<'PYEOF'` shell command, as `listing.md`'s is, written
+  once and reused, never with a file tool. The copy in QA had dropped the script's
+  comments and renamed a variable; told so only in prose, the agent still used a file
+  tool or retyped it with lines changed.
+- `tests/test_listing.py`, run in CI, fails when `listing.md`'s ticker table differs from
+  the helper's.
+
 ## 2.7.2
 
 - Files `options-account@3`: a Rysk put is listed on its Platforms row, with no value, the

@@ -2,9 +2,10 @@
 
 Derive's facts only; Paradex's are in `references/paradex.md`.
 
-Venue facts, not design choices. Measured against Derive v3 mainnet on **7 October
-2026** (selling) and **9 October 2026** (buying). Re-measure before relying on a
-spread or a depth: those move by the hour.
+How Derive works, not what it costs today. Every figure said to the owner - a fee, a
+minimum, a size, a time, a price - comes from this turn's read: a quote, `acp options
+account`, a card or its outcome. The one exception is the deposit minimum and the Base
+bridge's cost below; a spread or a depth moves by the hour.
 
 ## Where the data comes from
 
@@ -15,7 +16,6 @@ spread or a depth: those move by the hour.
   step, tick, and the fee terms, per instrument.
 - `public/get_tickers` with an `expiry_date` (`YYYYMMDD`) - every strike of one expiry
   in one call: bid and size, ask and size, mark, index, and delta, mark IV, bid IV.
-- v2 (`api.lyra.finance`) has been dead since 6 October 2026.
 
 ## The account
 
@@ -23,11 +23,10 @@ spread or a depth: those move by the hour.
   create: the first deposit creates it, with a subaccount.
 - **One subaccount per risk universe.** Derive splits its markets into risk universes,
   each with its own subaccounts, and rejects a trade between two (from the wrong one it
-  says `Zero liquidity for market or IOC/FOK order (11009)`, whatever the book holds):
-  PRIME (ETH, BTC), ALT (SOL, XRP, ADA, ZEC, …), MIDCAP (HYPE), RWA (XAUT). Deposits land
-  in PRIME; Butler's server moves the USDC a trade needs into the right one after approval
-  (`account.md`). Live list: `public/get_risk_universes`; an option's universe is its
-  `risk_universe_id`.
+  says `Zero liquidity for market or IOC/FOK order (11009)`, whatever the book holds).
+  Deposits land in PRIME; Butler's server moves the USDC a trade needs into the right one
+  after approval (`account.md`). Which universe an option is in is Derive's
+  (`public/get_risk_universes`, the option's `risk_universe_id`); the card names it.
 - Deposits and withdrawals happen on **Ethereum L1**, in USDC. Derive gives each
   account its own deposit address there (`public/register_deposit_address`), and a
   keeper sweeps what lands in it.
@@ -36,18 +35,17 @@ spread or a depth: those move by the hour.
   it covers, otherwise any other supported chain, gathering from several when none
   covers alone. The bridge fee comes out of the amount, and the credit lands a few
   minutes after the bridge. Ethereum USDC is the exception: the bot does not gather from
-  it, so it deposits directly with `--from 1` and is credited about **two minutes**
-  after it is mined.
+  it, so it deposits directly with `--from 1` and is credited shortly after it is mined.
 - The minimum deposit is $10; Derive gives a smaller one to its security module, so
   Butler's server refuses it. A bridged deposit is priced first: if the bridge's
   guaranteed arrival (bounded at 1% slippage) is under $10, it is refused with nothing
   moved. The direct Base bridge costs about $0.10; a route from another chain costs
-  more.
-- A withdrawal pays to the owner's wallet on Ethereum once Derive's batch is proven:
-  about **20 minutes** (17 measured), less a fee of up to $1. Bringing it
-  to Base (the `:home` leg) is an ordinary `acp trade` with the trade bot's $2 minimum
-  swap and fee of max($1, 0.5%); there is no Ethereum-specific minimum. Whether a
-  small amount routes is the quote's call, never yours: quote it, then say the number.
+  more. The card gives the bridge's fee and what arrives.
+- A withdrawal pays to the owner's wallet on Ethereum once Derive's batch is proven, in
+  the window its card gives, less a fee Derive does not state in advance. Bringing it to
+  Base (the `:home` leg) is an ordinary `acp trade`, whose quote gives its own minimum
+  and fee. Whether a small amount routes is the quote's call, never yours: quote it,
+  then say the number.
 - Ethereum gas for a direct deposit is paid by Butler's server wallet path, not asked
   of the owner.
 - Login and signing are Butler's server's job: it builds every Derive action, checks
@@ -56,23 +54,18 @@ spread or a depth: those move by the hour.
 
 ## Expiries
 
-All expiries settle at **08:00 UTC**: dailies, Friday weeklies, last-Friday
-monthlies, quarterlies. A note's tenor is a choice among listed expiries, never a
+Dailies, Friday weeklies, last-Friday monthlies and quarterlies, each settling at the
+time its quote's `expiry` gives. A note's tenor is a choice among listed expiries, never a
 date: the helper takes the one nearest the target (monthly = 24 days) and skips
 anything inside 24 hours.
 
 ## Size and the real minimum
 
-| Asset | Min size | Step | Min collateral at a ~10% OTM monthly strike |
-| --- | --- | --- | --- |
-| ETH | 0.1 | 0.01 | **~$230** (strike 2,300) |
-| BTC | 0.01 | 0.00001 | **~$750** (strike 75,000) |
-
-The minimum is in contracts, so the dollar minimum moves with the strike. A
-per-note cap below it cannot be filled at all. Buying, the minimum is the same number
-of contracts at the ask: about $7.40 with fees and headroom for a 5% out-of-the-money
-monthly ETH call on 9 October, where the $0.50 base fee is already about 9% of the
-premium.
+The minimum is in contracts (the quote's `min_size`, on its `size_step`), so the dollar
+minimum moves with the strike: a put needs `min_size` x the strike of collateral. A
+per-note cap below it cannot be filled at all, and the quote says what the minimum needs
+(`collateral too small`, `budget too small`). Buying, the minimum is the same number of
+contracts at the ask.
 
 ## Fees
 
@@ -80,10 +73,9 @@ premium.
 taker fee = base_fee + min(taker_fee_rate x index x size, mark_price_fee_rate_cap x mark x size)
 ```
 
-Each term is read from the instrument; today it is $0.50 + min(0.03% of index
-notional, 12.5% of mark value). This matched a live fill to the cent. The $0.50 is
-per order and uncapped, which is what makes small tickets and short tenors pointless:
-the helper refuses a sell or a buy whose fee is over 15% of the premium.
+Each term is read from the instrument, and the quote's `fee_usd` is the result. The base
+fee is per order and uncapped, which is what makes small tickets and short tenors
+pointless: the helper refuses a sell or a buy whose fee is over 15% of the premium.
 
 ## Spreads: what decides which trades clear
 
@@ -92,31 +84,10 @@ gives away; the gap between the ask IV and mark IV is what a buyer gives away. T
 helper refuses either over **5 vol points**; a 2-point guard would reject every fill,
 good ones included.
 
-Live mainnet, 7 October, $5,000 monthly put about 10% out of the money:
-
-| Asset | Result |
-| --- | --- |
-| ETH | ETH-20261030-2300-P, 2.17 contracts, $57.94 gross, $2.18 fee, **$55.76 net**, ~17.8% a year, edge -1.28 vol points |
-| BTC | tradeable, ~7.6% a year |
-| the other ten | refused: no bid, a spread wider than 5 points, a bid thinner than the note, or fees over 15% |
-
-By 13:20 UTC the same day HYPE had cleared as well (edge -1.8 points). The offerable
-set is an output of the gates, not a list: it changes as books deepen
-or thin. A single empty read just after the 08:00 roll is not evidence an asset is
-dead - quote fresh, never cache a book.
-
-Live mainnet, 9 October 05:05 UTC, $200 budget, monthly, strike about 5% out of the
-money:
-
-| Buy | Result |
-| --- | --- |
-| ETH call | ETH-20261030-2600-C, 2.91 contracts at 64.4, $187.40 + $2.67 fee = **$190.07**, max cost $199.58, breakeven $2,665.32, ask 1.03 vol points over mark |
-| ETH put | ETH-20261030-2350-P, 3.5 contracts at 53.5, $187.25 + $3.11 fee = **$190.36**, max cost $199.88, breakeven $2,295.61, ask 0.77 vol points over mark |
-| BTC call | BTC-20261030-86000-C, 0.14287 contracts at 1,305, **$190.48** total, max cost $200, breakeven $87,333.24 |
-| BTC put | BTC-20261030-78000-P, 0.18778 contracts at 987, **$190.47** total, max cost $200, breakeven $76,985.67 |
-
-The same morning XRP's call was refused at 11.5 vol points over mark ("paying 30%
-over fair value"), and an $8 weekly ETH call 15% out of the money at 16% fee drag.
+The offerable set is an output of the gates, not a list: it changes as books deepen or
+thin, often within a day. A single empty read just after an expiry rolls is not evidence
+an asset is dead - quote fresh, never cache a book, and never say which assets clear from
+memory.
 
 ## Execution
 
@@ -138,15 +109,15 @@ so a quote here is the worst case.
 
 ## Margin
 
-Derive is a **margin venue**: a put needing $250 drew about $35 of margin.
+Derive is a **margin venue**: it would carry a put on a fraction of its strike.
 Full collateralisation is Butler's rule - the helper sizes to what the collateral
 fully covers, and Butler's server refuses an open that free USDC does not cover for
 every open put plus the new one.
 
 ## Settlement
 
-**Cash settled**, at 08:00 UTC on the expiry date. A sold put that ends in the money
-reduces USDC; it does not deliver ETH. "You now own ETH at $2,300" is true only after
-a separate spot buy has filled. A bought option that ends in the money pays USDC into
+**Cash settled**, at the `expiry` time. A sold put that ends in the money reduces USDC;
+it does not deliver the asset. "You now own ETH at the strike" is true only after a
+separate spot buy has filled. A bought option that ends in the money pays USDC into
 the Derive account automatically: (settle - strike) x size for a call, (strike -
 settle) x size for a put.

@@ -1,6 +1,9 @@
 # The options helper
 
-Write the script below to `/tmp/derive_helper.py` and run it with `python3`. Stdlib
+Run the block at the end of this file as **one** shell command, copied exactly: it
+writes the script to `/tmp/derive_helper.py`. Never with a file tool, which cannot
+write `/tmp`. Already there from earlier in the chat: run it, never write it again. A listing needs none of this:
+`references/listing.md` is far quicker. Stdlib
 only, no API key, no secret, read-only: it screens and quotes against Derive v3's
 public API, or Paradex's with `--venue paradex`, and nothing else. Selling, buying, closing, funding and withdrawing are
 `acp options` commands in `SKILL.md`, never this file.
@@ -17,12 +20,13 @@ python3 /tmp/derive_helper.py chain --underlying ETH --tenor monthly --type C
 python3 /tmp/derive_helper.py chain --venue paradex
 python3 /tmp/derive_helper.py quote --venue paradex --side buy --product call --underlying ETH --budget 10 --expiry 2026-10-30
 python3 /tmp/derive_helper.py quote --venue paradex --side buy --product call --underlying ETH --budget 50
+python3 /tmp/derive_helper.py quote --venue paradex --side buy --product put --underlying ETH --budget 5 --expiry 2026-11-13 --strike 2100
 python3 /tmp/derive_helper.py quote --venue paradex --side close --instrument ETH-USD-27NOV26-2600-C --size 0.1
 ```
 
 `--venue paradex` (any command) reads Paradex instead, and every field below means the
-same there: names like `ETH-USD-27NOV26-2600-C`, sizes in the asset on a 0.1 step, a
-minimum of $20 of the underlying per order, Paradex's fee (no base fee), and only
+same there: names like `ETH-USD-27NOV26-2600-C`, sizes in the asset on the market's own
+step with Paradex's own order minimum (both in `size_step` and `min_size`), Paradex's fee, and only
 markets its order book trades (never an RFQ-only one). `venue` on every quote says
 which venue priced it; file the command on that venue (`references/paradex.md`).
 
@@ -33,8 +37,9 @@ command line was wrong (usage on stderr).
 
 `chain` with no `--underlying` lists what the venue trades: one row per underlying, its
 `underlying` ticker, `name`, `kind` (`crypto`, `stock`, `etf`, `index` or `commodity`)
-and `expiries` (ISO, UTC), order-book markets only. It is the answer to "what can I
-trade on Derive or Paradex"; `chain --underlying <ticker>` then gives **one** expiry's
+and `expiries` (ISO, UTC), order-book markets only. "What can I trade on Derive or
+Paradex" is answered by `references/listing.md`, the same list from a far smaller
+script; `chain --underlying <ticker>` gives **one** expiry's
 strikes, each row naming its `expiry`: the tenor's (monthly by default), so a date it
 does not show is not missing from the venue; the list above has every expiry. When the
 owner names a day ("this Friday", "30 October"), pass it as `--expiry 2026-10-30` to
@@ -54,7 +59,7 @@ softer - they are already written for an owner.
 | Field | Means |
 | --- | --- |
 | `instrument` | Derive's name, e.g. `ETH-20261030-2300-P`; passed to `--instrument` as is |
-| `strike`, `expiry`, `days_to_expiry` | the price and the instant the note turns on: 08:00 UTC, or a Paradex stock, index or commodity market's close |
+| `strike`, `expiry`, `days_to_expiry` | the price and the instant the note turns on, as the venue states it (a Paradex stock, index or commodity option at its market's close) |
 | `size` | contracts, which are units of the asset; passed to `--size` as is |
 | `collateral.amount` | what the note locks: USDC for a put, units of the asset for a call; passed to `--max-collateral` |
 | `collateral.usd` | the same in dollars |
@@ -78,7 +83,9 @@ the collateral **fully** covers, rounded down to Derive's step.
 `--product call` or `put`. `--budget` is the most the owner will spend, fees
 included; `--size` asks for an exact number of contracts instead (a hedge sized to
 what they hold). `--otm-pct` defaults to 5 for a buy: the strike nearest spot moved 5%
-up for a call, down for a put. `--delta 0.30` picks by delta instead.
+up for a call, down for a put. `--delta 0.30` picks by delta instead. `--strike 2100`
+takes exactly the strike the owner named (sell quotes too); an expiry that does not list
+it is refused with the strikes it does.
 
 | Field | Means |
 | --- | --- |
@@ -146,7 +153,8 @@ what they got for it: `netPremiumUsd` from the open's outcome, or the lifecycle 
 A buy-back is refused only when there is no ask or the ask is thinner than the size. An
 owner getting out of a falling put may accept a wide market; tell them it is wide.
 
-```python
+```sh
+cat > /tmp/derive_helper.py <<'PYEOF'
 """Screen and quote options on Derive v3 or Paradex, from their public APIs.
 
 Four sides:
@@ -179,7 +187,8 @@ Usage:
     derive_helper.py chain
 
 Every command takes --venue derive (the default) or --venue paradex. A buy or
-sell quote and chain take --expiry YYYY-MM-DD for the day the owner named.
+sell quote and chain take --expiry YYYY-MM-DD for the day the owner named, and a
+buy or sell quote --strike for the strike they named.
 """
 
 import argparse
@@ -202,7 +211,7 @@ V = {"id": "derive", "name": "Derive"}
 VENUES = {"derive": {"id": "derive", "name": "Derive"},
           "paradex": {"id": "paradex", "name": "Paradex"}}
 
-# Calibrated against measured spreads and fees; see references/venue.md.
+# Calibrated against measured spreads and fees; see README.md, Measurements.
 # ETH and BTC bids sit a few vol points under mark, every other listed asset
 # 10 to 60. Do not lower this to 2: that rejects every fill, good ones too.
 MAX_VOL_GAP_PTS = 5.0
@@ -219,11 +228,6 @@ MAX_COST_HEADROOM = 1.05
 # model never has to compute one; 25% sits well past the default 10% OTM strike.
 BAD_CASE_FALL = 0.25
 
-CURRENCIES = ["ETH", "BTC", "SOL", "XRP", "ADA", "HYPE",
-              "ZEC", "XAUT", "LIT", "VVV", "PUMP", "CC"]
-# Paradex's crypto option underlyings, measured 2026-10-20 (it also lists
-# equity and index options, which a note on idle USDC does not screen).
-PARADEX_CURRENCIES = ["BTC", "ETH", "SOL", "HYPE", "NEAR", "ZEC"]
 
 # What each ticker is, since neither venue's API says (Paradex tags its stocks,
 # indices and commodities alike as "RWA"). Every underlying Derive or Paradex
@@ -536,7 +540,7 @@ def load_chain(underlying, opt_type, tenor, now, on=None):
 
 
 def build_quote(product, underlying, collateral_usd, tenor="monthly",
-                otm_pct=10.0, target_delta=None, on=None):
+                otm_pct=10.0, target_delta=None, on=None, strike=None):
     if product not in ("cash_secured_put", "covered_call"):
         raise VenueError("unknown product %r" % product)
     opt_type = "P" if product == "cash_secured_put" else "C"
@@ -546,7 +550,7 @@ def build_quote(product, underlying, collateral_usd, tenor="monthly",
     expiry, chain, tickers = load_chain(underlying, opt_type, tenor, now, on)
     spot = num(tickers[chain[0]["instrument_name"]].get("I"))
 
-    inst = strike_for(chain, tickers, opt_type, spot, otm_pct, target_delta)
+    inst = strike_for(chain, tickers, opt_type, spot, otm_pct, target_delta, strike)
 
     t = tickers[inst["instrument_name"]]
     op = t.get("option_pricing") or {}
@@ -651,9 +655,17 @@ def build_quote(product, underlying, collateral_usd, tenor="monthly",
     return q
 
 
-def strike_for(chain, tickers, opt_type, spot, otm_pct, target_delta):
-    """The strike rule, applied: nearest the target delta, or nearest spot
-    moved otm_pct out of the money (down for a put, up for a call)."""
+def strike_for(chain, tickers, opt_type, spot, otm_pct, target_delta, strike=None):
+    """The strike the owner named, exactly, or the strike rule, applied: nearest
+    the target delta, or nearest spot moved otm_pct out of the money (down for a
+    put, up for a call)."""
+    if strike is not None:
+        hit = [i for i in chain if num(i["option_details"]["strike"]) == strike]
+        if not hit:
+            listed = sorted({num(i["option_details"]["strike"]) for i in chain})
+            raise VenueError("%s lists no %s strike for that expiry; it lists %s"
+                             % (V["name"], plain(strike), ", ".join(plain(k) for k in listed)))
+        return hit[0]
     if target_delta is not None:
         want = abs(target_delta)
         return min(chain, key=lambda i: abs(abs(num(
@@ -664,7 +676,7 @@ def strike_for(chain, tickers, opt_type, spot, otm_pct, target_delta):
 
 
 def build_buy_quote(product, underlying, budget_usd=None, tenor="monthly",
-                    otm_pct=5.0, target_delta=None, want_size=None, on=None):
+                    otm_pct=5.0, target_delta=None, want_size=None, on=None, strike=None):
     """Price buying one call or put. Sized from the budget (premium + fee, with
     room for the price to move), or exactly want_size contracts for a hedge."""
     if product not in ("call", "put"):
@@ -675,7 +687,7 @@ def build_buy_quote(product, underlying, budget_usd=None, tenor="monthly",
 
     expiry, chain, tickers = load_chain(underlying, opt_type, tenor, now, on)
     spot = num(tickers[chain[0]["instrument_name"]].get("I"))
-    inst = strike_for(chain, tickers, opt_type, spot, otm_pct, target_delta)
+    inst = strike_for(chain, tickers, opt_type, spot, otm_pct, target_delta, strike)
 
     t = tickers[inst["instrument_name"]]
     op = t.get("option_pricing") or {}
@@ -962,9 +974,14 @@ def build_buyback_quote(instrument, size, premium_received=None):
 
 def screen(tenor="monthly", collateral_usd=5000.0, otm_pct=10.0):
     """Which underlyings can carry a note right now. The offerable set is an
-    output of the gates, not an allowlist; one bad asset never stops the screen."""
+    output of the gates, not an allowlist; one bad asset never stops the screen.
+    The underlyings are what the venue lists now; on Paradex only its crypto,
+    since a note on idle USDC does not screen its stock, index or commodity options."""
     out = []
-    for cur in (PARADEX_CURRENCIES if V["id"] == "paradex" else CURRENCIES):
+    for row in listed():
+        if V["id"] == "paradex" and row["kind"] != "crypto":
+            continue
+        cur = row["underlying"]
         try:
             out.append(build_quote("cash_secured_put", cur, collateral_usd,
                                    tenor=tenor, otm_pct=otm_pct))
@@ -1032,12 +1049,12 @@ def run_quote(p, a):
         if a.product not in ("call", "put"):
             p.error("quote --side buy takes --product call or put")
         otm = 5.0 if a.otm_pct is None else a.otm_pct
-        return build_buy_quote(a.product, a.underlying, a.budget, a.tenor, otm, a.delta, a.size, a.expiry)
+        return build_buy_quote(a.product, a.underlying, a.budget, a.tenor, otm, a.delta, a.size, a.expiry, a.strike)
     need("collateral")
     if a.product not in ("cash_secured_put", "covered_call"):
         p.error("quote --side sell takes --product cash_secured_put or covered_call")
     otm = 10.0 if a.otm_pct is None else a.otm_pct
-    return build_quote(a.product, a.underlying, a.collateral, a.tenor, otm, a.delta, a.expiry)
+    return build_quote(a.product, a.underlying, a.collateral, a.tenor, otm, a.delta, a.expiry, a.strike)
 
 
 def main():
@@ -1067,6 +1084,8 @@ def main():
     rule.add_argument("--otm-pct", type=float, default=None,
                       help="strike this far out of the money (sell 10, buy 5 by default)")
     rule.add_argument("--delta", type=float, default=None)
+    rule.add_argument("--strike", type=float, default=None,
+                      help="the strike the owner named, exactly; refused if the expiry does not list it")
 
     c = sub.add_parser("chain", help="one expiry's strikes, with the book; "
                                      "without --underlying, every underlying listed")
@@ -1101,4 +1120,5 @@ if __name__ == "__main__":
     except Exception as exc:  # noqa: BLE001 - one line for the skill to read
         print("error: %s" % exc, file=sys.stderr)
         sys.exit(1)
+PYEOF
 ```

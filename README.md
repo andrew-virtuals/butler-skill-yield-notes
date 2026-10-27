@@ -6,7 +6,7 @@ selling cash-secured puts, buying calls and puts, and closing them on **Derive**
 people maintaining the repo. A butler receives only `SKILL.md` and `references/**/*.md`;
 the registry also serves the duty templates under `templates/`.
 
-- **Version:** 2.7.2 (`SKILL.md`), with `options-lifecycle` 9 and `options-account` 3.
+- **Version:** 2.7.3 (`SKILL.md`), with `options-lifecycle` 9 and `options-account` 3.
   What changed in each release: `CHANGELOG.md`.
 - **Registry name:** `options-trading`, listed in the hub's `skills.json` from this repo.
   The skill was `yield-notes` before 2.0.0, which is why the repository still has that
@@ -94,12 +94,43 @@ thinner than the size. A wide market is a warning there, since an owner cutting 
 may accept it. On Paradex a price outside the market's price band counts as no price.
 Rysk's helper has its own gates (`references/rysk-helper.md`).
 
-The worked examples in the references come from live mainnet captures; the figures are in
-`references/venue.md`.
+## Measurements
+
+Apart from Derive's $10 minimum deposit and the Base bridge's ~$0.10 (in
+`references/venue.md`), nothing a butler reads states a venue figure: fees, minimums,
+sizes, times and which assets clear come from the quote, the account read, the card or
+its outcome, so they cannot go stale in the skill. What was measured, for the people tuning the gates, is
+here only; re-measure before relying on a spread or a depth.
+
+Derive v3 mainnet, 7 October 2026 (selling) and 9 October 2026 (buying):
+
+- **Fees:** $0.50 + min(0.03% of index notional, 12.5% of mark value) per order, matched
+  to a live fill to the cent. Paradex retail orders paid no option fee.
+- **Minimums:** ETH 0.1 contracts on a 0.01 step (~$230 of collateral at a ~10% OTM
+  monthly strike), BTC 0.01 on 0.00001 (~$750). A 5% OTM monthly ETH call cost about
+  $7.40 at the minimum, where the base fee was about 9% of the premium. Paradex: $20 of
+  the underlying per order, a 40% price band around the mark, and 5 USDC or 0.001 ETH in
+  the wallet to open an account.
+- **Funding:** Derive's minimum deposit $10 and the direct Base bridge's ~$0.10, both also
+  kept in `references/venue.md`, where the agent sizes a deposit; an Ethereum deposit credited about 2 minutes after it is mined. A withdrawal took 17
+  minutes, less a fee capped at $1; the `:home` trade had a $2 minimum and a fee of
+  max($1, 0.5%). Opening a new Derive subaccount cost nothing.
+- **Margin:** a put needing $250 drew about $35 of Derive margin.
+- **$5,000 monthly put, ~10% OTM, 7 October:** ETH-20261030-2300-P, 2.17 contracts,
+  $57.94 gross, $2.18 fee, $55.76 net, ~17.8% a year, edge -1.28 vol points. BTC
+  tradeable at ~7.6% a year; the other ten refused (no bid, spread over 5 points, a bid
+  thinner than the note, or fees over 15%). HYPE cleared by 13:20 UTC (edge -1.8).
+- **$200 budget, monthly, ~5% OTM, 9 October 05:05 UTC:** ETH call
+  ETH-20261030-2600-C 2.91 contracts, $190.07 (max cost $199.58, breakeven $2,665.32,
+  ask 1.03 vol points over mark); ETH put ETH-20261030-2350-P 3.5 contracts, $190.36
+  (0.77 over); BTC call BTC-20261030-86000-C $190.48; BTC put BTC-20261030-78000-P
+  $190.47. XRP's call was refused at 11.5 vol points over mark, and an $8 weekly ETH call
+  at 16% fee drag.
+- Derive v2 (`api.lyra.finance`) has been dead since 6 October 2026.
 
 ## Testing the helpers
 
-Extract the script from `references/helper.md` and run it against mainnet:
+Run `references/helper.md`'s last block (it writes `/tmp/derive_helper.py`), then run it against mainnet:
 
 ```sh
 python3 derive_helper.py chain                                    # what Derive lists
@@ -115,9 +146,13 @@ python3 derive_helper.py quote --side buyback --instrument ETH-20261127-2300-P -
 Check these by hand after any change to the helper:
 
 - `chain` with no `--underlying` has a `name` and `kind` for every underlying both
-  venues list. A `null` is a ticker missing from `KNOWN`. Add it from the venue's own
+  venues list, and prints exactly what `references/listing.md`'s script prints for
+  each venue. The two carry the same `KNOWN` table, so change both together;
+  `tests/test_listing.py` fails CI when they differ. A `null` is a ticker missing from `KNOWN`. Add it from the venue's own
   documentation, never from a search on the ticker: Pyth's `CL` is Colgate-Palmolive.
 - `--expiry` on a date the venue does not list is refused with the dates it does.
+- `--strike` quotes exactly that strike, and one the expiry does not list is refused
+  with the strikes it does. Without it the strike rule is unchanged.
 - Against the reference fixture (`ETH-20261030-2300-P`, bid 26.7, mark 28.6, index
   2578.7, bid IV 0.4834, mark IV 0.4962) the sell quote gives size 2.17, collateral 4991,
   gross 57.94, fee 2.18, net 55.76, edge -1.28, breakeven 2273.3 and APR about 17.83.

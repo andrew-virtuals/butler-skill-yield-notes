@@ -37,7 +37,11 @@ asset and an amount. Never make up a budget, even a small one.
 The helper's strike rule is a starting point, said as one, with the quote's own
 numbers: "That is a call about 5% above today's price, expiring 30 October. Nearer,
 further, or another date?" `--delta 0.3` instead of `--otm-pct` holds the odds steady
-if they ask for that.
+if they ask for that. A strike they named ("the 2100 put") is `--strike 2100`, with
+`--expiry` for the day (`YYYY-MM-DD`): never a rule that lands near it, and never a
+price read off `chain`. A quote whose `strike` or `expiry` is not what they named is not
+offered; an expiry without that strike is refused with the strikes it lists, so say
+those and ask.
 
 ## Saying it out loud
 
@@ -50,7 +54,7 @@ Every number is a **field on the buy quote**. Never compute one.
 | fees | `fee_usd`, its own line |
 | where it starts paying at expiry | `breakeven` |
 | the price it turns on | `strike` |
-| the date | `expiry`, its time as given (not always 08:00 UTC on Paradex) |
+| the date | `expiry`, its time as given, never one from memory |
 | how much | `size`, in units of the asset |
 | how good the price is | `overpay_vs_fair_vol_pts` |
 
@@ -64,8 +68,8 @@ Four beats, in this order:
    every dollar above that."
 3. **Breakeven and time, in one sentence.** "It only beats what you paid above about
    $2,664, and each day ETH stands still it is worth a little less."
-4. **The date.** "It settles on 30 October at 08:00 UTC; you can sell it back before
-   then."
+4. **The date.** "It settles on 30 October at <`expiry`'s time>; you can sell it back
+   before then."
 
 For a put, the same with "below": "If ETH is below $2,350 on 30 October, the put pays
 $3.45 for every dollar below that; it only beats its cost below about $2,295."
@@ -128,7 +132,7 @@ filed again for what remains.
 
 ## At expiry
 
-Derive settles in cash at 08:00 UTC on the expiry date. A bought option that ends in
+Derive settles in cash at the `expiry` time. A bought option that ends in
 the money pays automatically into the Derive account: (settle - strike) x size for a
 call, (strike - settle) x size for a put. Nothing has to be done to collect it. It
 stays in the account until withdrawn. One that ends out of the money pays nothing.
