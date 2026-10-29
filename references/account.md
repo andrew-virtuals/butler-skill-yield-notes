@@ -94,8 +94,9 @@ moves nothing and still costs a fee. Out of Paradex it pays to Base instead
   Derive does not state in advance. Say that before filing, so a small withdrawal is not
   a surprise: on a small amount the fee can be most of it. The outcome says what arrived.
 - Bringing it to Base is the `:home` card, filed once it shows in `ethereum.usdc`, for the
-  amount that arrived. The trade has its own minimum and fee (`references/venue.md`); if
-  it refuses a small amount, the USDC stays on Ethereum. Give the reason as written.
+  amount that arrived. Under $2 arrived, file no `:home`: the trade refuses less, so the
+  USDC stays in their Ethereum wallet; say so. The trade also has its own fee
+  (`references/venue.md`); if it refuses an amount, give the reason as written.
 
 ## Say to the owner
 

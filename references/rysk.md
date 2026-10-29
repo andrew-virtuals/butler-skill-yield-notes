@@ -35,7 +35,8 @@ Quotes come from Rysk's own helper, not the Derive one: write the script in
 
 ```sh
 python3 /tmp/rysk.py screen --collateral <USD> --pay-with <collateral.address>
-python3 /tmp/rysk.py quote --asset <ASSET> --collateral <USD> --pay-with <collateral.address>
+python3 /tmp/rysk.py quote --asset <ASSET> --collateral <USD> --pay-with <collateral.address> [--expiry <DAY>] [--strike <N>]
+python3 /tmp/rysk.py chain --asset <ASSET> [--expiry <DAY>]
 ```
 
 `<collateral.address>` is the USDC Butler sells on, from step 1's
@@ -45,6 +46,11 @@ takes it from there. Its quote carries the Derive helper's field names
 `min_premium_usd`, `apr_pct`, `bad_case`), so steps 3 and 5 read it unchanged. Offer
 only `tradeable: true`, and always say its `notes`. Use `--delta 0.20` instead when
 the owner wants the odds of assignment held steady rather than the distance from spot.
+
+A strike or day the owner named goes in as `--strike` and `--expiry`, as
+`references/selling.md` says; a refusal lists the strikes or days Rysk does have, so
+say those and ask. "Which strikes are there on 13 November" is `chain` with that
+`--expiry`. "A weekly" is `--tenor weekly`; monthly is the default.
 
 ## The market
 
@@ -92,7 +98,8 @@ Step 4's deposit with `--venue rysk`:
 - From **USDC on Base** only (no `--from`), into the owner's HyperEVM wallet. Nothing
   is set aside for Rysk until a sale locks it.
 - Before it, say how much is already in that wallet (`account.usdc`) and deposit only
-  the shortfall, sized as step 4 says; the $6 floor does not apply.
+  the shortfall, sized as step 4 says but **never under $2** in place of its $6: the
+  bridge to HyperEVM refuses less.
 - After the card, re-read the account until `account.usdc` covers `collateral.amount`;
   only then step 5.
 
@@ -100,7 +107,8 @@ Step 4's deposit with `--venue rysk`:
 
 Step 8's withdraw line with `--venue rysk` added, and never its `:home` line. It moves
 USDC from the HyperEVM wallet back to Base within minutes - at most this turn's
-`freeForNewPutsUsd`. It never sells an asset Rysk delivered.
+`freeForNewPutsUsd`, and never under $2: the same bridge refuses less, so a smaller
+balance stays on HyperEVM. It never sells an asset Rysk delivered.
 
 ## Settlement: the asset arrives
 

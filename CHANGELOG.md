@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.8.1
+
+- **"Sell the 2100 put on Rysk for 13 November" sells that put.** Rysk's quote had no
+  way to name a strike or a day: it took the listed expiry nearest the tenor and the
+  strike nearest 10% under spot, so 30 October and 13 November could never be quoted
+  and a named strike only ever approximated, while `selling.md` says a named strike or
+  day is quoted exactly or not offered. `rysk.py quote` now takes `--strike` and
+  `--expiry`, as the Derive and Paradex helper does, refused with the strikes or days
+  Rysk lists when it has no such put.
+- **`rysk.py chain --asset ETH --expiry 2026-11-13`** lists one expiry's put strikes,
+  each with its `delta` and `pct_otm`: the answer to "which strikes are there". No
+  price, since Rysk only prices on request.
+- `rysk.md` says `--tenor weekly` is how to ask for a weekly.
+- **A Rysk deposit or withdrawal is never under $2.** Both ride `acp trade` between
+  Base and HyperEVM, which refuses a move under $2; `rysk.md` sized a deposit as the
+  bare shortfall with no floor, so a small one was filed only to be refused.
+- **No Derive `:home` leg under $2.** It is the same `acp trade`, from Ethereum to
+  Base; `account.md` now says a smaller arrival stays on Ethereum instead of filing a
+  card that is refused after approval.
+
 ## 2.8.0
 
 - **A duty that only watches no longer asks for a spending limit.** Seen in QA: a bought

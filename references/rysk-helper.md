@@ -8,8 +8,19 @@ A listing ("what can I trade on Rysk") is `references/listing.md`, never this he
 python3 /tmp/rysk.py screen --collateral 5000 --pay-with <collateral.address>
 python3 /tmp/rysk.py quote --asset ETH --collateral 5000 --pay-with <collateral.address>
 python3 /tmp/rysk.py quote --asset ETH --collateral 5000 --pay-with <collateral.address> --delta 0.20
+python3 /tmp/rysk.py quote --asset ETH --collateral 5000 --pay-with <collateral.address> --expiry 2026-11-13 --strike 2100
+python3 /tmp/rysk.py chain --asset ETH --expiry 2026-11-13
 python3 /tmp/rysk.py positions --address <smart account>
 ```
+
+The expiry is the tenor's (`--tenor weekly`, `monthly` by default, `quarterly`: the
+listed expiry nearest 7, 30 or 90 days out) unless the owner named a day: `--expiry`
+(`YYYY-MM-DD`, UTC), refused with the days Rysk lists when it lists none then. The
+strike is the one nearest 10% under spot (`--otm-pct`), or nearest a delta (`--delta`),
+unless the owner named one: `--strike`, exactly, refused with the strikes that expiry
+lists when it is not among them. `chain` gives one expiry's put strikes on one asset,
+each with its `delta` and `pct_otm`, and no price: Rysk has no book, so a price is only
+ever a quote.
 
 `--pay-with` is the address of the collateral Butler sells on - **USDC on HyperEVM** -
 as `acp options account --venue rysk --json` gives it (`collateral.address`). Rysk names
@@ -309,15 +320,48 @@ def _puts(inv, asset):
     return out
 
 
-def _pick(combos, tenor, otm_pct, target_delta):
-    """The listed strike closest to what was asked for, at the nearest expiry."""
+def _day(combo):
+    return time.strftime("%Y-%m-%d", time.gmtime(combo["expiration_timestamp"]))
+
+
+def _plain(strike):
+    """56.5 -> "56.5", 2100.0 -> "2100": a strike the way Rysk's names write it."""
+    return ("%f" % float(strike)).rstrip("0").rstrip(".")
+
+
+def _at_expiry(combos, asset, tenor, on=None):
+    """Every put at one expiry: the one on the day the owner named (`on`, YYYY-MM-DD,
+    UTC), never one inside the hour, or else the one nearest the tenor's target,
+    never one inside a day."""
+    if on:
+        live = [c for c in combos if (c.get("timeToExpiryDays") or 0) * 86400 >= 3600]
+        hit = [c for c in live if _day(c) == on]
+        if hit:
+            return hit
+        listed = sorted({_day(c) for c in live})
+        raise RyskError("Rysk lists no %s put expiring on %s; it lists %s"
+                        % (asset, on, ", ".join(listed) or "none"))
     want_days = TENOR_DAYS.get(tenor, TENOR_DAYS["monthly"])
     live = [c for c in combos if (c.get("timeToExpiryDays") or 0) >= 1]
     if not live:
-        return None
+        return []
     best_exp = min({round(c["timeToExpiryDays"]) for c in live},
                    key=lambda d: abs(d - want_days))
-    at_exp = [c for c in live if round(c["timeToExpiryDays"]) == best_exp]
+    return [c for c in live if round(c["timeToExpiryDays"]) == best_exp]
+
+
+def _pick(combos, asset, tenor, otm_pct, target_delta, on=None, strike=None):
+    """The strike the owner named, exactly, or the listed strike closest to the rule."""
+    at_exp = _at_expiry(combos, asset, tenor, on)
+    if not at_exp:
+        return None
+    if strike is not None:
+        hit = [c for c in at_exp if float(c["strike"]) == strike]
+        if not hit:
+            raise RyskError("Rysk lists no %s %s put on %s; it lists %s"
+                            % (asset, _plain(strike), at_exp[0]["expiry"],
+                               ", ".join(_plain(k) for k in sorted({float(c["strike"]) for c in at_exp}))))
+        return hit[0]
     if target_delta is not None:
         return min(at_exp, key=lambda c: abs(abs(c.get("delta") or 0) - abs(target_delta)))
     return min(at_exp, key=lambda c: abs(
@@ -354,7 +398,7 @@ def _fee(result, product, chosen, combo, size, strike, valid_until):
 
 
 def quote(asset, collateral_usd, tenor="monthly", otm_pct=10.0, target_delta=None,
-          pay_with=None, chain_id=None):
+          pay_with=None, chain_id=None, on=None, strike=None):
     """Ask real makers what they will pay for one cash-secured put.
 
     The returned price is signed and expires; `valid_for_seconds` is how long
@@ -371,7 +415,7 @@ def quote(asset, collateral_usd, tenor="monthly", otm_pct=10.0, target_delta=Non
     if not combos:
         raise RyskError("Rysk lists %s but is offering no puts on it right now" % asset)
 
-    combo = _pick(combos, tenor, otm_pct, target_delta)
+    combo = _pick(combos, asset, tenor, otm_pct, target_delta, on, strike)
     if combo is None:
         raise RyskError("no %s put with an expiry more than a day out" % asset)
     options = _options([combo])
@@ -440,7 +484,7 @@ def quote(asset, collateral_usd, tenor="monthly", otm_pct=10.0, target_delta=Non
         "product": "cash_secured_put",
         "settlement": "physical",
         # The name `acp options open --venue rysk` takes, in Rysk's own words.
-        "instrument": "%s-%s-%s-P" % (asset, combo["expiry"], ("%f" % strike).rstrip("0").rstrip(".")),
+        "instrument": "%s-%s-%s-P" % (asset, combo["expiry"], _plain(strike)),
         "asset": asset,
         "chain": chosen["chain"],
         "chain_id": chosen["chain_id"],
@@ -519,6 +563,36 @@ def screen(collateral_usd, tenor="monthly", otm_pct=10.0, pay_with=None, chain_i
     return rows
 
 
+def chain(asset, tenor="monthly", on=None):
+    """One expiry's puts on one asset, each row naming it: the strikes to choose from.
+
+    No prices: Rysk has no book, so a price is only ever a quote."""
+    asset = asset.upper()
+    inv = inventory()
+    if asset not in inv:
+        raise RyskError("Rysk does not list %s. It offers: %s"
+                        % (asset, ", ".join(sorted(inv))))
+    combos = _puts(inv, asset)
+    if not combos:
+        raise RyskError("Rysk lists %s but is offering no puts on it right now" % asset)
+    at_exp = _at_expiry(combos, asset, tenor, on)
+    if not at_exp:
+        raise RyskError("no %s put with an expiry more than a day out" % asset)
+    rows = []
+    for c in sorted(at_exp, key=lambda c: float(c["strike"])):
+        strike, index = float(c["strike"]), float(c.get("index") or 0)
+        rows.append({
+            "instrument": "%s-%s-%s-P" % (asset, c["expiry"], _plain(strike)),
+            "expiry": c["expiry"],
+            "expiry_ts": c["expiration_timestamp"],
+            "strike": strike,
+            "index_price": round(index, 4),
+            "pct_otm": round((strike / index - 1) * 100, 2) if index else None,
+            "delta": c.get("delta"),
+        })
+    return rows
+
+
 def _amount(raw, chain_id, address):
     """A settlement amount in the token's own units, and the token's name."""
     listed = _assets().get(address.lower())
@@ -592,6 +666,13 @@ def positions(address):
     return out
 
 
+def _utc_day(text):
+    try:
+        return time.strftime("%Y-%m-%d", time.strptime(text.strip(), "%Y-%m-%d"))
+    except ValueError:
+        raise argparse.ArgumentTypeError("%r is not a date like 2026-10-30" % text)
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -605,8 +686,17 @@ def main():
     q.add_argument("--asset", required=True)
     q.add_argument("--collateral", type=float, required=True)
     q.add_argument("--tenor", default="monthly", choices=sorted(TENOR_DAYS))
-    q.add_argument("--otm-pct", type=float, default=10.0)
-    q.add_argument("--delta", type=float, default=None)
+    rule = q.add_mutually_exclusive_group()
+    rule.add_argument("--otm-pct", type=float, default=10.0)
+    rule.add_argument("--delta", type=float, default=None)
+    rule.add_argument("--strike", type=float, default=None,
+                      help="the strike the owner named, exactly; refused if the expiry does not list it")
+    c = sub.add_parser("chain", help="one expiry's put strikes on one asset")
+    c.add_argument("--asset", required=True)
+    c.add_argument("--tenor", default="monthly", choices=sorted(TENOR_DAYS))
+    for cmd in (q, c):
+        cmd.add_argument("--expiry", type=_utc_day, default=None,
+                         help="YYYY-MM-DD (UTC): that day's expiry instead of the tenor's")
     for cmd in (s, q):
         cmd.add_argument("--pay-with", required=True,
                          help="the collateral's address: `collateral.address` of the account read")
@@ -635,12 +725,14 @@ def main():
         print(json.dumps(out, indent=2, ensure_ascii=False))
     elif a.cmd == "positions":
         print(json.dumps(positions(a.address), indent=2, ensure_ascii=False))
+    elif a.cmd == "chain":
+        print(json.dumps(chain(a.asset, a.tenor, a.expiry), indent=2, ensure_ascii=False))
     elif a.cmd == "screen":
         rows = screen(a.collateral, a.tenor, a.otm_pct, a.pay_with, a.chain)
         print(json.dumps(rows, indent=2, ensure_ascii=False))
     else:
         print(json.dumps(quote(a.asset, a.collateral, a.tenor, a.otm_pct, a.delta,
-                               a.pay_with, a.chain), indent=2, ensure_ascii=False))
+                               a.pay_with, a.chain, a.expiry, a.strike), indent=2, ensure_ascii=False))
 
 
 if __name__ == "__main__":

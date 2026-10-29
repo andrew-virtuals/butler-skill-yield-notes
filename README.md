@@ -6,7 +6,7 @@ selling cash-secured puts, buying calls and puts, and closing them on **Derive**
 people maintaining the repo. A butler receives only `SKILL.md` and `references/**/*.md`;
 the registry also serves the duty templates under `templates/`.
 
-- **Version:** 2.8.0 (`SKILL.md`), with `options-lifecycle` 10, `options-put-delivery` 1
+- **Version:** 2.8.1 (`SKILL.md`), with `options-lifecycle` 10, `options-put-delivery` 1
   and `options-account` 3.
   What changed in each release: `CHANGELOG.md`.
 - **Registry name:** `options-trading`, listed in the hub's `skills.json` from this repo.
@@ -160,7 +160,9 @@ Check these by hand after any change to the helper:
   gross 57.94, fee 2.18, net 55.76, edge -1.28, breakeven 2273.3 and APR about 17.83.
 
 Rysk's script (`references/rysk-helper.md`) runs the same way: `inventory`,
-`screen --collateral <USD> --pay-with <address>`, `quote --asset <ASSET> ...`.
+`screen --collateral <USD> --pay-with <address>`, `quote --asset <ASSET> ...`, and
+`chain --asset <ASSET>` for one expiry's put strikes. `--expiry` and `--strike` behave
+as they do above.
 
 ## Validating a change
 
