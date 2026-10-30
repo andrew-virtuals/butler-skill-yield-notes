@@ -1,22 +1,15 @@
-"""`references/listing.md`'s script against the quote helpers it stands in for."""
+"""`scripts/options_list.py` against the quote helper it stands in for."""
 import ast
 import pathlib
 import re
 import unittest
 
-REFS = pathlib.Path(__file__).resolve().parent.parent / "references"
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+SCRIPTS = ROOT / "scripts"
 
 
-def helper_script():
-    return re.search(r"cat > /tmp/derive_helper.py <<'PYEOF'\n(.*?)\nPYEOF\n", (REFS / "helper.md").read_text(), re.S).group(1)
-
-
-def listing_script():
-    return re.search(r"<<'PYEOF'\n(.*?)\nPYEOF\n", (REFS / "listing.md").read_text(), re.S).group(1)
-
-
-def known(src):
-    for node in ast.parse(src).body:
+def known(name):
+    for node in ast.parse((SCRIPTS / name).read_text()).body:
         if isinstance(node, ast.Assign) and getattr(node.targets[0], "id", None) == "KNOWN":
             return ast.literal_eval(node.value)
     raise AssertionError("no KNOWN table")
@@ -25,15 +18,30 @@ def known(src):
 class ListingTest(unittest.TestCase):
     def test_known_matches_the_helper(self):
         # Neither venue names its tickers: the two lists must say the same thing.
-        self.assertEqual(known(listing_script()), known(helper_script()))
+        self.assertEqual(known("options_list.py"), known("quote.py"))
 
-    def test_script_compiles(self):
-        compile(listing_script(), "options_list.py", "exec")
+    def test_scripts_compile(self):
+        for path in SCRIPTS.glob("*.py"):
+            compile(path.read_text(), str(path), "exec")
 
-    def test_one_command_writes_and_runs_it(self):
-        block = re.search(r"```sh\n(.*?)\n```", (REFS / "listing.md").read_text(), re.S).group(1)
-        self.assertTrue(block.startswith("cat > /tmp/options_list.py <<'PYEOF'\n"))
-        self.assertTrue(block.endswith("PYEOF\npython3 /tmp/options_list.py --venue paradex"))
+
+class InstalledTest(unittest.TestCase):
+    """The skill runs its scripts where they are installed, and never writes one."""
+
+    def text(self):
+        return {p.relative_to(ROOT).as_posix(): p.read_text()
+                for p in [ROOT / "SKILL.md", *sorted((ROOT / "references").glob("*.md"))]}
+
+    def test_every_script_is_named_and_every_name_ships(self):
+        named = set()
+        for body in self.text().values():
+            named |= set(re.findall(r"scripts/([a-z_]+\.py)", body))
+        self.assertEqual(named, {p.name for p in SCRIPTS.glob("*.py")})
+
+    def test_nothing_is_written_to_tmp(self):
+        for rel, body in self.text().items():
+            self.assertNotIn("/tmp/", body, rel)
+            self.assertNotIn("PYEOF", body, rel)
 
 
 if __name__ == "__main__":

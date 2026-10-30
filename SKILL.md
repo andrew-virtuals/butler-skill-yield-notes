@@ -1,13 +1,13 @@
 ---
 name: options-trading
 description: Trade options on Derive, Paradex or Rysk - earn on idle USDC by selling cash-secured puts, buy a call or a put, close before expiry, and check or withdraw USDC and positions.
-version: 2.8.1
-metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","withdraw","withdraw my usdc","derive","my options","options account","options positions","free usdc","derive positions","my option positions","withdraw from derive","withdraw my free usdc","paradex","paradex options","paradex positions","rysk","rysk options","rysk positions","physically settled","hyperevm"],"requires":{"bins":["python3","cat","bevo-read","acp"]}}}
+version: 2.9.0
+metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","withdraw","withdraw my usdc","derive","my options","options account","options positions","free usdc","derive positions","my option positions","withdraw from derive","withdraw my free usdc","paradex","paradex options","paradex positions","rysk","rysk options","rysk positions","physically settled","hyperevm"],"requires":{"bins":["python3","bevo-read","acp"]}}}
 ---
 
 ## When to use
 
-Your owner wants one of four things on Derive's, Paradex's or Rysk's options market:
+Your owner wants one of four things on Derive, Paradex or Rysk options:
 
 - **Earn** - "earn on my USDC", "get paid to buy the dip": **sell** one cash-secured
   put, fully collateralised in USDC. They keep the premium and may end up buying the
@@ -28,15 +28,15 @@ Not this skill: covered calls, spreads, leverage, or a trade the helper refuses.
 1. **Which of the four.** Earning and buying are different promises; never blur them.
    Selling fits only USDC whose owner would happily buy the asset lower; a no to that
    ends selling, every put on it.
-2. **Sizes are in the asset.** 1 contract is 1 ETH: 0.16 is 0.16 ETH, and `min_size`
-   is only its minimum. Say "0.16 ETH", never "contracts", and never convert.
+2. **Sizes are in the asset:** say "0.16 ETH", never "contracts", and never convert;
+   `min_size` is only its minimum.
 3. **The bad case first, in their words, before any upside number:** selling, from
    `bad_case`; buying, that what it costs is gone.
 4. **First time for that kind of trade:** the plain yes answers in
    `references/selling.md` or `buying.md`. A no or a vague answer stops it.
 5. **Figures come only from this turn's reads:** sizes, prices and positions
-   from `acp options account` and quotes, never memory; a note that disagrees is wrong,
-   so fix it. `bevo-read assets` has none.
+   from `acp options account` and quotes, never memory; a note that disagrees is wrong:
+   fix it. `bevo-read assets` has none.
 6. **Venue.** Derive, unless they name Paradex or Rysk or hold it there: `--venue` it
    everywhere, withdrawing too (`references/paradex.md` or `rysk.md`).
 
@@ -68,21 +68,23 @@ this chat. One missing: ask, and file nothing this turn.
    `references/account.md`. An unreadable account is not an empty one. On
    `exists: true` on any venue, step 9.
 
-2. [FIXED] Write the script in `references/helper.md` to `/tmp/derive_helper.py`.
-   Quote with the line for the intent; the strike is a rule or theirs, never yours:
+2. [FIXED] Run the helper in place; never write, copy or edit a script, or trim its
+   output. Missing: say so, and stop. Quote with the line for the intent
+   (`references/helper.md`); the strike is a rule or theirs:
 
    ```sh
-   python3 /tmp/derive_helper.py screen --collateral <USD>
-   python3 /tmp/derive_helper.py quote --product cash_secured_put --underlying <ASSET> --collateral <USD> [--expiry <DAY>] [--strike <N>]
-   python3 /tmp/derive_helper.py quote --side buy --product <PRODUCT> --underlying <ASSET> --budget <USD> [--expiry <DAY>] [--strike <N>]
-   python3 /tmp/derive_helper.py quote --side close --instrument <INSTRUMENT> --size <SIZE>
-   python3 /tmp/derive_helper.py quote --side buyback --instrument <INSTRUMENT> --size <SIZE> --premium-received <USD>
+   python3 ~/skills/options-trading/scripts/quote.py screen --collateral <USD>
+   python3 ~/skills/options-trading/scripts/quote.py quote --product cash_secured_put --underlying <ASSET> --collateral <USD> [--expiry <DAY>] [--strike <N>]
+   python3 ~/skills/options-trading/scripts/quote.py quote --side buy --product <PRODUCT> --underlying <ASSET> --budget <USD> [--expiry <DAY>] [--strike <N>]
+   python3 ~/skills/options-trading/scripts/quote.py quote --side close --instrument <INSTRUMENT> --size <SIZE>
+   python3 ~/skills/options-trading/scripts/quote.py quote --side buyback --instrument <INSTRUMENT> --size <SIZE> --premium-received <USD>
    ```
 
    Selling: the asset they named, or screen (never an APR menu) and ask. Buying:
    `<PRODUCT>` is `call` or `put`, `--budget` the most they will spend. Closing:
-   instrument and size from `positions`; positive is `--side close`, negative is `--side buyback` with the size positive and `--premium-received`
-   the note's `netPremiumUsd` (or its duty's PREMIUM_USD) scaled to it. **Offer only
+   instrument and size from `positions`; positive is `--side close`; negative,
+   `--side buyback` with the size positive and `--premium-received` the note's
+   `netPremiumUsd` (or its duty's PREMIUM_USD) scaled to it. **Offer only
    `tradeable: true`**; give the `reasons` as written. A strike or day they named:
    `buying.md`.
 
@@ -114,7 +116,7 @@ this chat. One missing: ask, and file nothing this turn.
    `--from 1` only when `ethereum.usdc` covers it alone. Never ask about gas or an
    address. Re-read `acp options account` until free USDC covers the trade, and do step
    9; if it ends short, re-quote smaller and re-offer. Free USDC spans their Derive
-   accounts: the server moves it (`account.md`).
+   accounts (`account.md`).
 
 5. [FIXED] Run the quote again now, after their last answer. With all four met, file
    the one command, with that quote's fields and the bound they agreed:
@@ -148,19 +150,18 @@ this chat. One missing: ask, and file nothing this turn.
    ```json
    {"recipe": "options-lifecycle@10", "movesFunds": false, "title": "Watch {INSTRUMENT} to expiry",
     "triggers": [{"kind": "timer", "intervalSeconds": 900}],
-    "params": {"VENUE": "<venue>", "INSTRUMENT": "<instrument>", "PRODUCT": "<product>", "UNDERLYING": "<prefix>",
+    "params": {"VENUE": "<venue>", "INSTRUMENT": "<instrument>", "PRODUCT": "<product>", "UNDERLYING": "<instrument prefix>",
     "STRIKE": <strike>, "SIZE": <filledSize>, "PREMIUM_USD": <usd>, "COLLATERAL_USD": <usd>}}
    ```
 
    Sold put: PRODUCT `cash_secured_put`, PREMIUM_USD `netPremiumUsd`, COLLATERAL_USD
    `collateral`. Bought: PRODUCT `long_call` or `long_put`, PREMIUM_USD `totalCostUsd`,
-   COLLATERAL_USD 0. Always SIZE `filledSize`, STRIKE `strike`, UNDERLYING the
-   instrument's prefix. Asked in step 3 to own the asset: `options-put-delivery@1`
+   COLLATERAL_USD 0. Asked in step 3 to own the asset: `options-put-delivery@1`
    (`references/selling.md`). After a close, `duty_delete` that instrument's duty; if
    part is still open, file it again with SIZE from `positions` (positive) and
    PREMIUM_USD and COLLATERAL_USD scaled to it. Never file for an unknown or failed
    trade. A second options duty in one chat needs
-   `"alongside": [<this chat's earlier ones' names>]`; step 9's needs none.
+   `"alongside": [<this chat's earlier ones>]`; step 9's needs none.
 
 8. [FIXED] Withdraw only when asked, only free USDC: at most this turn's
    `freeForNewPutsUsd`, rounded down to the cent. It lands on Ethereum in its card's
@@ -173,8 +174,8 @@ this chat. One missing: ask, and file nothing this turn.
    ```
 
 9. [FIXED] Once any venue has an account, unasked: with no `options-account` duty,
-   file it and delete any `derive-account` duty; one on `@1`/`@2` or a fork of it,
-   `duty_update` with this recipe.
+   file it and delete any `derive-account` one; one on `@1`/`@2` or a fork,
+   `duty_update` to this recipe.
 
    ```json
    {"recipe": "options-account@3", "title": "Options accounts", "triggers": [{"kind": "timer", "intervalSeconds": 600}]}
@@ -186,10 +187,10 @@ this chat. One missing: ask, and file nothing this turn.
 
 Derive one key per trade, such as `ot:eth:20261030:2600c:1`, with `:deposit`,
 `:open`, `:buy`, `:close`, `:withdraw`, `:home`. On an error, a timeout or an unclear
-answer, **do not re-run** the command - a retried buy can buy twice, a retried
-deposit can bridge twice. Look it up as in step 6: `not_found` means nothing was filed
-under that key. A deposit still crediting is not a failed one: re-read `acp options
-account` and wait. The `:home` leg is `acp trade`: look it up with `--route trade`.
+answer, **do not re-run** the command: a retry can buy or bridge twice. Look it up as
+in step 6: `not_found` means nothing was filed. A deposit still crediting is not a
+failed one: re-read `acp options account` and wait. The `:home` leg is `acp trade`:
+look it up with `--route trade`.
 
 ## Failure handling
 
@@ -199,7 +200,7 @@ account` and wait. The `:home` leg is `acp trade`: look it up with `--route trad
 | `no live bid` / `no live ask` | Opening: another strike, expiry or asset, or stop. Closing: nobody bids for theirs now; holding costs nothing. |
 | `vol points wide`, `paying N% over fair value` | A poor price; say so, never trade it. |
 | `fees are N% of the premium` | Too small or too short. Offer monthly or bigger. |
-| `collateral too small`, `budget too small` | Under Derive's minimum. Give the figure from the reason. |
+| `collateral too small`, `budget too small` | Under the minimum. Give the reason's figures, work out no others, and stop unless they name another strike, expiry or amount. |
 | An `OPTIONS_*` refusal | Nothing filed: follow its hint; never raise a bound the owner agreed. |
 | No fill (open, buy or close) | Nobody took it at the agreed bound; never call it no liquidity. Nothing moved. Re-quote, re-ask, never re-file the same bound. |
 | Buy failed over `--max-cost` | Give the reason as written, then read `positions`: anything shown there was bought. Never buy again. |

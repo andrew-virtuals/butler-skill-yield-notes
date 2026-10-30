@@ -14,7 +14,7 @@ for that trade, and `"VENUE": "paradex"` to its lifecycle duty's `params`. A quo
 Paradex, for example:
 
 ```sh
-python3 /tmp/derive_helper.py quote --venue paradex --side buy --product call --underlying ETH --budget 50
+python3 ~/skills/options-trading/scripts/quote.py quote --venue paradex --side buy --product call --underlying ETH --budget 50
 ```
 
 ## The market

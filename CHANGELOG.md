@@ -1,5 +1,44 @@
 # Changelog
 
+## 2.9.0
+
+- **"Sell a SOL put on Rysk with $5" says what the minimum needs.** Seen in QA: Rysk's
+  quote refused $5 with "may be under the minimum" and no figure, so the agent went
+  looking for one. It guessed a 10 SOL size, picked strikes itself, trimmed the quotes
+  with its own script, and offered a table whose 85 put was "down $52ish" if SOL fell
+  25%; the put's own `bad_case` was down $94. Rysk publishes no minimum, so an amount
+  under it now asks at each larger size step until a maker prices one, then once at the
+  day's lowest strike, and comes back as a quote that is not `tradeable`, with
+  `min_size` and the reason `collateral too small: Rysk prices no less than 10 SOL,
+  which needs $890 on SOL-27NOV26-89-P and $790 on SOL-27NOV26-79-P, the lowest strike
+  that day`. The second clause is left out when no maker prices the lowest strike; in
+  an eval without it, 4 of 6 agents multiplied the strike list out themselves. That is
+  Derive's reason too, so `SKILL.md`'s row reads both: give the figures, work out no
+  others, and stop unless the owner names another strike, expiry or amount. `screen`
+  skips the search, which costs one ask per step.
+- **The helpers ship as scripts, run where they are installed.** The Derive and
+  Paradex helper, Rysk's and the listing were fenced blocks in `references/` that a
+  butler retyped into `/tmp` every session: minutes of output, a typo that silently
+  changes a quote, and copies left behind. The QA run used a `rysk.py` an earlier
+  session had edited; evals found agents saving `rysk_tmp.py`, `rysk_session.py` and
+  `opt/rysk/rysk.py` because a file tool cannot write `/tmp`, and one retyping a
+  different script. They are now `scripts/quote.py` (was `derive_helper.py`),
+  `scripts/rysk.py` and `scripts/options_list.py`, run as
+  `python3 ~/skills/options-trading/scripts/<script>.py`. Step 2 says never write, copy
+  or edit one, or trim its output, and to stop if one is missing; `rysk.md` says a
+  `rysk.py` anywhere else is never run. The references keep each helper's lines and
+  fields. On the QA turn, 6 of 6 agents ran the installed script once, wrote nothing,
+  and gave both figures, in 33-40s against 50-79s.
+- `requires.bins` drops `cat`, which only wrote the heredocs. `SKILL.md` was already at
+  the registry's 12,000-character body: a sizes line in step 7 that repeated the
+  template and some wording are cut, with no rule changed.
+- Tests load the scripts themselves, and check that every script is named in
+  `SKILL.md` or a reference (a link install fetches only what is named) and that nothing
+  is written to `/tmp`.
+- Needs the registry to publish `scripts/**/*.py` (butler-skills `validate.py`); Butler's
+  agent already installs them (virtuals-agent#314). Until the registry does, keep
+  `skills.json` on 2.8.1: a hub install of 2.9.0 would have no helpers.
+
 ## 2.8.1
 
 - **"Sell the 2100 put on Rysk for 13 November" sells that put.** Rysk's quote had no

@@ -1,18 +1,16 @@
-"""`references/rysk-helper.md`'s script: a named strike and day, against a fixed inventory."""
+"""`scripts/rysk.py`: a named strike and day, and the minimum, against a fixed inventory."""
 import pathlib
-import re
 import time
 import types
 import unittest
 
-REFS = pathlib.Path(__file__).resolve().parent.parent / "references"
+SCRIPT = pathlib.Path(__file__).resolve().parent.parent / "scripts" / "rysk.py"
 DAY = 86400
 
 
 def helper():
-    src = re.search(r"```python\n(.*?)\n```", (REFS / "rysk-helper.md").read_text(), re.S).group(1)
     mod = types.ModuleType("rysk")
-    exec(compile(src, "rysk.py", "exec"), mod.__dict__)
+    exec(compile(SCRIPT.read_text(), str(SCRIPT), "exec"), mod.__dict__)
     return mod
 
 
@@ -82,6 +80,73 @@ class RyskPickTest(unittest.TestCase):
         self.assertEqual([r["instrument"] for r in rows],
                          ["ETH-FORT-56.5-P", "ETH-FORT-2000-P", "ETH-FORT-2100-P"])
         self.assertNotIn("price", rows[0])
+
+
+USDC = "0x00000000000000000000000000000000000usdc"
+
+
+class RyskMinimumTest(unittest.TestCase):
+    """A maker that prices nothing under 10 SOL, as Rysk's SOL puts did in QA."""
+
+    def setUp(self):
+        self.rysk = helper()
+        sol = put("27NOV26", 28, 88, 0.12)
+        sol["index"] = 99.75
+        sol["products"] = [{"asset": "0xsol", "collateralAsset": USDC, "strikeAsset": "0xusd"}]
+        low = dict(sol, strike=79, delta=-0.03)
+        self.rysk.inventory = lambda: {"SOL": {"combinations": {"0": sol, "1": low}}}
+        self.rysk._tokens["0xsol"] = (999, "USOL", 18)
+        self.asked = []
+        self.refuse = "{'code': -32603, 'message': 'trade size too small'}"
+        self.unpriced = set()
+
+        def call(payload, want_id, tries=3, timeout=25):
+            size = int(payload["params"]["quantity"]) / self.rysk.E18
+            strike = int(payload["params"]["strike"]) / self.rysk.E8
+            self.asked.append(size)
+            if size < 10:
+                raise self.rysk.RyskError(self.refuse)
+            if strike in self.unpriced:
+                raise self.rysk.RyskError("no maker answered")
+            return {"price": str(16 * 10 ** 17), "quantity": payload["params"]["quantity"]}
+
+        self.rysk._call = call
+
+    def test_under_the_minimum_names_the_least_it_prices(self):
+        q = self.rysk.quote("SOL", 5, pay_with=USDC)
+        self.assertFalse(q["tradeable"])
+        self.assertEqual(q["reasons"], ["collateral too small: Rysk prices no less than 10 SOL, which "
+                                        "needs $880 on SOL-27NOV26-88-P and $790 on "
+                                        "SOL-27NOV26-79-P, the lowest strike that day"])
+        self.assertEqual((q["size"], q["min_size"]), (0.0, 10))
+        self.assertEqual(self.asked[-6:], [0.1, 0.5, 1, 5, 10, 10])
+        # Nothing to quote a downside or a premium from: none was priced for the owner.
+        self.assertNotIn("bad_case", q)
+        self.assertNotIn("net_premium_usd", q)
+
+    def test_a_lowest_strike_no_maker_prices_is_left_out(self):
+        self.unpriced.add(79.0)
+        q = self.rysk.quote("SOL", 5, pay_with=USDC)
+        self.assertEqual(q["reasons"], ["collateral too small: Rysk prices no less than 10 SOL, which "
+                                        "needs $880 on SOL-27NOV26-88-P"])
+
+    def test_at_the_lowest_strike_it_is_said_once(self):
+        q = self.rysk.quote("SOL", 5, pay_with=USDC, strike=79.0)
+        self.assertEqual(q["reasons"], ["collateral too small: Rysk prices no less than 10 SOL, which "
+                                        "needs $790 on SOL-27NOV26-79-P"])
+
+    def test_screen_does_not_probe(self):
+        with self.assertRaises(self.rysk.RyskError) as e:
+            self.rysk.quote("SOL", 5, pay_with=USDC, probe=False)
+        self.assertIn("would not price $5 of SOL", str(e.exception))
+        self.assertTrue(all(s < 0.1 for s in self.asked))
+
+    def test_another_refusal_ends_the_search(self):
+        self.refuse = "no maker answered"
+        with self.assertRaises(self.rysk.RyskError) as e:
+            self.rysk.quote("SOL", 5, pay_with=USDC)
+        self.assertIn("would not price", str(e.exception))
+        self.assertTrue(all(s < 0.1 for s in self.asked))
 
 
 if __name__ == "__main__":

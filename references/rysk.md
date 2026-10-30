@@ -29,14 +29,14 @@ Add `--venue rysk` to every `acp options` line of `SKILL.md` for that trade, and
 A listing ("what can I trade on Rysk") is `references/listing.md` with `--venue rysk`:
 never this helper, which is for quotes only.
 
-Quotes come from Rysk's own helper, not the Derive one: write the script in
-`references/rysk-helper.md` to `/tmp/rysk.py` and use it where step 2 uses
-`/tmp/derive_helper.py`:
+Quotes come from Rysk's own helper, not the Derive one: `scripts/rysk.py`, run in
+place where step 2 runs `scripts/quote.py` (fields: `references/rysk-helper.md`).
+A `rysk.py` anywhere else in the workspace is an older or edited copy: never run it.
 
 ```sh
-python3 /tmp/rysk.py screen --collateral <USD> --pay-with <collateral.address>
-python3 /tmp/rysk.py quote --asset <ASSET> --collateral <USD> --pay-with <collateral.address> [--expiry <DAY>] [--strike <N>]
-python3 /tmp/rysk.py chain --asset <ASSET> [--expiry <DAY>]
+python3 ~/skills/options-trading/scripts/rysk.py screen --collateral <USD> --pay-with <collateral.address>
+python3 ~/skills/options-trading/scripts/rysk.py quote --asset <ASSET> --collateral <USD> --pay-with <collateral.address> [--expiry <DAY>] [--strike <N>]
+python3 ~/skills/options-trading/scripts/rysk.py chain --asset <ASSET> [--expiry <DAY>]
 ```
 
 `<collateral.address>` is the USDC Butler sells on, from step 1's
@@ -58,7 +58,8 @@ say those and ask. "Which strikes are there on 13 November" is `chain` with that
   will price today. Read it live; never from memory.
 - **Sizes step per asset**, and the steps are not published: the helper finds them.
   A round amount rarely lands exactly (a `note` says how much goes to work), and a
-  small one can be under the minimum: the helper's reason says so. Never guess a size.
+  small one can be under the minimum: the quote's reason (`collateral too small`)
+  names the least Rysk prices and what it needs. Never guess a size.
 - **Names** are Rysk's fields: `SOL-30OCT26-95-P`, a decimal strike with a point
   (`HYPE-6NOV26-56.5-P`). Each settles at the time its quote's `expiry` gives.
 - **Quotes live seconds**, at a time each maker sets (`valid_for_seconds`). A quote is
@@ -127,11 +128,11 @@ balance stays on HyperEVM. It never sells an asset Rysk delivered.
 How every put ended, when they ask or an expiry has passed: first
 `acp options account --venue rysk --json`, whose `positions` (not settled yet) and
 `settled` (recent settlements, with `received` and `assigned`) answer it with no script.
-Only for a put in neither, write the helper and read every one:
+Only for a put in neither, read every one with the helper:
 
 ```sh
 bevo-read me
-python3 /tmp/rysk.py positions --address <user.smartAccountAddress>
+python3 ~/skills/options-trading/scripts/rysk.py positions --address <user.smartAccountAddress>
 ```
 
 The address is `user.smartAccountAddress` from `bevo-read me`, never
@@ -144,7 +145,8 @@ yet: say so, never call it lost) or `settled`, with `settlement_price`, `receive
 | Outcome | What to do |
 | --- | --- |
 | `is offering no puts on it right now` | Listed, not quoted. Another asset, or wait. |
-| `would not price $X of <asset>` | Usually under the minimum. Say so; never guess a size. |
+| `collateral too small` | Under Rysk's minimum. Give the size and the dollar figures in the reason, and stop: work out none for another strike, and quote no other strike, expiry or amount unless the owner names one. |
+| `would not price $X of <asset>` | No maker priced it. Say so; never guess a size. |
 | `probably be exercised` (helper, or the card after approval) | Too close to the money; on the card, the market moved toward it since filing. Nothing was sold. |
 | The card `expired before it was approved` | Nothing was sold. Quote again and file a fresh card if they still want it. |
 | `no Rysk quote met the approved terms in 3 tries` | Nothing was sold. Quote again and give the new figure; never lower the floor without their yes. |

@@ -3,10 +3,10 @@
 The `options-trading` skill for [Butler](https://github.com/Virtual-Protocol/butler-skills):
 selling cash-secured puts, buying calls and puts, and closing them on **Derive**,
 **Paradex** and **Rysk**, through Butler's `acp options` rail. This README is for the
-people maintaining the repo. A butler receives only `SKILL.md` and `references/**/*.md`;
-the registry also serves the duty templates under `templates/`.
+people maintaining the repo. A butler receives `SKILL.md`, `references/**/*.md` and
+`scripts/**/*.py`; the registry also serves the duty templates under `templates/`.
 
-- **Version:** 2.8.1 (`SKILL.md`), with `options-lifecycle` 10, `options-put-delivery` 1
+- **Version:** 2.9.0 (`SKILL.md`), with `options-lifecycle` 10, `options-put-delivery` 1
   and `options-account` 3.
   What changed in each release: `CHANGELOG.md`.
 - **Registry name:** `options-trading`, listed in the hub's `skills.json` from this repo.
@@ -36,7 +36,7 @@ Not covered: covered calls, spreads, leverage, and any trade the helper refuses.
 | Sell a put | yes | yes | yes |
 | Buy, close, buy back | yes | yes | no: the collateral is locked to expiry |
 | Underlyings | crypto, and XAUT (tokenized gold) | crypto, stocks, indices, commodities | per Rysk's live inventory |
-| Quotes from | `references/helper.md` (public order book) | `references/helper.md` with `--venue paradex` | `references/rysk-helper.md` (an RFQ) |
+| Quotes from | `scripts/quote.py` (public order book) | `scripts/quote.py` with `--venue paradex` | `scripts/rysk.py` (an RFQ) |
 | Deposit | from any chain, bridged (`--from 1` for USDC on Ethereum); credited a few minutes after its card | USDC on Base, usually credited within minutes | USDC on Base, into the owner's HyperEVM wallet |
 | Withdraw | to Ethereum (about 20 min), then `acp trade` to Base | to Base through Layerswap (about a minute) | from HyperEVM back to Base |
 | Settles | cash (USDC), 08:00 UTC | cash (USDC): crypto at 08:00 UTC, other options at their market's close | **physically**: an assigned put delivers the asset |
@@ -50,7 +50,7 @@ helper and `acp options` line for a trade then carries `--venue paradex` or
 
 | Piece | Where | Does |
 | --- | --- | --- |
-| Quotes | `references/helper.md` (Derive, Paradex) and `references/rysk-helper.md` (Rysk), written to `/tmp` and run with `python3` | Read-only and keyless, against each venue's public API. Lists what a venue trades (`chain`, with each underlying's `name` and `kind`), and prices sells, buys, closes and buy-backs with every bound already worked out. |
+| Quotes | `scripts/quote.py` (Derive, Paradex) and `scripts/rysk.py` (Rysk), run in place with `python3 "$HOME/skills/options-trading/scripts/<script>.py"`; fields in `references/helper.md` and `rysk-helper.md` | Read-only and keyless, against each venue's public API. Lists what a venue trades (`chain`, with each underlying's `name` and `kind`), and prices sells, buys, closes and buy-backs with every bound already worked out. |
 | Account | `acp options account` | Every venue at once, or one with `--venue`: free USDC, positions (positive size is bought), each account's worth, and whether Butler's signer is ready. |
 | Funding | `acp options deposit` | One approval card. |
 | Trading | `acp options open`, `buy`, `close` | One approval card each. After approval the order is an immediate-or-cancel limit order, inside the bound on the card (`--min-premium`, `--max-cost`, `--min-proceeds`). Rysk's card is good for 5 minutes and is re-quoted against its floor. |
@@ -132,23 +132,23 @@ Derive v3 mainnet, 7 October 2026 (selling) and 9 October 2026 (buying):
 
 ## Testing the helpers
 
-Run `references/helper.md`'s last block (it writes `/tmp/derive_helper.py`), then run it against mainnet:
+Run them from the repo against mainnet:
 
 ```sh
-python3 derive_helper.py chain                                    # what Derive lists
-python3 derive_helper.py chain --venue paradex                    # with name and kind
-python3 derive_helper.py screen --collateral 5000
-python3 derive_helper.py quote --product cash_secured_put --underlying ETH --collateral 5000
-python3 derive_helper.py quote --side buy --product call --underlying ETH --budget 200
-python3 derive_helper.py quote --venue paradex --side buy --product call --underlying ETH --budget 10 --expiry 2026-11-27
-python3 derive_helper.py quote --side close --instrument ETH-20261127-2600-C --size 1
-python3 derive_helper.py quote --side buyback --instrument ETH-20261127-2300-P --size 0.1 --premium-received 3
+python3 scripts/quote.py chain                                    # what Derive lists
+python3 scripts/quote.py chain --venue paradex                    # with name and kind
+python3 scripts/quote.py screen --collateral 5000
+python3 scripts/quote.py quote --product cash_secured_put --underlying ETH --collateral 5000
+python3 scripts/quote.py quote --side buy --product call --underlying ETH --budget 200
+python3 scripts/quote.py quote --venue paradex --side buy --product call --underlying ETH --budget 10 --expiry 2026-11-27
+python3 scripts/quote.py quote --side close --instrument ETH-20261127-2600-C --size 1
+python3 scripts/quote.py quote --side buyback --instrument ETH-20261127-2300-P --size 0.1 --premium-received 3
 ```
 
 Check these by hand after any change to the helper:
 
 - `chain` with no `--underlying` has a `name` and `kind` for every underlying both
-  venues list, and prints exactly what `references/listing.md`'s script prints for
+  venues list, and prints exactly what `scripts/options_list.py` prints for
   each venue. The two carry the same `KNOWN` table, so change both together;
   `tests/test_listing.py` fails CI when they differ. A `null` is a ticker missing from `KNOWN`. Add it from the venue's own
   documentation, never from a search on the ticker: Pyth's `CL` is Colgate-Palmolive.
@@ -159,7 +159,7 @@ Check these by hand after any change to the helper:
   2578.7, bid IV 0.4834, mark IV 0.4962) the sell quote gives size 2.17, collateral 4991,
   gross 57.94, fee 2.18, net 55.76, edge -1.28, breakeven 2273.3 and APR about 17.83.
 
-Rysk's script (`references/rysk-helper.md`) runs the same way: `inventory`,
+`scripts/rysk.py` runs the same way: `inventory`,
 `screen --collateral <USD> --pay-with <address>`, `quote --asset <ASSET> ...`, and
 `chain --asset <ASSET>` for one expiry's put strikes. `--expiry` and `--strike` behave
 as they do above.
@@ -228,12 +228,14 @@ safely without it, as `options-lifecycle@9` and later do for Paradex expiries.
 ```
 SKILL.md                    the procedure a butler follows
 references/
-  helper.md                 the Derive and Paradex quote script and its fields
-  rysk-helper.md            Rysk's quote script
+  helper.md                 the Derive and Paradex quote helper's lines and fields
+  rysk-helper.md            Rysk's quote helper's lines and fields
+  listing.md                what a venue lists, from scripts/options_list.py
   selling.md, buying.md     what to say and ask for each kind of trade
   account.md                the account read, subaccounts, withdrawals
   venue.md                  Derive's facts: fees, sizes, spreads, settlement
   paradex.md, rysk.md       what differs on each of those venues
+scripts/                    the helpers, run in place: quote.py, rysk.py, options_list.py
 templates/
   options-lifecycle/        watch one option to its outcome
   options-put-delivery/     the same for a sold put, buying the asset if assigned
