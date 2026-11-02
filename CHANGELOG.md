@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.11.1
+
+- **A close waits only on Paradex.** Derive refuses a reduce-only order that rests, and a
+  close is always reduce-only, so a Derive sell-back or buy-back closes at once
+  (`references/resting.md`).
+- **A resting buy says what it holds:** price x size is set aside from placement, said
+  before the yes, as a sale's collateral is.
+
 ## 2.11.0
 
 - **"Sell cash-secured puts on HYPE" quotes every venue, not just Derive.** Seen in
