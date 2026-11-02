@@ -26,10 +26,14 @@ SKILL.md step 5's command, with the total bound swapped for `--order gtc` (or
 | --- | --- | --- |
 | Open (sell a put) | `--min-premium` | `--order gtc --min-price <THEIR_PRICE>`; keep `--max-collateral` |
 | Buy | `--max-cost` | `--order gtc --max-price <THEIR_PRICE>` |
-| Sell back | `--min-proceeds` | `--order gtc --min-price <THEIR_PRICE>` |
-| Buy back | `--max-cost` | `--order gtc --max-price <THEIR_PRICE>` |
+| Sell back (Paradex only) | `--min-proceeds` | `--order gtc --min-price <THEIR_PRICE>` |
+| Buy back (Paradex only) | `--max-cost` | `--order gtc --max-price <THEIR_PRICE>` |
 
 Never both a price and a total: the server refuses it.
+
+**A close waits only on Paradex.** Derive closes at once or not at all, so never offer a
+Derive sell-back or buy-back "at their price": say Derive cannot leave a close on the book,
+and offer to close now at a floor or ceiling they name (SKILL.md step 3).
 
 ## The price
 
@@ -42,6 +46,9 @@ Never both a price and a total: the server refuses it.
 - An open still needs `--max-collateral` (`collateral.amount`): the collateral is held
   from the moment the order is placed, not only once it fills, so free USDC drops at
   once.
+- **A resting buy holds money too:** their price x size, from the moment it is placed,
+  until it fills or is cancelled. Say that figure before the yes ("$3.82 is set aside
+  from now"). A sell-back holds nothing.
 - **A price inside the venue's band only.** Paradex refuses a price far from its mark
   (about ±40%); the card fails and nothing rests.
 
@@ -91,6 +98,11 @@ cancelled or expired, and nothing is filed. Read the account and say what it sho
 Derive. It waits on the book until someone pays that, you cancel it, or it expires on 30
 October. $1,100 is set aside from now; if it fills you are paid at least $20.50 before
 fees, and you may end up buying 0.5 ETH at $2,200. You'll hear when it fills. Yes?"
+
+A buy: "I'll leave an order to buy the $2,600 call for $19.10 or less per ETH, 0.2 ETH,
+on Derive. It waits until someone sells at that, you cancel it, or it expires on 27
+November. $3.82 is set aside from now. If it fills you pay at most $3.82 plus Derive's
+fee, and you can lose all of it. Yes?"
 
 Placed: "It's on the book at $41 or more, nothing filled yet. I'll let you know when it
 does."
