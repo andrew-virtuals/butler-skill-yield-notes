@@ -4,7 +4,9 @@ Watches one option on Derive, Paradex or Rysk from the fill to the outcome: a no
 
 ## How it is filed
 
-Filed with `recipe: "options-lifecycle@10"` and `movesFunds: false` only once `bevo-read request <key> --route options` reads `approvalStatus: confirmed`, with settings from its `approvalOutcome`, never the quote: `INSTRUMENT` and `STRIKE` as filled, `SIZE` = `filledSize`, `PREMIUM_USD` = `netPremiumUsd` (sold) or `totalCostUsd` (bought), `COLLATERAL_USD` = `collateral` (0 if bought). An unknown, refused or pending open gets no duty. A sold put whose owner asked to end up owning the asset is filed as `options-put-delivery` instead.
+Filed with `recipe: "options-lifecycle@11"` and `movesFunds: false` only once `bevo-read request <key> --route options` reads `approvalStatus: confirmed`, with settings from its `approvalOutcome`, never the quote: `INSTRUMENT` and `STRIKE` as filled, `SIZE` = `filledSize`, `PREMIUM_USD` = `netPremiumUsd` (sold) or `totalCostUsd` (bought), `COLLATERAL_USD` = `collateral` (0 if bought). An unknown, refused or pending open gets no duty. A sold put whose owner asked to end up owning the asset is filed as `options-put-delivery` instead.
+
+A **resting order** is filed when placed (`approvalOutcome.resting: true`) with `ORDER_ID` = `order.orderId`, `SIZE` the whole order, `PREMIUM_USD` its price × size. It waits while the order rests, watches what the account holds from the first fill (at its `costUsd`), and finishes quietly if nothing fills.
 
 ## What it does
 
@@ -39,6 +41,7 @@ Expiry and option type are read out of `INSTRUMENT` (08:00 UTC; Paradex: its tic
 | `PREMIUM_USD` | US dollars | sold: kept, net of the fee; bought: paid, fee included |
 | `COLLATERAL_USD` | US dollars | USDC locked behind a sold put; `0` otherwise |
 | `HEADS_UP_HOURS` | hours, default `24` | how long before expiry the heads-up is sent |
+| `ORDER_ID` | order id, default empty | a resting order's: wait for it to fill |
 
 ## Trigger
 

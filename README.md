@@ -6,7 +6,7 @@ selling cash-secured puts, buying calls and puts, and closing them on **Derive**
 people maintaining the repo. A butler receives `SKILL.md`, `references/**/*.md` and
 `scripts/**/*.py`; the registry also serves the duty templates under `templates/`.
 
-- **Version:** 2.9.0 (`SKILL.md`), with `options-lifecycle` 10, `options-put-delivery` 1
+- **Version:** 2.10.0 (`SKILL.md`), with `options-lifecycle` 11, `options-put-delivery` 1
   and `options-account` 3.
   What changed in each release: `CHANGELOG.md`.
 - **Registry name:** `options-trading`, listed in the hub's `skills.json` from this repo.
@@ -53,10 +53,10 @@ helper and `acp options` line for a trade then carries `--venue paradex` or
 | Quotes | `scripts/quote.py` (Derive, Paradex) and `scripts/rysk.py` (Rysk), run in place with `python3 "$HOME/skills/options-trading/scripts/<script>.py"`; fields in `references/helper.md` and `rysk-helper.md` | Read-only and keyless, against each venue's public API. Lists what a venue trades (`chain`, with each underlying's `name` and `kind`), and prices sells, buys, closes and buy-backs with every bound already worked out. |
 | Account | `acp options account` | Every venue at once, or one with `--venue`: free USDC, positions (positive size is bought), each account's worth, and whether Butler's signer is ready. |
 | Funding | `acp options deposit` | One approval card. |
-| Trading | `acp options open`, `buy`, `close` | One approval card each. After approval the order is an immediate-or-cancel limit order, inside the bound on the card (`--min-premium`, `--max-cost`, `--min-proceeds`). Rysk's card is good for 5 minutes and is re-quoted against its floor. |
+| Trading | `acp options open`, `buy`, `close` | One approval card each. After approval the order is an immediate-or-cancel limit order, inside the bound on the card (`--min-premium`, `--max-cost`, `--min-proceeds`). Rysk's card is good for 5 minutes and is re-quoted against its floor. With `--order gtc` or `post-only` (Derive and Paradex) it is instead a resting order at the owner's price per contract, and `acp options cancel` files a card to take it off the book (`references/resting.md`). |
 | Outcome | `bevo-read request <key> --route options` | `approvalStatus`, then `approvalOutcome` (the fill) or `approvalFailureReason`. |
 | Withdrawing | `acp options withdraw` | One approval card. A Derive withdrawal also takes an `acp trade` home to Base. |
-| Watching to expiry | the `options-lifecycle@10` duty, `templates/options-lifecycle/` | Filed only after a confirmed open or buy, from the fill. Sends a heads-up the day before expiry and the outcome once the option settles. Runs no command, so it is filed with `movesFunds: false` and no pocket. Deleted after a confirmed close. |
+| Watching to expiry | the `options-lifecycle@11` duty, `templates/options-lifecycle/` | Filed after a confirmed open or buy, from the fill, or when a resting order is placed (`ORDER_ID`), which it waits on until it fills. Sends a heads-up the day before expiry and the outcome once the option settles. Runs no command, so it is filed with `movesFunds: false` and no pocket. Deleted after a confirmed close. |
 | Owning the asset after an assigned put | the `options-put-delivery@1` duty, `templates/options-put-delivery/` | Filed instead of `options-lifecycle`, for a sold Derive or Paradex put, only when the owner asked before the open to end up owning the asset. Watches the same way, then buys the asset with `acp trade` if the put is assigned. The only options duty with a pocket. |
 | Platforms rows | the `options-account@3` duty, `templates/options-account/` | One per owner, filed unasked once any venue account exists. The only writer of the options rows on the wallet's Platforms tab: one row per venue, and one per Derive subaccount, each at the venue's own worth with its positions listed. |
 
@@ -232,6 +232,7 @@ references/
   rysk-helper.md            Rysk's quote helper's lines and fields
   listing.md                what a venue lists, from scripts/options_list.py
   selling.md, buying.md     what to say and ask for each kind of trade
+  resting.md                a resting order at the owner's price, and cancelling it
   account.md                the account read, subaccounts, withdrawals
   venue.md                  Derive's facts: fees, sizes, spreads, settlement
   paradex.md, rysk.md       what differs on each of those venues

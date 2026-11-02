@@ -1,7 +1,7 @@
 {
   "id": "options-lifecycle",
-  "version": 10,
-  "description": "Watch one Derive, Paradex or Rysk option to expiry, sold or bought: a heads-up the day before and the outcome once it settles. It only reports.",
+  "version": 11,
+  "description": "Watch one Derive, Paradex or Rysk option to expiry, sold or bought, or a resting order from the moment it is placed: a heads-up the day before and the outcome once it settles. It only reports.",
   "keywords": [
     "assigned",
     "bought option",
@@ -10,11 +10,14 @@
     "covered call",
     "derive",
     "expiry",
+    "gtc",
+    "limit order",
     "long call",
     "long put",
     "option",
     "paradex",
     "put option",
+    "resting order",
     "roll",
     "rysk",
     "settlement",
@@ -32,7 +35,8 @@
     "options-lifecycle@6",
     "options-lifecycle@7",
     "options-lifecycle@8",
-    "options-lifecycle@9"
+    "options-lifecycle@9",
+    "options-lifecycle@10"
   ],
   "params": {
     "type": "object",
@@ -85,7 +89,7 @@
       },
       "SIZE": {
         "type": "number",
-        "description": "Contracts sold, in units of the underlying.",
+        "description": "Contracts sold or bought, in units of the underlying. For a resting order, the whole order: what is held replaces it from the first fill.",
         "minimum": 1e-08
       },
       "PREMIUM_USD": {
@@ -105,6 +109,12 @@
         "maximum": 168,
         "default": 24,
         "description": "How long before expiry to send the heads-up. Sent once."
+      },
+      "ORDER_ID": {
+        "type": "string",
+        "maxLength": 80,
+        "default": "",
+        "description": "Only for a resting order (GTC or post-only), filed the moment it is placed: approvalOutcome.order.orderId. The duty waits while the order rests with nothing filled, then watches the size the account holds at what it cost, and finishes quietly if the order ends with nothing filled. SIZE and PREMIUM_USD are then the whole order at its own price; the account's figures replace them from the first fill. Empty for a fill."
       }
     }
   },
@@ -118,6 +128,8 @@
     "paused": "Paused: the settings need fixing",
     "done": "Settled at ${price}",
     "soon": "Settles within 2 hours · next check {next}",
-    "paid": "Settled"
+    "paid": "Settled",
+    "waiting": "Order waiting to fill · next check {next}",
+    "unfilled": "Order ended unfilled"
   }
 }

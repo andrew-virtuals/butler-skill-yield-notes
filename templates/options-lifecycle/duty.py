@@ -27,8 +27,15 @@ HyperEVM wallet, so there is no delivery buy. Near the strike the maker holding
 the option chooses whether to exercise it, so the outcome is what Rysk paid out
 (the account read's `settled`), never inferred from the price.
 
+A resting order (GTC or post-only, bevo-server docs/options-venues.md §
+Resting orders) is filed with ORDER_ID the moment it is placed, before anything
+has filled. Until it fills the duty only waits; from its first fill it watches
+the size the account actually holds, priced at what the account says it cost,
+so a part-fill is watched as what it is. An order that ends with nothing filled
+finishes the duty quietly: there is nothing to watch.
+
 Settings: VENUE, INSTRUMENT, PRODUCT, UNDERLYING, STRIKE, SIZE,
-PREMIUM_USD, COLLATERAL_USD, HEADS_UP_HOURS.
+PREMIUM_USD, COLLATERAL_USD, HEADS_UP_HOURS, ORDER_ID.
 """
 
 import bevo
@@ -53,6 +60,10 @@ SIZE = float(PARAMS.get("SIZE") or 0)
 PREMIUM_USD = float(PARAMS.get("PREMIUM_USD") or 0)
 COLLATERAL_USD = float(PARAMS.get("COLLATERAL_USD") or 0)
 HEADS_UP_HOURS = float(PARAMS.get("HEADS_UP_HOURS") or 24)
+#: A resting order's id, as `approvalOutcome.order.orderId` gave it; empty for a fill.
+ORDER_ID = str(PARAMS.get("ORDER_ID") or "").strip()
+#: What the skill filed for a resting order: the whole order, at its own price.
+ORDER_SIZE, ORDER_PREMIUM_USD = SIZE, PREMIUM_USD
 
 NAME = os.environ.get("BEVO_SERVICE_NAME") or "your note"
 
@@ -141,6 +152,8 @@ elif not INSTRUMENT.startswith(UNDERLYING + "-"):
     PROBLEM = "%s is not an option on UNDERLYING %s" % (INSTRUMENT, UNDERLYING)
 elif SIZE <= 0 or STRIKE <= 0:
     PROBLEM = "SIZE and STRIKE must both be above zero"
+elif ORDER_ID and VENUE == "rysk":
+    PROBLEM = "Rysk takes no resting orders, so ORDER_ID does not apply"
 
 EXPIRY = DETAIL["expiry"] if DETAIL else 0
 IS_PUT = PRODUCT == "cash_secured_put"
@@ -187,13 +200,8 @@ def intrinsic(px):
     return max(0.0, (px - STRIKE) if IS_CALL else (STRIKE - px)) * SIZE
 
 
-def still_held():
-    """Whether the account still holds this option, bought or sold. None when unreadable.
-
-    A bought option can be sold back, and a sold note bought back, before expiry;
-    the skill deletes this duty when it is, and this is the duty's own check in
-    case that was missed.
-    """
+def account_read():
+    """This option's position row and whether its resting order is still open. None when unreadable."""
     try:
         body = (bevo.read("/options/account", VENUE_QUERY) if VENUE_QUERY
                 else bevo.read("/options/account")) or {}
@@ -203,11 +211,75 @@ def still_held():
     account = body.get("account")
     if not isinstance(account, dict):
         return None
-    for row in account.get("positions") or []:
-        size = float(row.get("size") or 0)
-        if row.get("instrument") == INSTRUMENT and (size > 0 if IS_LONG else size < 0):
-            return True
-    return False
+    row = None
+    for r in account.get("positions") or []:
+        size = float(r.get("size") or 0)
+        if r.get("instrument") == INSTRUMENT and (size > 0 if IS_LONG else size < 0):
+            row = r
+            break
+    resting = bool(ORDER_ID) and any(
+        str(o.get("orderId")) == ORDER_ID and o.get("status", "open") == "open"
+        for o in account.get("openOrders") or [])
+    return {"row": row, "resting": resting}
+
+
+def still_held():
+    """Whether the account still holds this option, bought or sold. None when unreadable.
+
+    A bought option can be sold back, and a sold note bought back, before expiry;
+    the skill deletes this duty when it is, and this is the duty's own check in
+    case that was missed.
+    """
+    seen = account_read()
+    return None if seen is None else seen["row"] is not None
+
+
+def hold(row):
+    """Watch what a resting order has filled: the size held and what the account says it cost."""
+    held = abs(float(row.get("size") or 0))
+    if held <= 0:
+        return
+    cost = row.get("costUsd")
+    bevo.state["held_size"] = held
+    bevo.state["held_premium_usd"] = (float(cost) if cost not in (None, "")
+                                      else ORDER_PREMIUM_USD * held / ORDER_SIZE)
+    use_held()
+
+
+def use_held():
+    """SIZE, PREMIUM_USD and COLLATERAL_USD as filled so far, once a resting order has filled any."""
+    global SIZE, PREMIUM_USD, COLLATERAL_USD
+    held = bevo.state.get("held_size")
+    if not ORDER_ID or not held:
+        return
+    SIZE = float(held)
+    PREMIUM_USD = float(bevo.state.get("held_premium_usd") or 0)
+    if IS_PUT:
+        COLLATERAL_USD = STRIKE * SIZE
+
+
+def order_state():
+    """A resting order's duty before expiry: "held", "waiting", "unfilled", "closed", "unsure".
+
+    Waiting while the order rests with nothing held; held from its first fill;
+    two reads in a row with neither the order nor a position mean it ended
+    unfilled (or, once something had filled, that it was closed early).
+    """
+    seen = account_read()
+    if seen is None:
+        return "held" if bevo.state.get("held_size") else "waiting"
+    if seen["row"] is not None:
+        hold(seen["row"])
+        bevo.state["not_held_reads"] = 0
+        return "held"
+    if seen["resting"]:
+        bevo.state["not_held_reads"] = 0
+        return "waiting"
+    misses = int(bevo.state.get("not_held_reads") or 0) + 1
+    bevo.state["not_held_reads"] = misses
+    if misses < 2:
+        return "unsure"
+    return "closed" if bevo.state.get("held_size") else "unfilled"
 
 
 def closed_early():
@@ -459,12 +531,38 @@ def settle_rysk(late, settled):
 
 def fire():
     stated_expiry()
+    use_held()
     left = EXPIRY - time.time()
+
+    if ORDER_ID:
+        if left > 0:
+            seen = order_state()
+            if seen == "waiting":
+                say("%s: the order is resting with nothing filled yet" % INSTRUMENT)
+                bevo.status("waiting")
+                return
+            if seen == "unfilled":
+                bevo.status("unfilled")
+                bevo.done("%s: your order for %s ended with nothing filled, so there is nothing "
+                          "to watch." % (NAME, INSTRUMENT))
+            if seen == "closed":
+                bevo.status("closed")
+                bevo.done("%s: your %s was %s before expiry, so there is nothing left to watch."
+                          % (NAME, INSTRUMENT, "sold back" if IS_LONG else "bought back"))
+            if seen == "unsure":
+                say("%s is neither held nor resting on this read; checking again next tick" % INSTRUMENT)
+                bevo.status("unseen")
+                return
+        elif not bevo.state.get("held_size"):
+            # Nothing ever filled before the option expired: there is no outcome to report.
+            bevo.status("unfilled")
+            bevo.done("%s: your order for %s ended at expiry with nothing filled, so there was "
+                      "nothing to settle." % (NAME, INSTRUMENT))
 
     # Every tick until expiry, so a close the skill forgot to clean up still ends
     # the duty. After expiry the position is gone either way and says nothing.
     # A Rysk put cannot be closed early.
-    if left > 0 and VENUE != "rysk":
+    if left > 0 and VENUE != "rysk" and not ORDER_ID:
         seen = closed_early()
         if seen == "closed":
             bevo.status("closed")
