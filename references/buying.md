@@ -138,7 +138,7 @@ the money pays automatically into the Derive account: (settle - strike) x size f
 call, (strike - settle) x size for a put. Nothing has to be done to collect it. It
 stays in the account until withdrawn. One that ends out of the money pays nothing.
 
-The `options-lifecycle@10` duty, filed after a confirmed buy, tells the owner the day
+The `options-lifecycle@11` duty, filed after a confirmed buy (or when a resting buy is placed, `references/resting.md`), tells the owner the day
 before and again with the outcome. It is filed with:
 
 | Param | From |

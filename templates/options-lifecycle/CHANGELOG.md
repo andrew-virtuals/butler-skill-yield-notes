@@ -1,5 +1,16 @@
 # Changelog
 
+## 11
+
+- **A resting order is watched from the moment it is placed.** bevo-server now takes
+  GTC and post-only options orders, whose card is confirmed once the order is on the
+  book, often with nothing filled. With `ORDER_ID` set the duty waits while the order
+  rests (`/options/account`'s `openOrders`), watches the size the account holds from
+  its first fill, at the position's own cost, and finishes quietly if the order ends
+  with nothing filled, before or at expiry: there is no settlement to report on an
+  option never held. Without `ORDER_ID` it reads exactly as before. Supersedes
+  `options-lifecycle@10`.
+
 ## 10
 
 - **Watch-only: the delivery buy moved to `options-put-delivery`.** `DELIVER_ASSET`,

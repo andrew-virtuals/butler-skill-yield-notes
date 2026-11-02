@@ -1,8 +1,8 @@
 ---
 name: options-trading
 description: Trade options on Derive, Paradex or Rysk - earn on idle USDC by selling cash-secured puts, buy a call or a put, close before expiry, and check or withdraw USDC and positions.
-version: 2.10.0
-metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","withdraw","withdraw my usdc","derive","my options","options account","options positions","free usdc","derive positions","my option positions","withdraw from derive","withdraw my free usdc","paradex","paradex options","paradex positions","rysk","rysk options","rysk positions","physically settled","hyperevm"],"requires":{"bins":["python3","bevo-read","acp"]}}}
+version: 2.11.0
+metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","withdraw","withdraw my usdc","derive","my options","options account","options positions","free usdc","derive positions","my option positions","withdraw from derive","withdraw my free usdc","paradex","paradex options","paradex positions","rysk","rysk options","rysk positions","physically settled","hyperevm","limit order","resting order","at my price","or better","leave it on the book","cancel my order"],"requires":{"bins":["python3","bevo-read","acp"]}}}
 ---
 
 ## When to use
@@ -17,6 +17,7 @@ Your owner wants one of four things on Derive, Paradex or Rysk options:
 - **Close** - before expiry: "sell my call back" **sells back** an option they
   **bought**; "get out of my put", "free my collateral" **buys back** a note they
   **sold**.
+- **At their price** - "or better", "cancel my order": `references/resting.md`.
 - **Look or withdraw** - "my free USDC in Derive" (`freeForNewPutsUsd`, not wallet
   cash), "my positions": step 1, then stop. "Withdraw my free USDC": step 8, never an
   `acp trade` (`references/account.md`). Listing: `references/listing.md`.
@@ -25,7 +26,7 @@ Not this skill: covered calls, spreads, leverage, or a trade the helper refuses.
 
 ## Before you start
 
-1. **Which of the four.** Earning and buying are different promises; never blur them.
+1. **Which one.** Earning and buying are different promises; never blur them.
    Selling fits only USDC whose owner would happily buy the asset lower; a no to that
    ends selling, every put on it.
 2. **Sizes are in the asset:** say "0.16 ETH", never "contracts", and never convert;
@@ -97,12 +98,10 @@ this chat. One missing: ask, and file nothing this turn.
    - **Buy:** not yield; `max_cost_usd` is the most they pay and can lose, all of it;
      `breakeven` is where it pays at expiry. Get an explicit yes to *"you can lose the whole $199.54"*.
    - **Close (sell back):** `net_proceeds_usd` now, against what they paid (the duty's
-     PREMIUM_USD); `warnings` as written. Ask the floor; `min_proceeds_usd` is the
-     suggestion.
-   - **Close (buy back):** `total_cost_usd` now, then `result_usd`: what the note made
-     or lost once bought back; `warnings` as written; it frees `frees`. Ask the
-     ceiling; `max_cost_usd` is the suggestion. Waiting for expiry costs nothing;
-     say so when `result_usd` is negative.
+     PREMIUM_USD); `warnings` as written. Ask the floor (`min_proceeds_usd` suggested).
+   - **Close (buy back):** `total_cost_usd` now, then `result_usd` (what the note made
+     or lost); `warnings` as written; it frees `frees`. Ask the ceiling (`max_cost_usd`
+     suggested). Waiting costs nothing: say so when `result_usd` is negative.
 
 4. [FIXED] With all four met, fund a sell or a buy only when `freeForNewPutsUsd` is below
    `collateral.amount` (sell) or `max_cost_usd` (buy). Deposit the shortfall plus 2% for
@@ -113,7 +112,7 @@ this chat. One missing: ask, and file nothing this turn.
    acp options deposit --amount <DEPOSIT_USDC> --idempotency-key <KEY>:deposit
    ```
 
-   The bot gathers USDC from **every chain**, not one (`references/venue.md`).
+   The bot gathers USDC from **every chain** (`references/venue.md`).
    `--from 1` only when `ethereum.usdc` covers it alone. Never ask about gas or an
    address. Re-read `acp options account` until free USDC covers the trade, and do step
    9; if it ends short, re-quote smaller and re-offer. Free USDC spans their Derive
@@ -130,7 +129,7 @@ this chat. One missing: ask, and file nothing this turn.
    ```
 
    One bound per close. The reply is an approval card, not a fill: tell the owner to
-   approve it in the app.
+   approve it in the app. At their price: `resting.md`.
 
 6. [FIXED] Wait for the outcome; never re-run the command to find it. The server nudges
    you here when the card lands. Then:
@@ -149,7 +148,7 @@ this chat. One missing: ask, and file nothing this turn.
    `approvalOutcome`, never the quote. After an open or a buy, `duty_create`:
 
    ```json
-   {"recipe": "options-lifecycle@10", "movesFunds": false, "title": "Watch {INSTRUMENT} to expiry",
+   {"recipe": "options-lifecycle@11", "movesFunds": false, "title": "Watch {INSTRUMENT} to expiry",
     "triggers": [{"kind": "timer", "intervalSeconds": 900}],
     "params": {"VENUE": "<venue>", "INSTRUMENT": "<instrument>", "PRODUCT": "<product>", "UNDERLYING": "<instrument prefix>",
     "STRIKE": <strike>, "SIZE": <filledSize>, "PREMIUM_USD": <usd>, "COLLATERAL_USD": <usd>}}
@@ -157,7 +156,7 @@ this chat. One missing: ask, and file nothing this turn.
 
    Sold put: PRODUCT `cash_secured_put`, PREMIUM_USD `netPremiumUsd`, COLLATERAL_USD
    `collateral`. Bought: PRODUCT `long_call` or `long_put`, PREMIUM_USD `totalCostUsd`,
-   COLLATERAL_USD 0. Asked in step 3 to own the asset: `options-put-delivery@1`
+   COLLATERAL_USD 0. Resting: `resting.md`. Asked in step 3 to own the asset: `options-put-delivery@1`
    (`references/selling.md`). After a close, `duty_delete` that instrument's duty; if
    part is still open, file it again with SIZE from `positions` (positive) and
    PREMIUM_USD and COLLATERAL_USD scaled to it. Never file for an unknown or failed
@@ -166,7 +165,7 @@ this chat. One missing: ask, and file nothing this turn.
 
 8. [FIXED] Withdraw only when asked, only free USDC: at most this turn's
    `freeForNewPutsUsd`, rounded down to the cent. It lands on Ethereum in its card's
-   window, less Derive's fee (say so first); `:home` brings it to Base once it shows in
+   window, less Derive's fee (say so first); `:home` brings it to Base once in
    `ethereum.usdc`:
 
    ```sh
@@ -190,8 +189,7 @@ Derive one key per trade, such as `ot:eth:20261030:2600c:1`, with `:deposit`,
 `:open`, `:buy`, `:close`, `:withdraw`, `:home`. On an error, a timeout or an unclear
 answer, **do not re-run** the command: a retry can buy or bridge twice. Look it up as
 in step 6: `not_found` means nothing was filed. A deposit still crediting has not
-failed: re-read `acp options account` and wait. The `:home` leg is `acp trade`:
-look it up with `--route trade`.
+failed: re-read `acp options account` and wait. Look up `:home` with `--route trade`.
 
 ## Failure handling
 
@@ -203,9 +201,9 @@ look it up with `--route trade`.
 | `fees are N% of the premium` | Too small or too short. Offer monthly or bigger. |
 | `collateral too small`, `budget too small` | Under the minimum. Give the reason's figures, work out no others, and stop unless they name another strike, expiry or amount. |
 | An `OPTIONS_*` refusal | Nothing filed: follow its hint; never raise a bound the owner agreed. |
-| No fill (open, buy or close) | Nobody took it at the agreed bound; never call it no liquidity. Nothing moved. Re-quote, re-ask, never re-file the same bound. |
+| No fill | Nobody took it at the agreed bound (never "no liquidity"); nothing moved. Re-quote, re-ask, never re-file the same bound. |
 | Buy failed over `--max-cost` | Give the reason as written, then read `positions`: anything shown there was bought. Never buy again. |
-| Deposit refused, failed or partial | Give the reason as written; re-read the account before any new deposit. Never move funds between chains to fix it. |
+| Deposit refused, failed or partial | Give the reason as written; re-read the account before another deposit. Never move funds between chains to fix it. |
 | Withdraw or `:home` failed | Give the reason as written, and stop (`only $N is free`: the rest backs sold puts). |
 | Card swept after 30 minutes | Unsigned; re-quote before offering again. |
 
