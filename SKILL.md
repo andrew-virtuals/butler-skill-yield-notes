@@ -1,7 +1,7 @@
 ---
 name: options-trading
 description: Trade options on Derive, Paradex or Rysk - earn on idle USDC by selling cash-secured puts, buy a call or a put, close before expiry, and check or withdraw USDC and positions.
-version: 2.9.0
+version: 2.10.0
 metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","withdraw","withdraw my usdc","derive","my options","options account","options positions","free usdc","derive positions","my option positions","withdraw from derive","withdraw my free usdc","paradex","paradex options","paradex positions","rysk","rysk options","rysk positions","physically settled","hyperevm"],"requires":{"bins":["python3","bevo-read","acp"]}}}
 ---
 
@@ -37,8 +37,8 @@ Not this skill: covered calls, spreads, leverage, or a trade the helper refuses.
 5. **Figures come only from this turn's reads:** sizes, prices and positions
    from `acp options account` and quotes, never memory; a note that disagrees is wrong:
    fix it. `bevo-read assets` has none.
-6. **Venue.** Derive, unless they name Paradex or Rysk or hold it there: `--venue` it
-   everywhere, withdrawing too (`references/paradex.md` or `rysk.md`).
+6. **Venue.** Quote an open on each venue offering it, unless they name one; the
+   rest where it is. `--venue` it everywhere.
 
 ### Never file without all four
 
@@ -80,13 +80,14 @@ this chat. One missing: ask, and file nothing this turn.
    python3 ~/skills/options-trading/scripts/quote.py quote --side buyback --instrument <INSTRUMENT> --size <SIZE> --premium-received <USD>
    ```
 
-   Selling: the asset they named, or screen (never an APR menu) and ask. Buying:
-   `<PRODUCT>` is `call` or `put`, `--budget` the most they will spend. Closing:
-   instrument and size from `positions`; positive is `--side close`; negative,
-   `--side buyback` with the size positive and `--premium-received` the note's
-   `netPremiumUsd` (or its duty's PREMIUM_USD) scaled to it. **Offer only
-   `tradeable: true`**; give the `reasons` as written. A strike or day they named:
-   `buying.md`.
+   Selling: the asset they named, or screen (never an APR menu) and ask. **No amount
+   from them:** each venue's `minimum` (`which-venue.md`), then ask it; no quote,
+   screen or chain till then. Buying: `<PRODUCT>` is `call` or `put`,
+   `--budget` the most they will spend. Closing: instrument and size from `positions`;
+   positive is `--side close`; negative, `--side buyback` with the size positive and
+   `--premium-received` the note's `netPremiumUsd` (or its duty's PREMIUM_USD) scaled
+   to it. **Offer only `tradeable: true`**; give the `reasons` as written. A strike or
+   day they named: `buying.md`.
 
 3. [ADAPT] Offer it using **only** quote fields; never compute a number:
    - **Sell:** `bad_case` first, then `net_premium_usd`, `fee_usd`, the lock to
@@ -188,8 +189,8 @@ this chat. One missing: ask, and file nothing this turn.
 Derive one key per trade, such as `ot:eth:20261030:2600c:1`, with `:deposit`,
 `:open`, `:buy`, `:close`, `:withdraw`, `:home`. On an error, a timeout or an unclear
 answer, **do not re-run** the command: a retry can buy or bridge twice. Look it up as
-in step 6: `not_found` means nothing was filed. A deposit still crediting is not a
-failed one: re-read `acp options account` and wait. The `:home` leg is `acp trade`:
+in step 6: `not_found` means nothing was filed. A deposit still crediting has not
+failed: re-read `acp options account` and wait. The `:home` leg is `acp trade`:
 look it up with `--route trade`.
 
 ## Failure handling
@@ -212,10 +213,9 @@ look it up with `--route trade`.
 
 - Selling locks collateral until expiry or a buy-back; buying is paid in full, nothing
   borrowed. No rolling without a fresh yes.
-- **Monthly by default**; weeklies lose too much to fees and the spread.
 - **Cash settled** on Derive and Paradex, kept there till withdrawn; Rysk delivers the asset.
 - Not advice: never rank or recommend.
 
 ## Say to the owner
 
-Worked sentences end each file in `references/`.
+Worked sentences end each reference.

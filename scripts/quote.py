@@ -26,6 +26,7 @@ Usage:
     quote.py quote --side close --instrument ETH-20261030-2750-C --size 0.5
     quote.py quote --side buyback --instrument ETH-20261030-2300-P --size 2 \
         [--premium-received 61.40]
+    quote.py minimum --underlying ETH [--tenor monthly | --expiry 2026-10-30] [--strike 2100]
     quote.py chain --underlying ETH [--tenor monthly | --expiry 2026-10-30] [--type P]
     quote.py chain
 
@@ -498,6 +499,32 @@ def build_quote(product, underlying, collateral_usd, tenor="monthly",
     return q
 
 
+def build_minimum(underlying, tenor="monthly", otm_pct=10.0, on=None, strike=None):
+    """The smallest cash-secured put the venue takes, before the owner names an amount:
+    the rule's strike (or theirs) and the day's lowest, each with the USDC it locks.
+    No premium and no APR: nothing is priced for the owner until they name one."""
+    underlying = underlying.strip().upper()
+    expiry, chain, tickers = load_chain(underlying, "P", tenor, time.time(), on)
+    spot = num(tickers[chain[0]["instrument_name"]].get("I"))
+    inst = strike_for(chain, tickers, "P", spot, otm_pct, None, strike)
+
+    def least(i):
+        k, m = num(i["option_details"]["strike"]), num(i.get("minimum_amount"))
+        return {"instrument": i["instrument_name"], "strike": k, "min_size": m,
+                "min_collateral_usd": rnd(m * k, 2)}
+
+    out = {"product": "cash_secured_put", "venue": V["id"], "settlement": "cash",
+           "underlying": underlying, "spot": rnd(spot, 6)}
+    out.update(least(inst))
+    out.update({"expiry": iso(expiry), "expiry_sec": expiry,
+                "days_to_expiry": rnd((expiry - time.time()) / 86400.0, 2),
+                "size_step": num(inst.get("amount_step")), "lowest_strike": None})
+    low = min(chain, key=lambda i: num(i["option_details"]["strike"]))
+    if num(low["option_details"]["strike"]) < out["strike"]:
+        out["lowest_strike"] = least(low)
+    return out
+
+
 def strike_for(chain, tickers, opt_type, spot, otm_pct, target_delta, strike=None):
     """The strike the owner named, exactly, or the strike rule, applied: nearest
     the target delta, or nearest spot moved otm_pct out of the money (down for a
@@ -930,16 +957,22 @@ def main():
     rule.add_argument("--strike", type=float, default=None,
                       help="the strike the owner named, exactly; refused if the expiry does not list it")
 
+    m = sub.add_parser("minimum", help="the smallest cash-secured put, before the owner names an amount")
+    m.add_argument("--underlying", required=True)
+    m.add_argument("--tenor", default="monthly", choices=sorted(TENOR_DAYS))
+    m.add_argument("--strike", type=float, default=None,
+                   help="the strike the owner named, exactly; refused if the expiry does not list it")
+
     c = sub.add_parser("chain", help="one expiry's strikes, with the book; "
                                      "without --underlying, every underlying listed")
     c.add_argument("--underlying")
     c.add_argument("--tenor", default="monthly", choices=sorted(TENOR_DAYS))
     c.add_argument("--type", default="P", choices=["P", "C"])
-    for sp in (q, c):
+    for sp in (q, m, c):
         sp.add_argument("--expiry", type=utc_day, default=None,
                         help="YYYY-MM-DD (UTC): that day's expiry instead of the tenor's")
 
-    for sp in (s, q, c):
+    for sp in (s, q, m, c):
         sp.add_argument("--venue", default="derive", choices=sorted(VENUES))
     a = p.parse_args()
     V.update(VENUES[a.venue])
@@ -948,6 +981,8 @@ def main():
         out = screen(a.tenor, a.collateral, a.otm_pct)
     elif a.cmd == "quote":
         out = run_quote(p, a)
+    elif a.cmd == "minimum":
+        out = build_minimum(a.underlying, a.tenor, on=a.expiry, strike=a.strike)
     elif a.underlying:
         out = chain_rows(a.underlying, a.tenor, a.type, a.expiry)
     else:

@@ -2,8 +2,9 @@
 
 Everything in `SKILL.md` holds on Rysk - the checks before filing, the bad case first,
 one key per trade, the approval card, the lifecycle duty. This file is only what
-differs. Use Rysk when the owner names it, or when the put or the USDC they mean is
-there; never move a trade from one venue to another on your own.
+differs. A put is quoted here beside Derive's and Paradex's unless the owner named a
+venue (`references/which-venue.md`), and filed here only once they pick Rysk; never
+move a trade from one venue to another on your own.
 
 **Why an owner would pick it: Rysk settles physically.** A put that ends below its
 strike delivers the asset itself, not a loss in cash. When Rysk and Derive or Paradex

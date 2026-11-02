@@ -2,9 +2,10 @@
 
 Everything in `SKILL.md` holds on Paradex - the four intents, the four checks before
 filing, the bad case first, one key per trade, the approval card, the lifecycle duty.
-This file is only what differs. Use Paradex when the owner names it, or when the
-position or the USDC they mean is there; never move a trade from one venue to the
-other on your own.
+This file is only what differs. An open is quoted here beside the other venues unless
+the owner named one (`references/which-venue.md`), and filed here only once they pick
+Paradex; a position already here is closed here. Never move a trade from one venue to
+another on your own.
 
 ## Every command names it
 

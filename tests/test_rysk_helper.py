@@ -148,6 +148,22 @@ class RyskMinimumTest(unittest.TestCase):
         self.assertIn("would not price", str(e.exception))
         self.assertTrue(all(s < 0.1 for s in self.asked))
 
+    def test_minimum_needs_no_amount(self):
+        m = self.rysk.minimum("SOL", pay_with=USDC)
+        self.assertEqual((m["instrument"], m["min_size"], m["min_collateral_usd"]),
+                         ("SOL-27NOV26-88-P", 10, 880))
+        self.assertEqual(m["lowest_strike"], {"instrument": "SOL-27NOV26-79-P", "strike": 79.0,
+                                              "min_size": 10, "min_collateral_usd": 790})
+        self.assertEqual(m["settlement"], "physical")
+        self.assertNotIn("net_premium_usd", m)
+        self.assertNotIn("apr_pct", m)
+
+    def test_minimum_with_no_maker_raises(self):
+        self.refuse = "no maker answered"
+        with self.assertRaises(self.rysk.RyskError) as e:
+            self.rysk.minimum("SOL", pay_with=USDC)
+        self.assertIn("no Rysk maker priced any size of SOL-27NOV26-88-P", str(e.exception))
+
 
 if __name__ == "__main__":
     unittest.main()

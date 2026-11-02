@@ -8,6 +8,7 @@ A listing ("what can I trade on Rysk") is `references/listing.md`, never this he
 ```sh
 python3 ~/skills/options-trading/scripts/rysk.py screen --collateral 5000 --pay-with <collateral.address>
 python3 ~/skills/options-trading/scripts/rysk.py quote --asset ETH --collateral 5000 --pay-with <collateral.address>
+python3 ~/skills/options-trading/scripts/rysk.py minimum --asset ETH --pay-with <collateral.address>
 python3 ~/skills/options-trading/scripts/rysk.py quote --asset ETH --collateral 5000 --pay-with <collateral.address> --delta 0.20
 python3 ~/skills/options-trading/scripts/rysk.py quote --asset ETH --collateral 5000 --pay-with <collateral.address> --expiry 2026-11-13 --strike 2100
 python3 ~/skills/options-trading/scripts/rysk.py chain --asset ETH --expiry 2026-11-13
@@ -29,6 +30,15 @@ no stablecoin, so this helper knows a collateral only by that address. `inventor
 lists every collateral per asset (`put_collateral`), and every quote carries
 `collateral_options` too. In `positions`, a `received` leg with `collateral: true` is
 the stablecoin the put was backed by, coming back.
+
+## The minimum, before an amount
+
+`minimum --asset <ASSET>` asks makers at each size step until one prices the put the
+strike rule picks (or `--strike`, `--expiry`), then once at the day's lowest strike. It
+gives `instrument`, `strike`, `min_size`, `min_collateral_usd`, `expiry`,
+`settlement` (`physical`), and `lowest_strike` (`null` when no maker priced it or the
+put is already the lowest). No premium: the makers' answers are not kept. No maker
+pricing any size is exit 1. It takes as long as a quote under the minimum does.
 
 ## The quote, field by field
 

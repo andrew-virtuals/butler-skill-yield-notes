@@ -13,8 +13,12 @@ and keeping the fee. The premium is certain. What they own at expiry is not.
   asset lower. If not - or they want to earn on an asset they hold - there is no note
   here: say so and stop.
 - **Which asset is theirs to name.** `screen` says which assets can carry a note today;
-  it is not a menu. Never lay out APRs side by side. If more than one is `tradeable`,
+  it is not a menu. Never lay out APRs of assets or strikes side by side (one asset on
+  several venues is `references/which-venue.md`). If more than one is `tradeable`,
   name them and ask which they would happily own lower, then quote that one.
+- **How much is theirs to name.** No amount yet: quote nothing, not even at a round
+  number or their whole balance. Each venue's `minimum` says what the smallest put
+  needs there; say those and ask (`references/which-venue.md`).
 - **How much, in one asset.** The collateral is locked until expiry. Getting out
   early means buying the note back, which can cost more than it brought in.
 - **A strike or day they named** goes in as `--strike` and `--expiry` (`YYYY-MM-DD`),
