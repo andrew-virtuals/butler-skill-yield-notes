@@ -6,7 +6,7 @@ selling cash-secured puts, buying calls and puts, and closing them on **Derive**
 people maintaining the repo. A butler receives `SKILL.md`, `references/**/*.md` and
 `scripts/**/*.py`; the registry also serves the duty templates under `templates/`.
 
-- **Version:** 2.10.0 (`SKILL.md`), with `options-lifecycle` 11, `options-put-delivery` 1
+- **Version:** 2.11.0 (`SKILL.md`), with `options-lifecycle` 11, `options-put-delivery` 1
   and `options-account` 3.
   What changed in each release: `CHANGELOG.md`.
 - **Registry name:** `options-trading`, listed in the hub's `skills.json` from this repo.
@@ -42,15 +42,18 @@ Not covered: covered calls, spreads, leverage, and any trade the helper refuses.
 | Settles | cash (USDC), 08:00 UTC | cash (USDC): crypto at 08:00 UTC, other options at their market's close | **physically**: an assigned put delivers the asset |
 | What differs | `references/venue.md`, `account.md` | `references/paradex.md` | `references/rysk.md` |
 
-Derive is used unless the owner names a venue or already holds the position there. Every
-helper and `acp options` line for a trade then carries `--venue paradex` or
-`--venue rysk`, as does its lifecycle duty's `VENUE` setting.
+An open is quoted on every venue that offers it unless the owner names one, and offered
+side by side with what the quotes do not say (cash or physical settlement, getting out
+early, funding), never ranked (`references/which-venue.md`). A close or withdrawal runs
+where the position or USDC is. Every helper and `acp options` line for a trade then
+carries `--venue paradex` or `--venue rysk`, as does its lifecycle duty's `VENUE`
+setting.
 
 ## How the pieces fit
 
 | Piece | Where | Does |
 | --- | --- | --- |
-| Quotes | `scripts/quote.py` (Derive, Paradex) and `scripts/rysk.py` (Rysk), run in place with `python3 "$HOME/skills/options-trading/scripts/<script>.py"`; fields in `references/helper.md` and `rysk-helper.md` | Read-only and keyless, against each venue's public API. Lists what a venue trades (`chain`, with each underlying's `name` and `kind`), and prices sells, buys, closes and buy-backs with every bound already worked out. |
+| Quotes | `scripts/quote.py` (Derive, Paradex) and `scripts/rysk.py` (Rysk), run in place with `python3 "$HOME/skills/options-trading/scripts/<script>.py"`; fields in `references/helper.md` and `rysk-helper.md` | Read-only and keyless, against each venue's public API. Lists what a venue trades (`chain`, with each underlying's `name` and `kind`), and prices sells, buys, closes and buy-backs with every bound already worked out. `minimum` gives the smallest put a venue takes and the USDC it locks, for an owner who has named no amount yet. |
 | Account | `acp options account` | Every venue at once, or one with `--venue`: free USDC, positions (positive size is bought), each account's worth, and whether Butler's signer is ready. |
 | Funding | `acp options deposit` | One approval card. |
 | Trading | `acp options open`, `buy`, `close` | One approval card each. After approval the order is an immediate-or-cancel limit order, inside the bound on the card (`--min-premium`, `--max-cost`, `--min-proceeds`). Rysk's card is good for 5 minutes and is re-quoted against its floor. With `--order gtc` or `post-only` (Derive and Paradex) it is instead a resting order at the owner's price per contract, and `acp options cancel` files a card to take it off the book (`references/resting.md`). |
@@ -231,6 +234,7 @@ references/
   helper.md                 the Derive and Paradex quote helper's lines and fields
   rysk-helper.md            Rysk's quote helper's lines and fields
   listing.md                what a venue lists, from scripts/options_list.py
+  which-venue.md            quoting every venue for an open, and offering them side by side
   selling.md, buying.md     what to say and ask for each kind of trade
   resting.md                a resting order at the owner's price, and cancelling it
   account.md                the account read, subaccounts, withdrawals

@@ -336,8 +336,47 @@ def _fee(result, product, chosen, combo, size, strike, valid_until):
         return None
 
 
+def _least(ask, asset, combo, combos, chosen, above=0.0):
+    """The least a maker prices of this put, and of the day's lowest strike.
+
+    Rysk publishes no minimum, so the only way to say what one needs is to ask
+    at each larger step until a maker prices it. Without the figure the owner is
+    told nothing they can act on, and a model goes and finds one. None when a
+    refusal other than "too small" ends the search.
+    """
+    strike = float(combo["strike"])
+    for step in [s for s in SIZE_STEPS if s > above]:
+        try:
+            ask(step)
+        except RyskError as exc:
+            if "too small" in str(exc):
+                continue
+            return None
+        out = {"min_size": step, "min_collateral_usd": round(step * strike, 2), "lowest_strike": None}
+        # Owners asking what it takes want the cheapest way in, and a model left
+        # with the day's strike list multiplies it out itself. One ask at the
+        # lowest strike makes that a figure a maker priced, not a guess.
+        low = min((c for c in combos if c.get("expiry") == combo.get("expiry")),
+                  key=lambda c: float(c["strike"]))
+        low_strike = float(low["strike"])
+        if low_strike < strike:
+            try:
+                ask(step, (low, low_strike,
+                           _choose(_options([low]), asset, chosen["address"], chosen["chain_id"])))
+                out["lowest_strike"] = {
+                    "instrument": "%s-%s-%s-P" % (asset, low["expiry"], _plain(low_strike)),
+                    "strike": low_strike,
+                    "min_size": step,
+                    "min_collateral_usd": round(step * low_strike, 2),
+                }
+            except RyskError:
+                pass
+        return out
+    return None
+
+
 def quote(asset, collateral_usd, tenor="monthly", otm_pct=10.0, target_delta=None,
-          pay_with=None, chain_id=None, on=None, strike=None, probe=True):
+          pay_with=None, chain_id=None, on=None, strike=None, probe=True, least_only=False):
     """Ask real makers what they will pay for one cash-secured put.
 
     The returned price is signed and expires; `valid_for_seconds` is how long
@@ -386,6 +425,24 @@ def quote(asset, collateral_usd, tenor="monthly", otm_pct=10.0, target_delta=Non
             },
         }, "request", tries=1, timeout=15)
 
+    if least_only:
+        instrument = "%s-%s-%s-P" % (asset, combo["expiry"], _plain(strike))
+        least = _least(ask, asset, combo, combos, chosen)
+        if least is None:
+            raise RyskError("no Rysk maker priced any size of %s" % instrument)
+        return dict({
+            "venue": "rysk",
+            "product": "cash_secured_put",
+            "settlement": "physical",
+            "asset": asset,
+            "instrument": instrument,
+            "strike": strike,
+            "expiry": combo.get("expiry"),
+            "expiry_ts": combo["expiration_timestamp"],
+            "days_to_expiry": round(float(combo.get("timeToExpiryDays") or 0), 2),
+            "index_price": index,
+        }, **least)
+
     # Largest step that still divides what the owner can afford, walking up
     # until the venue stops complaining about the increment or the minimum.
     result, used, last = None, 0.0, None
@@ -402,33 +459,14 @@ def quote(asset, collateral_usd, tenor="monthly", otm_pct=10.0, target_delta=Non
     # The name `acp options open --venue rysk` takes, in Rysk's own words.
     instrument = "%s-%s-%s-P" % (asset, combo["expiry"], _plain(strike))
     if result is None and probe and "too small" in str(last or ""):
-        # Rysk publishes no minimum, so the only way to say what one needs is to
-        # ask at each larger step until a maker prices it. Without the figure the
-        # owner is told nothing they can act on, and a model goes and finds one.
-        for step in [s for s in SIZE_STEPS if s > wanted]:
-            try:
-                ask(step)
-            except RyskError as exc:
-                if "too small" in str(exc):
-                    continue
-                break
+        least = _least(ask, asset, combo, combos, chosen, wanted)
+        if least:
             reason = ("collateral too small: Rysk prices no less than %s %s, which needs $%s on %s"
-                      % (_plain(step), asset, format(step * strike, ",.0f"), instrument))
-            # Owners asking what it takes want the cheapest way in, and a model left
-            # with the day's strike list multiplies it out itself. One ask at the
-            # lowest strike makes that a figure a maker priced, not a guess.
-            low = min((c for c in combos if c.get("expiry") == combo.get("expiry")),
-                      key=lambda c: float(c["strike"]))
-            low_strike = float(low["strike"])
-            if low_strike < strike:
-                try:
-                    ask(step, (low, low_strike,
-                               _choose(_options([low]), asset, chosen["address"], chosen["chain_id"])))
-                    reason += (" and $%s on %s-%s-%s-P, the lowest strike that day"
-                               % (format(step * low_strike, ",.0f"), asset, low["expiry"],
-                                  _plain(low_strike)))
-                except RyskError:
-                    pass
+                      % (_plain(least["min_size"]), asset, format(least["min_collateral_usd"], ",.0f"), instrument))
+            if least["lowest_strike"]:
+                low = least["lowest_strike"]
+                reason += (" and $%s on %s, the lowest strike that day"
+                           % (format(low["min_collateral_usd"], ",.0f"), low["instrument"]))
             return {
                 "venue": "rysk",
                 "product": "cash_secured_put",
@@ -439,7 +477,7 @@ def quote(asset, collateral_usd, tenor="monthly", otm_pct=10.0, target_delta=Non
                 "expiry": combo.get("expiry"),
                 "expiry_ts": combo["expiration_timestamp"],
                 "size": 0.0,
-                "min_size": step,
+                "min_size": least["min_size"],
                 "tradeable": False,
                 "reasons": [reason],
                 "notes": [],
@@ -532,6 +570,15 @@ def quote(asset, collateral_usd, tenor="monthly", otm_pct=10.0, target_delta=Non
 
     q["tradeable"] = not q["reasons"]
     return q
+
+
+def minimum(asset, tenor="monthly", otm_pct=10.0, target_delta=None, pay_with=None,
+            chain_id=None, on=None, strike=None):
+    """The least Rysk prices of one put, with no amount from the owner: its size and
+    the USDC it locks, and the same at the day's lowest strike. No premium: nothing
+    was priced for the owner."""
+    return quote(asset, 0, tenor, otm_pct, target_delta, pay_with, chain_id, on, strike,
+                 least_only=True)
 
 
 def screen(collateral_usd, tenor="monthly", otm_pct=10.0, pay_with=None, chain_id=None):
@@ -679,13 +726,18 @@ def main():
     rule.add_argument("--delta", type=float, default=None)
     rule.add_argument("--strike", type=float, default=None,
                       help="the strike the owner named, exactly; refused if the expiry does not list it")
+    m = sub.add_parser("minimum", help="the least Rysk prices of one put, before the owner names an amount")
+    m.add_argument("--asset", required=True)
+    m.add_argument("--tenor", default="monthly", choices=sorted(TENOR_DAYS))
+    m.add_argument("--strike", type=float, default=None,
+                   help="the strike the owner named, exactly; refused if the expiry does not list it")
     c = sub.add_parser("chain", help="one expiry's put strikes on one asset")
     c.add_argument("--asset", required=True)
     c.add_argument("--tenor", default="monthly", choices=sorted(TENOR_DAYS))
-    for cmd in (q, c):
+    for cmd in (q, m, c):
         cmd.add_argument("--expiry", type=_utc_day, default=None,
                          help="YYYY-MM-DD (UTC): that day's expiry instead of the tenor's")
-    for cmd in (s, q):
+    for cmd in (s, q, m):
         cmd.add_argument("--pay-with", required=True,
                          help="the collateral's address: `collateral.address` of the account read")
         cmd.add_argument("--chain", type=int, default=None, choices=sorted(CHAIN_NAMES),
@@ -715,6 +767,9 @@ def main():
         print(json.dumps(positions(a.address), indent=2, ensure_ascii=False))
     elif a.cmd == "chain":
         print(json.dumps(chain(a.asset, a.tenor, a.expiry), indent=2, ensure_ascii=False))
+    elif a.cmd == "minimum":
+        print(json.dumps(minimum(a.asset, a.tenor, pay_with=a.pay_with, chain_id=a.chain,
+                                 on=a.expiry, strike=a.strike), indent=2, ensure_ascii=False))
     elif a.cmd == "screen":
         rows = screen(a.collateral, a.tenor, a.otm_pct, a.pay_with, a.chain)
         print(json.dumps(rows, indent=2, ensure_ascii=False))

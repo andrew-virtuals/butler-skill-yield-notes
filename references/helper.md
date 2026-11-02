@@ -15,6 +15,8 @@ python3 ~/skills/options-trading/scripts/quote.py quote --side buy --product put
 python3 ~/skills/options-trading/scripts/quote.py quote --side close --instrument ETH-20261030-2600-C --size 2.95
 python3 ~/skills/options-trading/scripts/quote.py quote --side buyback --instrument ETH-20261030-2300-P --size 2 --premium-received 61.40
 python3 ~/skills/options-trading/scripts/quote.py chain --underlying ETH --tenor monthly --type C
+python3 ~/skills/options-trading/scripts/quote.py minimum --underlying ETH
+python3 ~/skills/options-trading/scripts/quote.py minimum --venue paradex --underlying ETH --expiry 2026-11-27
 python3 ~/skills/options-trading/scripts/quote.py quote --venue paradex --side buy --product call --underlying ETH --budget 10 --expiry 2026-10-30
 python3 ~/skills/options-trading/scripts/quote.py quote --venue paradex --side buy --product call --underlying ETH --budget 50
 python3 ~/skills/options-trading/scripts/quote.py quote --venue paradex --side buy --product put --underlying ETH --budget 5 --expiry 2026-11-13 --strike 2100
@@ -50,6 +52,15 @@ otherwise. Every
 quote carries `tradeable` and, when false, `reasons` in plain English. **Never offer a
 trade whose quote is not `tradeable`**, and never rewrite a reason into something
 softer - they are already written for an owner.
+
+## The minimum, before an amount
+
+`minimum --underlying <ASSET>` answers "what does the smallest put need" when the owner
+has named no amount: the put the strike rule picks (or `--strike`), at the tenor's
+expiry (or `--expiry`). It prices nothing. Fields: `instrument`, `strike`, `min_size`
+(the venue's least, on `size_step`), `min_collateral_usd` (`min_size` x `strike`),
+`expiry`, `settlement` (`cash`), and `lowest_strike`, the same three for the day's
+lowest strike, or `null` when the put is that one. Puts only.
 
 ## The sell quote, field by field
 

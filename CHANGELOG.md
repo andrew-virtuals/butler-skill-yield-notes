@@ -1,5 +1,45 @@
 # Changelog
 
+## 2.11.0
+
+- **"Sell cash-secured puts on HYPE" quotes every venue, not just Derive.** Seen in
+  chat: the owner named no venue, so step 6 sent the trade to Derive; the agent quoted
+  only Derive, never checked Paradex, and quoted Rysk only after the owner asked "this
+  is derive and not rysk?". It then called Rysk's "the better rate". The owner was
+  never told that Rysk settles physically. An open (a put on any venue; a call or a put
+  bought on Derive or Paradex) is now quoted on every venue that offers it, at the
+  owner's amount, unless they named a venue. With no amount given, the agent asks for
+  one first and says each venue has its own minimum; a made-up amount had hidden Rysk,
+  whose HYPE minimum was 50 HYPE ($4,125). A venue whose minimum is above the amount
+  is named, with its minimum's figures from the quote. The new
+  `references/which-venue.md` gives the lines. A venue that is not `tradeable` gets
+  one line with its reason; one that does not list the asset, one line saying so. When
+  two venues are on the table, the owner hears settlement, getting out early and
+  funding. A venue is never ranked or recommended, and the owner picks before the
+  ownership question. A close or withdrawal stays where it is. `rysk.md`, `paradex.md`,
+  `selling.md` (no side-by-side APRs across assets or strikes; one asset across venues
+  is allowed) and the README follow.
+- **No amount named: each venue's minimum, then a question.** In 3 trials of the
+  transcript's ask on this release's first draft, every agent quoted at an amount it
+  made up ($500 to $1,600, once sizing to the owner's whole balance and then saying
+  "Derive is where your money fits"), even after reading the rule to ask first: "give
+  me some options" left it nothing true to show without one. Both helpers gain
+  `minimum`, which prices nothing and gives the smallest put a venue takes, its
+  `min_collateral_usd`, and the same at the day's lowest strike (`rysk.py` reuses the
+  search its quote already makes under the minimum). `SKILL.md` step 2: no amount
+  from the owner, each venue's `minimum`, then ask it, with no quote, screen or chain
+  until they name one. A first draft said only "no quote"; the one trial that got far
+  enough ran every `minimum`, then quoted at the minimums themselves and at a made-up
+  $2,000. `which-venue.md` has the
+  lines and the sentence; `selling.md` says it too, as `buying.md` already did for a
+  budget.
+- `SKILL.md`'s "Monthly by default" line moves to `buying.md` (`selling.md` already
+  has it), and "Say to the owner" is one shorter line, to pay for step 2's sentence
+  under the 12,000-character body.
+- `SKILL.md` stays under the registry's 12,000-character body: step 6 no longer links
+  `paradex.md` and `rysk.md` (`which-venue.md` does), and a line in the idempotency
+  section is reworded.
+
 ## 2.10.0
 
 - **Resting orders: the owner's own price, on the book.** "Sell it at $41 or better"
