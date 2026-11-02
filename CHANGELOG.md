@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.10.0
+
+- **Resting orders: the owner's own price, on the book.** "Sell it at $41 or better"
+  is now an order that waits on Derive's or Paradex's book at their price per contract
+  until it fills, they cancel it, or the option expires: `--order gtc` (or `post-only`,
+  refused rather than fill at once) with `--min-price` to sell and `--max-price` to buy,
+  in place of the total bound. Never on Rysk, and never Butler's idea
+  (`references/resting.md`).
+- **Its card is placed, not filled.** `approvalOutcome.resting` says so; the server tells
+  the owner once on the first fill and once when it ends, so Butler never polls it.
+- **`acp options cancel --order <id>`** files a card to take one off the book; until the
+  owner approves it the order can still fill, and Butler says so. What had filled stays
+  (`references/resting.md`).
+- **The lifecycle duty is filed when the order is placed:** `options-lifecycle@11` with
+  `ORDER_ID`, which waits for the fill and finishes quietly if nothing fills.
+
 ## 2.9.0
 
 - **"Sell a SOL put on Rysk with $5" says what the minimum needs.** Seen in QA: Rysk's

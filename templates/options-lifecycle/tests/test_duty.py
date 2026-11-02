@@ -229,6 +229,77 @@ class ClosedEarly(unittest.TestCase):
         self.assertIn("your call paid", fake.dones[0])
 
 
+def resting_account(rows=(), orders=()):
+    return {"network": "mainnet", "account": {"exists": True, "positions": list(rows), "openOrders": list(orders)}}
+
+
+RESTING_PUT = dict(PUT, SIZE=2, PREMIUM_USD=60, COLLATERAL_USD=4900, ORDER_ID="r1")
+OPEN_ORDER = {"orderId": "r1", "instrument": PUT["INSTRUMENT"], "side": "sell", "size": 2, "filledSize": 0, "status": "open"}
+
+
+class RestingOrder(unittest.TestCase):
+    """bevo-server docs/options-venues.md § Resting orders: filed when the order is placed."""
+
+    TICK = 900
+
+    def ticks(self, start, n=2):
+        return [start + self.TICK * i for i in range(n)]
+
+    def test_waits_quietly_while_the_order_rests_with_nothing_filled(self):
+        reads = dict(PRICE, **{"/options/account": resting_account(orders=[OPEN_ORDER])})
+        fake = run(RESTING_PUT, self.ticks(EXPIRY - hours(5), 3), reads)
+        self.assertEqual(fake.notes, [])
+        self.assertEqual(fake.dones, [])
+        self.assertEqual(fake.lines[-1][0], "waiting")
+        self.assertNotIn("/options/ticker", [path for path, _ in fake.read_calls])
+
+    def test_from_the_first_fill_watches_what_is_held_at_what_it_cost(self):
+        part = {"instrument": PUT["INSTRUMENT"], "size": -0.5, "costUsd": 14.5}
+        reads = dict(priced("2300"), **settled("2400"), **{
+            "/options/account": resting_account([part], [dict(OPEN_ORDER, filledSize=0.5)])})
+        fake = run(RESTING_PUT, [EXPIRY - hours(5), SETTLED_AT], reads)
+        self.assertEqual(fake.state["held_size"], 0.5)
+        self.assertIn("buying ETH at $2,450", fake.notes[0])
+        # Settled on the 0.5 held and its $14.50, never the 2 ordered.
+        self.assertIn("you agreed to buy 0.5 ETH at $2,450, which is $25.00 more", fake.dones[0])
+        self.assertIn("After the $14.50 premium you are down $10.50", fake.dones[0])
+
+    def test_an_order_that_ends_with_nothing_filled_finishes_quietly(self):
+        reads = dict(PRICE, **{"/options/account": reads_in_turn(
+            resting_account(orders=[OPEN_ORDER]), resting_account(), resting_account())})
+        fake = run(RESTING_PUT, self.ticks(EXPIRY - hours(72), 3), reads)
+        self.assertEqual(len(fake.dones), 1)
+        self.assertIn("ended with nothing filled", fake.dones[0])
+        self.assertEqual(fake.notes, [])
+
+    def test_one_read_with_neither_order_nor_position_waits_a_tick(self):
+        fake = run(RESTING_PUT, [EXPIRY - hours(72)], {"/options/account": resting_account()})
+        self.assertEqual(fake.dones, [])
+        self.assertEqual(fake.state["not_held_reads"], 1)
+
+    def test_still_unfilled_at_expiry_reports_no_settlement(self):
+        reads = dict(settled("2400"), **{"/options/account": resting_account(orders=[OPEN_ORDER])})
+        fake = run(RESTING_PUT, [EXPIRY - hours(1), SETTLED_AT], reads)
+        self.assertEqual(len(fake.dones), 1)
+        self.assertIn("ended at expiry with nothing filled", fake.dones[0])
+        self.assertNotIn("/options/settlement", [path for path, _ in fake.read_calls])
+
+    def test_a_filled_then_closed_position_ends_as_closed_early(self):
+        held_row = {"instrument": PUT["INSTRUMENT"], "size": -2, "costUsd": 60}
+        reads = dict(priced("2600"), **{"/options/account": reads_in_turn(
+            resting_account([held_row]), resting_account(), resting_account())})
+        fake = run(RESTING_PUT, self.ticks(EXPIRY - hours(72), 3), reads)
+        self.assertIn("was bought back before expiry", fake.dones[0])
+
+    def test_an_unreadable_account_never_ends_a_waiting_order(self):
+        fake = run(RESTING_PUT, self.ticks(EXPIRY - hours(72), 4), {"/options/account": BevoError("503")})
+        self.assertEqual(fake.dones, [])
+
+    def test_rysk_takes_no_order_id(self):
+        fake = run(dict(RESTING_PUT, VENUE="rysk", INSTRUMENT="ETH-30OCT26-2450-P"), [EXPIRY - hours(72)])
+        self.assertIn("Rysk takes no resting orders", fake.notes[0])
+
+
 class Settings(unittest.TestCase):
     def test_a_bought_call_must_be_a_call(self):
         fake = run(dict(LONG_CALL, PRODUCT="long_put"), [SETTLED_AT], settled("3000"))
