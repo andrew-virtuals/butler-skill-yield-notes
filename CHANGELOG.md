@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.11.2
+
+- **An order's status is read, never remembered.** Seen in chat: the owner cancelled a
+  resting Paradex order with the app's Cancel hold, and the agent then said it was "still
+  resting", while the account showed nothing held. The app's cancel, a fill and an expiry
+  all reach the owner, not the agent, so the last thing it had seen was the order resting.
+  It now reads `acp options account --venue <venue>` before saying where an order or
+  position stands (`references/resting.md`).
+
 ## 2.11.1
 
 - **A close waits only on Paradex.** Derive refuses a reduce-only order that rests, and a
