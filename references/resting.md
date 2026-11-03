@@ -66,6 +66,12 @@ order that would have filled is refused: nothing rests, nothing is locked.
 `acp options account` lists every resting order under `resting orders (… held back …)`,
 with its id, side, size, price and how much has filled.
 
+An order's state changes without you hearing: the owner can cancel it with the Cancel hold
+in the app, it can fill, or the option can expire, and the server's notes about it go to
+the owner, not to you. Never say where an order or position stands from earlier in the
+conversation. Read `acp options account --venue <venue>` first and say what it shows; an
+order no longer under `resting orders` has ended.
+
 ## The lifecycle duty
 
 Filed when the order is placed, not on a fill (SKILL.md step 7's `duty_create`, with
