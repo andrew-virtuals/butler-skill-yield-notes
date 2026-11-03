@@ -97,8 +97,11 @@ and Paradex's: free USDC on one never pays for a put on another.
 
 Step 4's deposit with `--venue rysk`:
 
-- From **USDC on Base** only (no `--from`), into the owner's HyperEVM wallet. Nothing
-  is set aside for Rysk until a sale locks it.
+- From the owner's stablecoins on **any chain** (USDC, USDT or USDG; no `--from`), into
+  their HyperEVM wallet as USDC: the bot moves it from Base, or gathers it from their
+  other chains when Base is short. Never
+  judge it by Base's balance. It moves the amount or nothing. Nothing is set aside for
+  Rysk until a sale locks it.
 - Before it, say how much is already in that wallet (`account.usdc`) and deposit only
   the shortfall, sized as step 4 says but **never under $2** in place of its $6: the
   bridge to HyperEVM refuses less.

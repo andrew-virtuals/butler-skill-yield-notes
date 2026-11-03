@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.12.0
+
+- **A deposit draws on every chain, on every venue.** Seen in chat: asked for a $7
+  Paradex deposit with $2.97 on Base, $11.02 on Arbitrum and $15.65 on Ethereum, the
+  agent refused it and offered to bridge to Base first, because `paradex.md` (and
+  `rysk.md`) said "From USDC on Base only". Butler's server now has the trade bot gather
+  a deposit from the owner's stablecoins (USDC, USDT or USDG) on any chain for Derive,
+  Rysk and Paradex alike
+  (bevo-server `feat/options-deposit-any-chain`, ITB `feat/swept-deposit-quote`), so
+  both references say so and never judge a deposit by Base's balance. Step 4's line
+  now covers every venue and says stablecoins, not USDC.
+- A deposit moves the amount or nothing: short across every chain it is refused with
+  nothing moved, and if what was gathered lands short, nothing is deposited and the USDC
+  stays in the owner's Base wallet. `venue.md`, `paradex.md` and `rysk.md` say what to
+  tell the owner.
+- `venue.md` no longer says the bot skips Ethereum USDC: it gathers from it last, and
+  `--from 1` still deposits Ethereum USDC directly when it covers alone.
+- Ships after both server changes are live: before them, a deposit Base can't cover is
+  still refused.
+
 ## 2.11.2
 
 - **An order's status is read, never remembered.** Seen in chat: the owner cancelled a

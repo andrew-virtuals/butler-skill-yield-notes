@@ -64,8 +64,13 @@ Derive's: free USDC on one never pays for a trade on the other.
 
 `SKILL.md` step 4's deposit, with `--venue paradex`:
 
-- From **USDC on Base** only (no `--from`): the owner's wallet must hold it there. Size
-  it as in step 4, $6 at least.
+- From the owner's stablecoins on **any chain** (USDC, USDT or USDG; no `--from`): it
+  lands as USDC from Base, and when Base alone is short the bot first gathers the rest
+  there from their other chains. Never judge
+  it by Base's balance, and never bridge first. Size it as in step 4, $6 at least.
+- It moves the amount or nothing. Short across every chain, it is refused with nothing
+  moved; if what was gathered lands short, nothing is deposited and the USDC stays in
+  the owner's Base wallet. Say so as the reason gives it.
 - The first deposit opens the account, and Paradex opens one only for a wallet holding a
   minimum balance. A refusal for that moves nothing: say what its reason says it needs.
 - It is usually credited within minutes. The outcome's `depositStatus` is `CREDITED`
