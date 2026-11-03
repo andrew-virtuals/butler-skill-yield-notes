@@ -99,9 +99,9 @@ Step 4's deposit with `--venue rysk`:
 
 - From the owner's stablecoins on **any chain** (USDC, USDT or USDG; no `--from`), into
   their HyperEVM wallet as USDC: the bot moves it from Base, or gathers it from their
-  other chains when Base is short. Never
-  judge it by Base's balance. It moves the amount or nothing. Nothing is set aside for
-  Rysk until a sale locks it.
+  other chains when Base is short. Never judge it by Base's balance. It moves the
+  amount or nothing; if what was gathered lands short, it stays in their wallet on the
+  chain the reason names. Nothing is set aside for Rysk until a sale locks it.
 - Before it, say how much is already in that wallet (`account.usdc`) and deposit only
   the shortfall, sized as step 4 says but **never under $2** in place of its $6: the
   bridge to HyperEVM refuses less.

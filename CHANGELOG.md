@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.12.1
+
+- **A short gather is in the owner's wallet on the chain that gathered it, not always
+  Base.** 2.12.0 said a deposit's sweep lands on Base and a short one stays in the
+  owner's Base wallet. For Derive and Rysk the trade bot gathers onto the chain holding
+  the most USDC (Paradex's top-up does use Base), so `venue.md` and `rysk.md` point the
+  owner at the chain the refusal names (bevo-server #1482, internal-trading-bot #414).
+
 ## 2.12.0
 
 - **A deposit draws on every chain, on every venue.** Seen in chat: asked for a $7
