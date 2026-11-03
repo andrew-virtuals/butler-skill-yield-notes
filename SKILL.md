@@ -1,7 +1,7 @@
 ---
 name: options-trading
 description: Trade options on Derive, Paradex or Rysk - earn on idle USDC by selling cash-secured puts, buy a call or a put, close before expiry, and check or withdraw USDC and positions.
-version: 2.11.2
+version: 2.12.0
 metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","withdraw","withdraw my usdc","derive","my options","options account","options positions","free usdc","derive positions","my option positions","withdraw from derive","withdraw my free usdc","paradex","paradex options","paradex positions","rysk","rysk options","rysk positions","physically settled","hyperevm","limit order","resting order","at my price","or better","leave it on the book","cancel my order"],"requires":{"bins":["python3","bevo-read","acp"]}}}
 ---
 
@@ -112,10 +112,10 @@ this chat. One missing: ask, and file nothing this turn.
    acp options deposit --amount <DEPOSIT_USDC> --idempotency-key <KEY>:deposit
    ```
 
-   The bot gathers USDC from **every chain** (`references/venue.md`).
+   On any venue the bot gathers stablecoins from **every chain**, not one.
    `--from 1` only when `ethereum.usdc` covers it alone. Never ask about gas or an
    address. Re-read `acp options account` until free USDC covers the trade, and do step
-   9; if it ends short, re-quote smaller and re-offer. Free USDC spans their Derive
+   9; if short, re-quote smaller and re-offer. Free USDC spans their Derive
    accounts (`account.md`).
 
 5. [FIXED] Run the quote again now, after their last answer. With all four met, file

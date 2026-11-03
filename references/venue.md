@@ -31,11 +31,15 @@ bridge's cost below; a spread or a depth moves by the hour.
   account its own deposit address there (`public/register_deposit_address`), and a
   keeper sweeps what lands in it.
 - `acp options deposit` has Butler's trade bot bridge USDC from the owner's wallet
-  straight to that address. It sources from whichever chains hold the money: Base when
-  it covers, otherwise any other supported chain, gathering from several when none
-  covers alone. The bridge fee comes out of the amount, and the credit lands a few
-  minutes after the bridge. Ethereum USDC is the exception: the bot does not gather from
-  it, so it deposits directly with `--from 1` and is credited shortly after it is mined.
+  straight to that address. It sources from whichever chains hold the owner's
+  stablecoins (USDC, USDT or USDG, each bridged as USDC; also Solana USDC and USDT and
+  Hyperliquid's free USDC): Base when it covers, else one other chain that covers
+  alone, else several gathered onto Base first, Ethereum last. It moves the amount or nothing: short across every chain, it is
+  refused with each chain's balance; if what was gathered lands short on Base, nothing
+  is deposited and the USDC stays in the owner's Base wallet. The bridge fee comes out
+  of the amount, and the credit lands a few minutes after the bridge (longer when it
+  gathers). Ethereum USDC that covers it alone goes directly with `--from 1`, no
+  bridge, credited shortly after it is mined.
 - The minimum deposit is $10; Derive gives a smaller one to its security module, so
   Butler's server refuses it. A bridged deposit is priced first: if the bridge's
   guaranteed arrival (bounded at 1% slippage) is under $10, it is refused with nothing
