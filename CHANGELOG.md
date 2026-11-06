@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.13.0
+
+- **Resting orders show on the Platforms tab.** Files `options-account@4`: each open order
+  is its account row's last line, status `Resting`, with its limit, fill and what it holds
+  back, refreshed every check (bevo-server `feat/platforms-resting-orders` builds the line
+  and hands it to the duty in the account read). Step 9 updates a duty on `@1`, `@2` or `@3`
+  in place. Ships with that server change: before it the read carries no line, and the
+  duty lists no orders, as before.
+
 ## 2.12.0
 
 - **A deposit draws on every chain, on every venue.** Seen in chat: asked for a $7

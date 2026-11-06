@@ -4,7 +4,7 @@ Keeps the owner's account on every options venue on the wallet's Platforms tab: 
 
 ## How it is filed
 
-`{"recipe": "options-account@3", "title": "Options accounts", "triggers": [{"kind": "timer", "intervalSeconds": 600}]}`. No settings. One per owner: a second writes the same rows. An owner still running `derive-account` has it removed when this one is filed, so each row has one writer. A duty on `@1`/`@2`, or forked from one, is updated in place with `duty_update {"recipe": "options-account@3"}`.
+`{"recipe": "options-account@4", "title": "Options accounts", "triggers": [{"kind": "timer", "intervalSeconds": 600}]}`. No settings. One per owner: a second writes the same rows. An owner still running `derive-account` has it removed when this one is filed, so each row has one writer. An older or forked one is updated in place with `duty_update {"recipe": "options-account@4"}`.
 
 ## What it does
 
