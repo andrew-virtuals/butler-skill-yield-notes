@@ -1,5 +1,20 @@
 # Changelog
 
+## 4
+
+- **Resting orders are listed.** Each open order is its account row's last line, after the
+  cash and positions: "Buying 0.95 ETH 2,600 call", status `Resting`, with its limit, what
+  has filled and what it holds back. The line has no value of its own: what it holds back is
+  still in the Cash line and the account's worth. Seen on staging: a $9.50 resting bid on
+  Derive appeared nowhere on its row. The line is the one Butler's server builds
+  (`platformLine` on each open order in the account read), so the duty and the server
+  write it word for word. It refreshes every check: an order that filled or was cancelled
+  drops off, and a fill shows as the position it became. A read that cannot see orders
+  (`ordersUnread`, Derive's public read) keeps the lines the row already shows rather than
+  wiping them.
+- Supersedes `options-account@3`. A duty on `@1`, `@2` or `@3`, or a fork of one, is updated
+  in place (`duty_update {"recipe": "options-account@4"}`, SKILL.md step 9).
+
 ## 3
 
 - **A position with no mark is listed.** Rysk marks no position (`valueUsd: null`), so

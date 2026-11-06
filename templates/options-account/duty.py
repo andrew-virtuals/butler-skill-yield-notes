@@ -38,6 +38,8 @@ DEPOSIT_MIN_USD = 1.0
 #: A settlement or a close pays USDC in. A rise this soon after a position
 #: changed is that cash, not a deposit.
 QUIET_AFTER_POSITION_CHANGE = 3600
+# A resting order's line on its row (the server's `RESTING_STATUS`): how the lines are found again.
+RESTING = "Resting"
 
 
 def say(text):
@@ -101,6 +103,34 @@ def unmarked(row, size, strike, kind):
     return details
 
 
+def resting(account, shown):
+    """The account's resting orders as its row's last lines, each the server's own line for it.
+
+    The account read hands every open order the line its Platforms row shows
+    (`platformLine`), so this duty and Butler's server write the same row. A read that
+    could not see orders (`ordersUnread`: Derive's public read) keeps the lines the row
+    already shows rather than wiping an order it cannot see; an order that ended drops
+    off on the next read that can see it.
+    """
+    if account.get("ordersUnread"):
+        return list(shown or [])
+    return [o["platformLine"] for o in account.get("openOrders") or []
+            if isinstance(o, dict) and isinstance(o.get("platformLine"), dict)]
+
+
+def shown_resting(site):
+    """The resting lines each of the site's rows shows now, by account. Read only when needed."""
+    host = site_host(site)
+    try:
+        rows = bevo.platform_balances()
+    except bevo.BevoError as exc:
+        say("could not list the Platforms rows, so their resting orders are not kept: %s" % exc)
+        return {}
+    return {row.get("account"): [p for p in row.get("positions") or []
+                                 if isinstance(p, dict) and p.get("status") == RESTING]
+            for row in rows if row.get("siteHost") == host}
+
+
 def landed(venue, usdc, held):
     """The USDC a deposit just added to `venue`, or 0. Moves the baseline on either way.
 
@@ -134,10 +164,11 @@ def cash_line(usdc):
     return {"title": "Cash", "valueUsd": round(float(usdc or 0), 2)}
 
 
-def subaccount_rows(subs):
+def subaccount_rows(subs, unread=False, shown=None):
     """(account, worth, positions, open count) per subaccount, or None when one has no worth.
 
-    A subaccount's cash is part of its worth, so it is listed as the row's first line.
+    A subaccount's cash is part of its worth, so it is listed as the row's first line; its
+    resting orders come last.
     """
     rows = []
     for sub in subs:
@@ -145,9 +176,11 @@ def subaccount_rows(subs):
         if worth is None or float(worth) < 0:
             return None
         named = " ".join(str(sub.get("universe") or "").split())
+        account = named or "Subaccount %s" % sub.get("subaccountId")
         held = listed(sub)
-        rows.append((named or "Subaccount %s" % sub.get("subaccountId"), round(float(worth), 2),
-                     [cash_line(sub.get("usdc"))] + held[:19], len(held)))
+        orders = resting(dict(sub, ordersUnread=unread), (shown or {}).get(account))
+        rows.append((account, round(float(worth), 2),
+                     ([cash_line(sub.get("usdc"))] + held + orders)[:20], len(held)))
     return rows
 
 
@@ -201,9 +234,11 @@ def write(entry, wallet):
         say("the %s account has no worth this run; the row keeps its last value" % name)
         return "unpriced", 0, 0, 0
     value = round(float(worth), 2)
+    unread = bool(account.get("ordersUnread"))
+    shown = shown_resting(site) if unread else None
     subs = [sub for sub in account.get("accounts") or [] if isinstance(sub, dict)]
     if subs:
-        rows = subaccount_rows(subs)
+        rows = subaccount_rows(subs, unread, shown)
         if rows is None:
             say("a %s subaccount has no worth this run; its rows keep their last value" % name)
             return "unpriced", 0, 0, 0
@@ -216,10 +251,11 @@ def write(entry, wallet):
     else:
         positions = listed(account)
         held = len(positions)
-        if entry.get("cashLine") is True:
-            positions = [cash_line(account.get("usdc"))] + positions[:19]
-        bevo.platform_balance(site, name, value, account=entry.get("wallet") or wallet,
-                              positions=positions)
+        row_account = entry.get("wallet") or wallet
+        cash = [cash_line(account.get("usdc"))] if entry.get("cashLine") is True else []
+        orders = resting(account, (shown or {}).get(row_account))
+        bevo.platform_balance(site, name, value, account=row_account,
+                              positions=(cash + positions + orders)[:20])
     credit = landed(venue, float(account.get("usdc") or 0), holdings(account)) if late else 0.0
     if credit:
         bevo.notify("Your %s deposit landed: $%s USDC credited. The account is worth $%s now."
