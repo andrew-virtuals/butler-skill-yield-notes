@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.13.2
+
+- **The Platforms Cash line is spendable.** Files `options-account@5`: a resting order's line
+  carries the cash it holds back as its value, and Cash is the account's USDC less that, so
+  the owner sees what they can spend while the row still adds up to its worth (bevo-server
+  `feat/platforms-resting-orders`). Ships with that server change.
+
 ## 2.13.1
 
 - **Paradex money moves through Arbitrum, not Base.** Layerswap lists no Base route to

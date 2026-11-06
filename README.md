@@ -6,8 +6,8 @@ selling cash-secured puts, buying calls and puts, and closing them on **Derive**
 people maintaining the repo. A butler receives `SKILL.md`, `references/**/*.md` and
 `scripts/**/*.py`; the registry also serves the duty templates under `templates/`.
 
-- **Version:** 2.13.1 (`SKILL.md`), with `options-lifecycle` 11, `options-put-delivery` 1
-  and `options-account` 4.
+- **Version:** 2.13.2 (`SKILL.md`), with `options-lifecycle` 11, `options-put-delivery` 1
+  and `options-account` 5.
   What changed in each release: `CHANGELOG.md`.
 - **Registry name:** `options-trading`, listed in the hub's `skills.json` from this repo.
   The skill was `yield-notes` before 2.0.0, which is why the repository still has that
@@ -61,7 +61,7 @@ setting.
 | Withdrawing | `acp options withdraw` | One approval card. A Derive withdrawal also takes an `acp trade` home to Base. |
 | Watching to expiry | the `options-lifecycle@11` duty, `templates/options-lifecycle/` | Filed after a confirmed open or buy, from the fill, or when a resting order is placed (`ORDER_ID`), which it waits on until it fills. Sends a heads-up the day before expiry and the outcome once the option settles. Runs no command, so it is filed with `movesFunds: false` and no pocket. Deleted after a confirmed close. |
 | Owning the asset after an assigned put | the `options-put-delivery@1` duty, `templates/options-put-delivery/` | Filed instead of `options-lifecycle`, for a sold Derive or Paradex put, only when the owner asked before the open to end up owning the asset. Watches the same way, then buys the asset with `acp trade` if the put is assigned. The only options duty with a pocket. |
-| Platforms rows | the `options-account@4` duty, `templates/options-account/` | One per owner, filed unasked once any venue account exists. The only writer of the options rows on the wallet's Platforms tab: one row per venue, and one per Derive subaccount, each at the venue's own worth with its positions and resting orders listed. |
+| Platforms rows | the `options-account@5` duty, `templates/options-account/` | One per owner, filed unasked once any venue account exists. The only writer of the options rows on the wallet's Platforms tab: one row per venue, and one per Derive subaccount, each at the venue's own worth with its positions and resting orders listed. |
 
 ## Safety model
 

@@ -1,5 +1,16 @@
 # Changelog
 
+## 5
+
+- **Cash is what can be spent.** A resting order's line now carries the cash it holds back
+  as its value (a buy's limit x what is left, a put sale's strike x what is left; a call
+  sale holds the asset, so none), and the row's Cash line is the account's USDC less those
+  values. Seen on staging: Cash read $22.69 with a 2 ETH bid holding $20 of it, so $2.69 was
+  spendable. The lines still add up to the account's worth. Carried-over lines (a read
+  that cannot see orders) are subtracted the same way, so nothing is counted twice. The
+  order's line and its value are Butler's server's own (`platformLine`).
+- Supersedes `options-account@4`: SKILL.md step 9 updates an older or forked duty in place.
+
 ## 4
 
 - **Resting orders are listed.** Each open order is its account row's last line, after the

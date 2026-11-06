@@ -159,9 +159,14 @@ def site_host(url):
     return host[4:] if host.startswith("www.") else host
 
 
-def cash_line(usdc):
-    """An account's USDC as its row's first line."""
-    return {"title": "Cash", "valueUsd": round(float(usdc or 0), 2)}
+def cash_line(usdc, orders=()):
+    """An account's spendable USDC as its row's first line.
+
+    What its resting orders hold back is on those orders' lines (their `valueUsd`), so Cash
+    is what can be spent and the lines still add up to the account's worth.
+    """
+    held = sum(float(o.get("valueUsd") or 0) for o in orders)
+    return {"title": "Cash", "valueUsd": round(max(0.0, float(usdc or 0) - held), 2)}
 
 
 def subaccount_rows(subs, unread=False, shown=None):
@@ -180,7 +185,7 @@ def subaccount_rows(subs, unread=False, shown=None):
         held = listed(sub)
         orders = resting(dict(sub, ordersUnread=unread), (shown or {}).get(account))
         rows.append((account, round(float(worth), 2),
-                     ([cash_line(sub.get("usdc"))] + held + orders)[:20], len(held)))
+                     ([cash_line(sub.get("usdc"), orders)] + held + orders)[:20], len(held)))
     return rows
 
 
@@ -252,8 +257,8 @@ def write(entry, wallet):
         positions = listed(account)
         held = len(positions)
         row_account = entry.get("wallet") or wallet
-        cash = [cash_line(account.get("usdc"))] if entry.get("cashLine") is True else []
         orders = resting(account, (shown or {}).get(row_account))
+        cash = [cash_line(account.get("usdc"), orders)] if entry.get("cashLine") is True else []
         bevo.platform_balance(site, name, value, account=row_account,
                               positions=(cash + positions + orders)[:20])
     credit = landed(venue, float(account.get("usdc") or 0), holdings(account)) if late else 0.0

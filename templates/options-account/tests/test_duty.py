@@ -250,7 +250,8 @@ if __name__ == "__main__":
 
 # Staging, andrew5 (2026-11-06): a $10 resting bid for 0.95 ETH-20261127-2600-C on Derive's
 # PRIME, which the Platforms row did not show. The line is the server's own (`platformLine`).
-BID_LINE = {"title": "Buying 0.95 ETH 2,600 call", "subtitle": "ETH-20261127-2600-C", "status": "Resting",
+BID_LINE = {"title": "Buying 0.95 ETH 2,600 call", "subtitle": "ETH-20261127-2600-C", "valueUsd": 9.5,
+            "status": "Resting",
             "details": [{"label": "Limit", "value": "$10.00 each"}, {"label": "Held back", "value": "$9.50"}]}
 
 
@@ -274,14 +275,17 @@ class RestingOrders(unittest.TestCase):
         self.assertEqual([p["title"] for p in fake.rows[0]["positions"]],
                          ["Cash", "Bought 0.17 ETH 2,550 call", "Buying 0.95 ETH 2,600 call"])
         self.assertEqual(fake.rows[0]["positions"][-1], BID_LINE)
+        # Cash is what can be spent: 22.69 less the 9.50 the bid holds.
+        self.assertEqual(fake.rows[0]["positions"][0], {"title": "Cash", "valueUsd": 13.19})
         # An order is no position: the status counts only what is held.
         self.assertEqual(fake.statuses[0][1]["positions"], 1)
 
     def test_a_single_account_venue_lists_its_orders_after_its_positions(self):
-        entry = paradex("3", 10, [position(CALL, 0.1, 7)])
+        entry = paradex("12", 19, [position(CALL, 0.1, 7)])
         entry["account"]["openOrders"] = [bid()]
         line = run([0], {"/options/account": accounts(entry)}).rows[0]["positions"]
-        self.assertEqual([p["title"] for p in line], ["Cash", "Bought 0.1 ETH 2,500 call", "Buying 0.95 ETH 2,600 call"])
+        self.assertEqual([(p["title"], p.get("valueUsd")) for p in line],
+                         [("Cash", 2.5), ("Bought 0.1 ETH 2,500 call", 7), ("Buying 0.95 ETH 2,600 call", 9.5)])
 
     def test_an_order_that_ended_drops_off_on_the_next_read(self):
         shown = dict(platform("prime", DERIVE, "PRIME"), positions=[BID_LINE])
@@ -293,7 +297,15 @@ class RestingOrders(unittest.TestCase):
         fake = run([0], {"/options/account": accounts(prime_with([], unread=True))}, platforms=[shown])
         self.assertEqual(fake.rows[0]["positions"][-1], BID_LINE)
         self.assertEqual(sum(p.get("status") == "Resting" for p in fake.rows[0]["positions"]), 1)
+        # The carried line's cash is not counted twice.
+        self.assertEqual(fake.rows[0]["positions"][0]["valueUsd"], 13.19)
 
     def test_an_order_without_the_servers_line_is_not_listed(self):
         fake = run([0], {"/options/account": accounts(prime_with([dict(bid(), platformLine=None)]))})
         self.assertFalse(any(p.get("status") == "Resting" for p in fake.rows[0]["positions"]))
+
+
+    def test_a_call_sale_holds_the_asset_so_cash_is_untouched(self):
+        line = dict(BID_LINE, title="Selling 1 ETH 3,000 call", valueUsd=None)
+        fake = run([0], {"/options/account": accounts(prime_with([bid(line)]))})
+        self.assertEqual(fake.rows[0]["positions"][0]["valueUsd"], 22.69)

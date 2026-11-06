@@ -1,7 +1,7 @@
 ---
 name: options-trading
 description: Trade options on Derive, Paradex or Rysk - earn on idle USDC by selling cash-secured puts, buy a call or a put, close before expiry, and check or withdraw USDC and positions.
-version: 2.13.1
+version: 2.13.2
 metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","withdraw","withdraw my usdc","derive","my options","options account","options positions","free usdc","derive positions","my option positions","withdraw from derive","withdraw my free usdc","paradex","paradex options","paradex positions","rysk","rysk options","rysk positions","physically settled","hyperevm","limit order","resting order","at my price","or better","leave it on the book","cancel my order"],"requires":{"bins":["python3","bevo-read","acp"]}}}
 ---
 
@@ -178,7 +178,7 @@ this chat. One missing: ask, and file nothing this turn.
    `duty_update` to this recipe.
 
    ```json
-   {"recipe": "options-account@4", "title": "Options accounts", "triggers": [{"kind": "timer", "intervalSeconds": 600}]}
+   {"recipe": "options-account@5", "title": "Options accounts", "triggers": [{"kind": "timer", "intervalSeconds": 600}]}
    ```
 
    It alone writes Platforms rows; never `bevo-platforms set`.
