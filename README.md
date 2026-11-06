@@ -6,7 +6,7 @@ selling cash-secured puts, buying calls and puts, and closing them on **Derive**
 people maintaining the repo. A butler receives `SKILL.md`, `references/**/*.md` and
 `scripts/**/*.py`; the registry also serves the duty templates under `templates/`.
 
-- **Version:** 2.13.0 (`SKILL.md`), with `options-lifecycle` 11, `options-put-delivery` 1
+- **Version:** 2.13.1 (`SKILL.md`), with `options-lifecycle` 11, `options-put-delivery` 1
   and `options-account` 4.
   What changed in each release: `CHANGELOG.md`.
 - **Registry name:** `options-trading`, listed in the hub's `skills.json` from this repo.
@@ -37,8 +37,8 @@ Not covered: covered calls, spreads, leverage, and any trade the helper refuses.
 | Buy, close, buy back | yes | yes | no: the collateral is locked to expiry |
 | Underlyings | crypto, and XAUT (tokenized gold) | crypto, stocks, indices, commodities | per Rysk's live inventory |
 | Quotes from | `scripts/quote.py` (public order book) | `scripts/quote.py` with `--venue paradex` | `scripts/rysk.py` (an RFQ) |
-| Deposit | from any chain, bridged (`--from 1` for USDC on Ethereum); credited a few minutes after its card | USDC on Base, usually credited within minutes | USDC on Base, into the owner's HyperEVM wallet |
-| Withdraw | to Ethereum (about 20 min), then `acp trade` to Base | to Base through Layerswap (about a minute) | from HyperEVM back to Base |
+| Deposit | from any chain, bridged (`--from 1` for USDC on Ethereum); credited a few minutes after its card | from any chain, through the owner's wallet on Arbitrum and Layerswap; usually credited within minutes | USDC on Base, into the owner's HyperEVM wallet |
+| Withdraw | to Ethereum (about 20 min), then `acp trade` to Base | to the owner's wallet on Arbitrum through Layerswap (about a minute) | from HyperEVM back to Base |
 | Settles | cash (USDC), 08:00 UTC | cash (USDC): crypto at 08:00 UTC, other options at their market's close | **physically**: an assigned put delivers the asset |
 | What differs | `references/venue.md`, `account.md` | `references/paradex.md` | `references/rysk.md` |
 
