@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.13.1
+
+- **Paradex money moves through Arbitrum, not Base.** Layerswap lists no Base route to
+  or from Paradex any more (mainnet, 2026-11-06), so a Paradex withdrawal could not reach
+  Base and every Paradex deposit from Base was refused. Butler's server now moves both
+  directions between Paradex and the owner's wallet on Arbitrum through Layerswap
+  (bevo-server `feat/paradex-arbitrum-deposit`). `paradex.md` says a deposit goes in from
+  Arbitrum (topped up there from Base when short, so it may send a little less than
+  asked), and a withdrawal pays to the owner's wallet on Arbitrum and stays there; moving
+  it on to Base is a separate trade, offered, never done unasked. `account.md` and the
+  README say the same.
+- Ships with that server change: before it, Paradex money moves neither way.
+
 ## 2.13.0
 
 - **Resting orders show on the Platforms tab.** Files `options-account@4`: each open order

@@ -65,12 +65,13 @@ Derive's: free USDC on one never pays for a trade on the other.
 `SKILL.md` step 4's deposit, with `--venue paradex`:
 
 - From the owner's stablecoins on **any chain** (USDC, USDT or USDG; no `--from`): it
-  lands as USDC from Base, and when Base alone is short the bot first gathers the rest
-  there from their other chains. Never judge
-  it by Base's balance, and never bridge first. Size it as in step 4, $6 at least.
-- It moves the amount or nothing. Short across every chain, it is refused with nothing
-  moved; if what was gathered lands short, nothing is deposited and the USDC stays in
-  the owner's Base wallet. Say so as the reason gives it.
+  goes into Paradex from their wallet **on Arbitrum**, through Layerswap. When Arbitrum
+  is short, the server first bridges the rest there from Base (the bot gathers onto Base
+  from their other chains). Never judge it by Base's or Arbitrum's balance, and never
+  bridge first. Size it as in step 4, $6 at least.
+- The bridge to Arbitrum takes its fee on the way, so the deposit may send a little less
+  than asked: the outcome says what was sent. If the bridge fails, nothing is deposited
+  and whatever moved is in the owner's wallet on Arbitrum. Say so as the reason gives it.
 - The first deposit opens the account, and Paradex opens one only for a wallet holding a
   minimum balance. A refusal for that moves nothing: say what its reason says it needs.
 - It is usually credited within minutes. The outcome's `depositStatus` is `CREDITED`
@@ -85,8 +86,9 @@ Derive's: free USDC on one never pays for a trade on the other.
 never its `:home` line.
 
 - At most this turn's `freeForNewPutsUsd`, rounded down to the cent, as on Derive.
-- It pays to the owner's wallet **on Base**, usually quickly, less a bridge fee
-  (Layerswap). No `:home` leg: it is already on Base.
+- It pays to the owner's wallet **on Arbitrum**, usually quickly, less a bridge fee
+  (Layerswap), and stays there. No `:home` leg. If they want it on Base, that is a
+  separate `acp trade` from Arbitrum to Base, offered, never done unasked.
 - The outcome says what arrived, to the unit (`Received`, `Bridge fee`). If Layerswap
   is still paying it out, the outcome says it is on its way: check the wallet, never
   withdraw again to find out. A refund, if Layerswap fails, goes back to the Paradex
@@ -109,6 +111,6 @@ Paradex deposit: the deposit card already says when the USDC is credited.
 ## Say to the owner
 
 - *"This one is on Paradex, not Derive: a separate account with its own USDC."*
-- *"Withdrawn: 1.995943 USDC arrived in your wallet on Base; the bridge took 0.004057."*
+- *"Withdrawn: 1.995943 USDC arrived in your wallet on Arbitrum; the bridge took 0.004057."*
 - *"Paradex wants the wallet to hold <what the refusal names> before it opens an account,
   and you have <the wallet's USDC>. Nothing moved."*

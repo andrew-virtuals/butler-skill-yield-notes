@@ -83,8 +83,8 @@ A row behind this turn's read is that delay, not a discrepancy: answer from the 
 
 "Withdraw my free USDC" means out of Derive, to the owner's wallet. It is `acp options
 withdraw` (step 8), never an `acp trade` from the wallet to the owner's own address: that
-moves nothing and still costs a fee. Out of Paradex it pays to Base instead
-(`references/paradex.md`); the rest of this section is Derive's.
+moves nothing and still costs a fee. Out of Paradex it pays to the owner's wallet on
+Arbitrum instead (`references/paradex.md`); the rest of this section is Derive's.
 
 - The amount is at most this turn's `freeForNewPutsUsd` (the total across accounts; the
   server gathers it into one before paying out), rounded down to the cent. "All
