@@ -8,9 +8,8 @@
   makers have 20 seconds, the best quote inside the bound is taken, nothing trades otherwise,
   and an RFQ never falls back to the book. After it: a no-maker refusal is never re-filed at a
   looser bound without their yes, and the order book is the other offer. Step 5 points to it;
-  `venue.md` no longer says RFQ "is not used yet". Ships with bevo-server's RFQ PRs into
-  `feat/options-rfq`; until `OPTIONS_RFQ_ENABLED` is on, the server answers "takes no rfq
-  orders here" and the reference offers the book.
+  `venue.md` no longer says RFQ "is not used yet". Ships with bevo-server#1653; a
+  server without it answers "takes no rfq orders here", and the reference offers the book.
 
 ## 2.14.0
 
