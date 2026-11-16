@@ -63,10 +63,15 @@ never softened - they are already written for an owner:
 Each safeguard is `id` (`spread` or `fees`; Rysk's `exercise`), `text` with the figure
 and the line it crossed, and `waived`.
 
-1. Say each `text` as written, that it is Butler's safeguard, and that the owner may
-   choose to trade past it. File nothing, and say it once: never press for it.
-2. Only the owner's own explicit choice, after hearing the figure, waives one: "do it
-   anyway", "go past it". A yes to the trade, the amount or the premium is not one.
+1. Say each `text` as written, that it is Butler's safeguard, and that it goes ahead
+   only if they tell you in their own words to trade past it. File nothing, and say it
+   once: never press for it. End that message with **no question**: not "want to go
+   past it?", and not the ownership question or the offer's figures, so that no bare
+   "yes" can answer it.
+2. Only the owner's own words choosing to go past it, after hearing the figure, waive
+   one: "do it anyway", "go past the safeguard". A yes to the trade, the amount, the
+   premium or owning the asset is not one, even straight after the safeguard was said:
+   say the safeguard still holds and what would waive it, and file nothing.
 3. Quote again with `--waive <ids>`, comma-separated. That quote comes back
    `tradeable: true` with `waive`; offer it as step 3 says, with the bad case and the
    ownership question as for any other, then file with `--waive <waive>`. The card
