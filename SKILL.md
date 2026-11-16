@@ -87,7 +87,8 @@ this chat. One missing: ask, and file nothing this turn.
    `--budget` the most they will spend. Closing: instrument and size from `positions`;
    positive is `--side close`; negative, `--side buyback` with the size positive and
    `--premium-received` the note's `netPremiumUsd` (or its duty's PREMIUM_USD) scaled
-   to it. `tradeable: false` is a venue limit: give its `reasons` as written. A strike or
+   to it. `reasons`: a venue limit, give them as written. `waivable: true`: a
+   safeguard (`helper.md` § Safeguards). A strike or
    day they named: `buying.md`.
 
 3. [ADAPT] Offer it using **only** quote fields, its `warnings` said as written and
@@ -123,8 +124,8 @@ this chat. One missing: ask, and file nothing this turn.
    the one command, with that quote's fields and the bound they agreed:
 
    ```sh
-   acp options open --instrument <instrument> --size <size> --min-premium <min_premium_usd> --max-collateral <collateral.amount> --idempotency-key <KEY>:open
-   acp options buy --instrument <instrument> --size <size> --max-cost <max_cost_usd> --idempotency-key <KEY>:buy
+   acp options open --instrument <instrument> --size <size> --min-premium <min_premium_usd> --max-collateral <collateral.amount> [--waive <waive>] --idempotency-key <KEY>:open
+   acp options buy --instrument <instrument> --size <size> --max-cost <max_cost_usd> [--waive <waive>] --idempotency-key <KEY>:buy
    acp options close --instrument <instrument> --size <size> --min-proceeds <AGREED_FLOOR> --idempotency-key <KEY>:close
    acp options close --instrument <instrument> --size <size> --max-cost <AGREED_CEILING> --idempotency-key <KEY>:close
    ```
@@ -196,6 +197,7 @@ failed: re-read `acp options account` and wait. Look up `:home` with `--route tr
 
 | Outcome | What to do |
 | --- | --- |
+| `waivable: true` | A safeguard: say its `text`, that they may waive it, and file nothing. Only their own explicit choice re-quotes it (`helper.md`). |
 | `no live bid` / `no live ask` | Opening: another strike, expiry or asset, or stop. Closing: nobody bids for theirs now; holding costs nothing. |
 | `collateral too small`, `budget too small` | Under the minimum. Give the reason's figures, work out no others, and stop unless they name another strike, expiry or amount. |
 | An `OPTIONS_*` refusal | Nothing filed: follow its hint; never raise a bound the owner agreed. |

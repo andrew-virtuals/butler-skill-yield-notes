@@ -49,11 +49,31 @@ by ticker alone, never a guess at what it is.
 
 `quote` is the sell side unless `--side buy`, `--side close` or `--side buyback` says
 otherwise. Every
-quote carries `tradeable` and `warnings`. `tradeable: false` is a limit the venue
-itself enforces (under its minimum, nobody bidding or asking), with `reasons` in plain
-English: nothing can be filed. `warnings` say what a poor price costs: say each as
-written and let the owner choose; never withhold a trade over one. Never rewrite either
-into something softer - they are already written for an owner.
+quote carries `tradeable`, and three lists, each in plain English and said as written,
+never softened - they are already written for an owner:
+
+- `reasons`: a limit the venue itself enforces (under its minimum, nobody bidding or
+  asking). Nothing can be filed, and nothing waives it.
+- `safeguards` (sell and buy): a price poor enough that Butler holds the trade back,
+  with `waivable: true`. See **Safeguards** below.
+- `warnings`: a poor price that never stops a trade. Say each, then let the owner choose.
+
+## Safeguards
+
+Each safeguard is `id` (`spread` or `fees`; Rysk's `exercise`), `text` with the figure
+and the line it crossed, and `waived`.
+
+1. Say each `text` as written, that it is Butler's safeguard, and that the owner may
+   choose to trade past it. File nothing, and say it once: never press for it.
+2. Only the owner's own explicit choice, after hearing the figure, waives one: "do it
+   anyway", "go past it". A yes to the trade, the amount or the premium is not one.
+3. Quote again with `--waive <ids>`, comma-separated. That quote comes back
+   `tradeable: true` with `waive`; offer it as step 3 says, with the bad case and the
+   ownership question as for any other, then file with `--waive <waive>`. The card
+   and the record name what was waived.
+4. A waiver holds for that one quote. A new quote, strike, expiry or size asks again.
+
+## The minimum, before an amount
 
 ## The minimum, before an amount
 
@@ -83,10 +103,13 @@ lowest strike, or `null` when the put is that one. Puts only.
 | `edge_vs_fair_vol_pts` | how far the bid sits under Derive's own mark; negative for a seller |
 | `bid_depth` | contracts on the best bid; a note bigger than this warns it may fill part-way |
 | `valid_until` | 60 seconds after the read; quote again past it |
+| `waive` | present only when a safeguard was waived; passed to `--waive` |
 
-Warnings, never refusals: the bid more than 5 vol points under mark, fees over 15% of
-the premium, a premium under $1, or the best bid smaller than the note. Size is always
-what the collateral **fully** covers, rounded down to Derive's step.
+The spread is the share of the option's value the bid gives up (`1 - bid / mark`):
+over 10% warns, over 20% is the `spread` safeguard, and neither applies when it costs
+under $1 in all. Fees over 15% of the premium warn, over 30% are the `fees` safeguard.
+A premium under $1, or a best bid smaller than the note, only warns. Size is always what
+the collateral **fully** covers, rounded down to Derive's step.
 
 ## The buy quote, field by field
 
@@ -115,9 +138,10 @@ it is refused with the strikes it does.
 | `valid_until` | 60 seconds after the read |
 
 A buy is refused only with no live ask, or a budget (or size) under Derive's minimum,
-with what the minimum costs. It warns when the ask is thinner than the size, more than
-5 vol points over mark ("you would be paying N% over fair value"), or fees are over 15%
-of the premium.
+with what the minimum costs. The spread and fees are measured as for a sale, the ask
+over mark ("you would be paying N% over fair value"): a warning past the lower figure,
+a safeguard past the higher. An ask thinner than the size only warns. A waived buy
+passes `waive` to `--waive` the same way.
 
 ## The close quote, field by field
 

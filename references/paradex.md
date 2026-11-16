@@ -42,8 +42,8 @@ python3 ~/skills/options-trading/scripts/quote.py quote --venue paradex --side b
   sets: a stock, index or commodity option at its market's close, not the crypto time.
   Say the time the quote's `expiry` (or a position's `expiresIn`) gives, never one from
   memory.
-- Spreads outside ETH are often wide, so expect more `warnings` there. Say them as
-  written; the choice is the owner's.
+- Spreads outside ETH are often wide, so expect more `warnings` and safeguards there
+  (`references/helper.md` § Safeguards).
 
 ## The account
 

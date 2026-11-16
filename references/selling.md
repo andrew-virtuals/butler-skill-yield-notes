@@ -16,7 +16,7 @@ and keeping the fee. The premium is certain. What they own at expiry is not.
   it is not a menu. Never lay out APRs of assets or strikes side by side (one asset on
   several venues is `references/which-venue.md`). If more than one is `tradeable`,
   name them and ask which they would happily own lower, then quote that one, with its
-  `warnings`.
+  `warnings` and any safeguard.
 - **How much is theirs to name.** No amount yet: quote nothing, not even at a round
   number or their whole balance. Each venue's `minimum` says what the smallest put
   needs there; say those and ask (`references/which-venue.md`).
@@ -113,13 +113,13 @@ prices**". Never "16% APY", and never put it in a headline on its own.
 
 ## When the price is poor
 
-`edge_vs_fair_vol_pts` is how far below Derive's own mark the bid sits. It is
-negative for a seller - that is the spread, and it is what a market maker keeps.
+The bid under Derive's own mark is the spread, and it is what a market maker keeps.
 
-- worse than -3: say the market is wide today and they are not getting a great
-  price.
-- worse than -5: the quote warns how much of the option's value the spread takes. Say
-  it as written, before the ownership question; the choice is theirs.
+- over 10% of the option's value: a `warning`. Say it as written, before the ownership
+  question; the choice is theirs.
+- over 20%: the `spread` safeguard holds the note back until they waive it
+  (`references/helper.md` § Safeguards). A waived note still gets the bad case and the
+  ownership question.
 
 An owner who hears "16% a year" without hearing that the spread took part of the
 premium has been told half of it.
@@ -207,3 +207,6 @@ promise to buy. I won't file anything."
 
 A wide market: "You can sell it, but the spread is wide today: selling here hands over
 16% of the option's value. Still want it?"
+
+A safeguard: "Butler has a safeguard here: selling now hands over 28% of the option's
+value to the spread. You can choose to trade past it; otherwise I'll leave it."

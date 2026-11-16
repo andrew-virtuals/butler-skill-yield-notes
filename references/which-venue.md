@@ -57,7 +57,8 @@ made knowingly. Derive is not a default for an open.
   one column per venue is fine, `bad_case` its first row.
 - **Each venue whose quote is not**: one line with its `reasons` as written, figures and
   all. The owner still learns it is there. Every quote's `warnings` (Rysk: `notes`) are
-  said with it.
+  said with it. A quote held by a safeguard is said with its `text`, as
+  `references/helper.md` § Safeguards says, on that venue's line.
 - **A venue whose minimum is above their amount** (`collateral too small`, `budget too
   small`): say plainly that this venue's minimum differs from the others', with the
   size and dollar figure its reason gives, and that a larger amount would open it. Ask

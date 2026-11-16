@@ -79,26 +79,37 @@ setting.
 - **Full collateral.** A put's size is what the collateral fully covers; none of the
   venues' margin is used.
 
-## Warnings, not gates
+## Venue limits, safeguards and warnings
 
-The owner picks the trade. A quote is refused (`tradeable: false`) only where the venue
-itself would refuse it: under its minimum size, nobody bidding or asking, a close whose
-fee is more than the bid pays, a Paradex price outside the market's band, or a Rysk
-quote about to die. Everything below is a warning the butler says as written before the
-owner chooses; none stops a trade, and the owner's `--min-premium` or `--max-cost`
-bound still caps what a fill can cost them:
+A quote sorts what stands in a trade's way three ways:
 
-| Warning | Default | Side | Why |
-| --- | --- | --- | --- |
-| `MAX_VOL_GAP_PTS` | 5.0 | both | Bid under mark (selling) or ask over mark (buying). ETH's and BTC's own spreads are a few points wide; a 2-point guard would reject every fill. |
-| `MAX_FEE_DRAG` | 15% | both | Derive's $0.50 base fee is charged per order and is uncapped, so it swamps small tickets and weeklies. Paradex charges no base fee. |
-| `MIN_PREMIUM_USD` | $1 | sell | Below it the premium rounds to nothing. |
-| depth < size | - | both | The best bid (selling) or ask (buying) is smaller than the size, so the order may fill part-way. |
-| `MAX_COST_HEADROOM` | 1.05 | buy | `max_cost_usd` is the total cost plus 5%, and a budget buy is sized so that ceiling fits inside the budget. |
+- **Venue limits** (`reasons`, `tradeable: false`): what the venue itself refuses: under
+  its minimum size, nobody bidding or asking, a close whose fee is more than the bid
+  pays, a Paradex price outside the market's band, a Rysk quote about to die. Nothing
+  waives them.
+- **Safeguards** (`safeguards`, `waivable: true`): a price poor enough that the butler
+  holds the trade back, says why with the figure, and files only once the owner, in
+  chat, chooses to trade past it. The quote is re-run with `--waive <ids>`, and the
+  open or buy passes `--waive` on, so the card and the approval's intent record it
+  (bevo-server `feat/options-safeguard-waive`).
+- **Warnings** (`warnings`; Rysk `notes`): said as written, never a stop.
 
-On Paradex a price outside the market's price band counts as no price. Rysk's helper
-notes a put likely to be exercised (delta over 0.35) or paying under 4% a year
-(`references/rysk-helper.md`).
+The owner's `--min-premium` or `--max-cost` bound still caps what any fill can cost.
+
+| Check | Warns past | Safeguard past | Side | Why |
+| --- | --- | --- | --- | --- |
+| spread (`1 - bid/mark`, `ask/mark - 1`) | 10% | 20% (`spread`) | sell, buy | Measured as the share of the option's value given away, not vol points: at the 75-120% vols of alts and stocks a 5-point gap is a small spread. Skipped when under $1 in all, where one price tick is a large share. |
+| fees / premium | 15% | 30% (`fees`) | sell, buy | Derive's $0.50 base fee is per order and uncapped, so it swamps small tickets and weeklies. Paradex charges no base fee. |
+| premium | under $1 | - | sell | Below it the premium rounds to nothing. |
+| depth < size | yes | - | all | The best bid or ask is smaller than the size: it may fill part-way, inside the owner's bound. |
+| Rysk delta | - | 0.35 (`exercise`) | sell | The put will probably be exercised: a likely purchase, not idle cash earning. |
+| Rysk APR | under 4% | - | sell | The premium barely pays for the lock. |
+
+A close or a buy-back only ever warns about price (over 5 vol points), since an owner
+cutting a loss may accept a wide market. `MAX_COST_HEADROOM` (1.05) sets `max_cost_usd`
+at the total cost plus 5%, and a budget buy is sized so that ceiling fits the budget.
+These figures come from four live cases (BTC and ZEC on 2026-11-11, NVDA on
+2026-11-16); tune them from how often safeguards hold trades and are waived.
 
 ## Measurements
 

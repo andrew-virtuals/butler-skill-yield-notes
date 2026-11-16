@@ -79,13 +79,16 @@ taker fee = base_fee + min(taker_fee_rate x index x size, mark_price_fee_rate_ca
 
 Each term is read from the instrument, and the quote's `fee_usd` is the result. The base
 fee is per order and uncapped, which is what makes small tickets and short tenors
-poor value: a sell or a buy whose fee is over 15% of the premium carries a warning.
+poor value: a fee over 15% of the premium warns, and over 30% is a safeguard the owner
+may waive.
 
 ## Spreads: what decides which trades clear
 
 The gap between Derive's mark IV and the bid IV is what a seller crossing the spread
 gives away; the gap between the ask IV and mark IV is what a buyer gives away. The
-helper warns past **5 vol points**; outside ETH and BTC most books sit wider than that.
+helper measures it as a share of the option's value: over 10% warns, over 20% is a
+safeguard the owner may waive. Vol points are no measure across assets: at the 75-120%
+vols of alts and stocks, a 5-point gap is a small spread.
 
 Spreads and depth change as books deepen or thin, often within a day. A single empty read just after an expiry rolls is not evidence
 an asset is dead - quote fresh, never cache a book, and never say which assets clear from

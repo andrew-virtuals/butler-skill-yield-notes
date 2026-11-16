@@ -55,10 +55,21 @@ V = {"id": "derive", "name": "Derive"}
 VENUES = {"derive": {"id": "derive", "name": "Derive"},
           "paradex": {"id": "paradex", "name": "Paradex"}}
 
-# Past these a quote carries a warning, never a refusal: the owner picks the
-# trade and hears what it costs them. See README.md, Measurements.
+# A sell or a buy warns past the first figure and is held back past the second,
+# a safeguard the owner may waive in chat. The spread is measured as the share
+# of the option's value given away (bid under mark, ask over it), not in vol
+# points: at the 75-120% vols of alts and stocks a 5-point gap is a small spread.
+# Under SPREAD_MIN_USD given away, the share is left alone: on a cheap option one
+# price tick is already a large share of it. See README.md, Measurements.
+SPREAD_WARN_SHARE = 0.10
+SPREAD_GUARD_SHARE = 0.20
+SPREAD_MIN_USD = 1.00
+FEE_WARN_SHARE = 0.15
+FEE_GUARD_SHARE = 0.30
+SAFEGUARDS = ("spread", "fees")
+# A close or a buy-back only ever warns, past this many vol points.
 MAX_VOL_GAP_PTS = 5.0
-MAX_FEE_DRAG = 0.15
+MAX_FEE_DRAG = FEE_WARN_SHARE
 MIN_PREMIUM_USD = 1.00
 QUOTE_TTL_SEC = 60
 # --min-premium is set this far under the quoted net, so ordinary movement
@@ -382,8 +393,47 @@ def load_chain(underlying, opt_type, tenor, now, on=None):
     return expiry, chain, tickers
 
 
+def pct(share):
+    return int(math.floor(share * 100 + 0.5))
+
+
+def check_spread(q, share, given_usd, text):
+    """Warn past SPREAD_WARN_SHARE, hold back past SPREAD_GUARD_SHARE."""
+    if given_usd < SPREAD_MIN_USD or share <= SPREAD_WARN_SHARE:
+        return
+    said = text % (pct(share), given_usd)
+    if share > SPREAD_GUARD_SHARE:
+        q["safeguards"].append({"id": "spread", "text": "%s (safeguard: %d%%)" % (said, pct(SPREAD_GUARD_SHARE))})
+    else:
+        q["warnings"].append(said)
+
+
+def check_fees(q, drag):
+    """Warn past FEE_WARN_SHARE of the premium, hold back past FEE_GUARD_SHARE."""
+    if drag > FEE_GUARD_SHARE:
+        q["safeguards"].append({"id": "fees", "text": "fees are %d%% of the premium (safeguard: %d%%)"
+                                % (pct(drag), pct(FEE_GUARD_SHARE))})
+    elif drag > FEE_WARN_SHARE:
+        q["warnings"].append("fees are %d%% of the premium: a bigger ticket or a longer tenor "
+                             "keeps more of it" % pct(drag))
+
+
+def settle(q, waived):
+    """Tradeable once nothing the venue refuses is left and every safeguard is
+    waived. `waive` is what the open or buy passes on to `--waive`."""
+    for sg in q["safeguards"]:
+        sg["waived"] = sg["id"] in waived
+    held = [sg for sg in q["safeguards"] if not sg["waived"]]
+    q["tradeable"] = not q["reasons"] and not held
+    q["waivable"] = not q["reasons"] and bool(held)
+    passed = [sg["id"] for sg in q["safeguards"] if sg["waived"]]
+    if passed and q["tradeable"]:
+        q["waive"] = ",".join(passed)
+    return q
+
+
 def build_quote(product, underlying, collateral_usd, tenor="monthly",
-                otm_pct=10.0, target_delta=None, on=None, strike=None):
+                otm_pct=10.0, target_delta=None, on=None, strike=None, waived=()):
     if product not in ("cash_secured_put", "covered_call"):
         raise VenueError("unknown product %r" % product)
     opt_type = "P" if product == "cash_secured_put" else "C"
@@ -435,6 +485,8 @@ def build_quote(product, underlying, collateral_usd, tenor="monthly",
         "tradeable": False,
         "reasons": [],
         "warnings": [],
+        "safeguards": [],
+        "waivable": False,
     }
 
     if size < min_amt or size <= 0:
@@ -482,20 +534,13 @@ def build_quote(product, underlying, collateral_usd, tenor="monthly",
         q["warnings"].append(
             "the best bid is only %s contracts and this note is %s - it may fill "
             "part-way" % (plain(bid_sz), plain(size)))
-    if gap > MAX_VOL_GAP_PTS:
-        q["warnings"].append(
-            "the market is %.1f vol points wide against the seller: selling here "
-            "hands over %d%% of the option's value"
-            % (gap, int(math.floor((1 - bid / mark) * 100 + 0.5)) if mark else 0))
     if gross < MIN_PREMIUM_USD:
         q["warnings"].append("the premium is only $%.2f" % gross)
-    elif fee / gross > MAX_FEE_DRAG:
-        q["warnings"].append(
-            "fees are %d%% of the premium: a bigger ticket or a longer tenor keeps "
-            "more of it" % int(math.floor(fee / gross * 100 + 0.5)))
-
-    q["tradeable"] = not q["reasons"]
-    return q
+    share = 1 - bid / mark if mark > 0 else 0.0
+    check_spread(q, share, (mark - bid) * size,
+                 "the market is wide: selling here hands over %d%% of the option's value ($%.2f)")
+    check_fees(q, fee / gross)
+    return settle(q, waived)
 
 
 def build_minimum(underlying, tenor="monthly", otm_pct=10.0, on=None, strike=None):
@@ -545,7 +590,8 @@ def strike_for(chain, tickers, opt_type, spot, otm_pct, target_delta, strike=Non
 
 
 def build_buy_quote(product, underlying, budget_usd=None, tenor="monthly",
-                    otm_pct=5.0, target_delta=None, want_size=None, on=None, strike=None):
+                    otm_pct=5.0, target_delta=None, want_size=None, on=None, strike=None,
+                    waived=()):
     """Price buying one call or put. Sized from the budget (premium + fee, with
     room for the price to move), or exactly want_size contracts for a hedge."""
     if product not in ("call", "put"):
@@ -586,6 +632,8 @@ def build_buy_quote(product, underlying, budget_usd=None, tenor="monthly",
         "tradeable": False,
         "reasons": [],
         "warnings": [],
+        "safeguards": [],
+        "waivable": False,
     }
     if budget_usd is not None:
         q["budget_usd"] = rnd(budget_usd, 2)
@@ -650,18 +698,11 @@ def build_buy_quote(product, underlying, budget_usd=None, tenor="monthly",
         q["warnings"].append(
             "the best ask is only %s contracts and this buy is %s - it may fill "
             "part-way" % (plain(ask_sz), plain(size)))
-    if gap > MAX_VOL_GAP_PTS:
-        q["warnings"].append(
-            "the market is %.1f vol points wide against the buyer: you would be "
-            "paying %d%% over fair value"
-            % (gap, int(math.floor((ask / mark - 1) * 100 + 0.5)) if mark else 0))
-    if fee / gross > MAX_FEE_DRAG:
-        q["warnings"].append(
-            "fees are %d%% of the premium: a bigger ticket or a longer tenor keeps "
-            "more of it" % int(math.floor(fee / gross * 100 + 0.5)))
-
-    q["tradeable"] = not q["reasons"]
-    return q
+    share = ask / mark - 1 if mark > 0 else 0.0
+    check_spread(q, share, (ask - mark) * size,
+                 "the market is wide: you would be paying %d%% over fair value ($%.2f)")
+    check_fees(q, fee / gross)
+    return settle(q, waived)
 
 
 def held_option(instrument):
@@ -898,6 +939,14 @@ def utc_day(text):
         raise argparse.ArgumentTypeError("%r is not a date like 2026-10-30" % text)
 
 
+def safeguard_list(text):
+    named = [s for s in text.lower().split(",") if s]
+    unknown = [s for s in named if s not in SAFEGUARDS]
+    if not named or unknown:
+        raise argparse.ArgumentTypeError("--waive takes %s, comma-separated" % ", ".join(SAFEGUARDS))
+    return tuple(named)
+
+
 def run_quote(p, a):
     def need(*flags):
         missing = [f for f in flags if getattr(a, f) is None]
@@ -918,12 +967,14 @@ def run_quote(p, a):
         if a.product not in ("call", "put"):
             p.error("quote --side buy takes --product call or put")
         otm = 5.0 if a.otm_pct is None else a.otm_pct
-        return build_buy_quote(a.product, a.underlying, a.budget, a.tenor, otm, a.delta, a.size, a.expiry, a.strike)
+        return build_buy_quote(a.product, a.underlying, a.budget, a.tenor, otm, a.delta, a.size, a.expiry,
+                               a.strike, a.waive)
     need("collateral")
     if a.product not in ("cash_secured_put", "covered_call"):
         p.error("quote --side sell takes --product cash_secured_put or covered_call")
     otm = 10.0 if a.otm_pct is None else a.otm_pct
-    return build_quote(a.product, a.underlying, a.collateral, a.tenor, otm, a.delta, a.expiry, a.strike)
+    return build_quote(a.product, a.underlying, a.collateral, a.tenor, otm, a.delta, a.expiry, a.strike,
+                       a.waive)
 
 
 def main():
@@ -949,6 +1000,8 @@ def main():
     q.add_argument("--premium-received", type=float,
                    help="buyback: what the note brought in, for the result")
     q.add_argument("--tenor", default="monthly", choices=sorted(TENOR_DAYS))
+    q.add_argument("--waive", type=safeguard_list, default=(),
+                   help="sell, buy: safeguards the owner chose to trade past (%s)" % ",".join(SAFEGUARDS))
     rule = q.add_mutually_exclusive_group()
     rule.add_argument("--otm-pct", type=float, default=None,
                       help="strike this far out of the money (sell 10, buy 5 by default)")
