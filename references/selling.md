@@ -209,4 +209,4 @@ A wide market: "You can sell it, but the spread is wide today: selling here hand
 16% of the option's value. Still want it?"
 
 A safeguard: "Butler has a safeguard here: selling now hands over 28% of the option's
-value to the spread. You can choose to trade past it; otherwise I'll leave it."
+value to the spread. Still want to go ahead, and happy to own it at that price?"

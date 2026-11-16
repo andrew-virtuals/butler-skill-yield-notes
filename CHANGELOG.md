@@ -9,8 +9,8 @@
     Rysk quote about to die.
   - `safeguards` (`waivable: true`) hold a sell or buy back: the spread giving up over
     20% of the option's value (`spread`), fees over 30% of the premium (`fees`), a Rysk
-    put with delta over 0.35 (`exercise`). The butler says the figure once; only the
-    owner's explicit choice re-quotes with `--waive <ids>`, and the open or buy passes
+    put with delta over 0.35 (`exercise`). The butler says the figure in the offer and
+    asks if they still want to go ahead; their yes re-quotes with `--waive <ids>`, and the open or buy passes
     `--waive` to bevo-server, which records it on the intent and puts a "Safeguard"
     line on the card (bevo-server `feat/options-safeguard-waive`).
   - `warnings` never stop a trade: spread over 10%, fees over 15%, a premium under $1,

@@ -197,7 +197,7 @@ failed: re-read `acp options account` and wait. Look up `:home` with `--route tr
 
 | Outcome | What to do |
 | --- | --- |
-| `waivable: true` | A safeguard: say its `text`, that they may waive it, and file nothing. Only their own explicit choice re-quotes it (`helper.md`). |
+| `waivable: true` | A safeguard: offer it with its `text` and ask if they still want to go ahead. Their yes re-quotes with `--waive` (`helper.md`). |
 | `no live bid` / `no live ask` | Opening: another strike, expiry or asset, or stop. Closing: nobody bids for theirs now; holding costs nothing. |
 | `collateral too small`, `budget too small` | Under the minimum. Give the reason's figures, work out no others, and stop unless they name another strike, expiry or amount. |
 | An `OPTIONS_*` refusal | Nothing filed: follow its hint; never raise a bound the owner agreed. |

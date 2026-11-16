@@ -88,8 +88,8 @@ A quote sorts what stands in a trade's way three ways:
   pays, a Paradex price outside the market's band, a Rysk quote about to die. Nothing
   waives them.
 - **Safeguards** (`safeguards`, `waivable: true`): a price poor enough that the butler
-  holds the trade back, says why with the figure, and files only once the owner, in
-  chat, chooses to trade past it. The quote is re-run with `--waive <ids>`, and the
+  holds the trade back, says why with the figure, and asks if they still want to go
+  ahead; their yes waives it. The quote is re-run with `--waive <ids>`, and the
   open or buy passes `--waive` on, so the card and the approval's intent record it
   (bevo-server `feat/options-safeguard-waive`).
 - **Warnings** (`warnings`; Rysk `notes`): said as written, never a stop.
