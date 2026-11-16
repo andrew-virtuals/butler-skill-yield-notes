@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.15.0
+
+- **RFQ when the owner asks.** New `references/rfq.md`: on Derive or Paradex, "RFQ", "request
+  a quote" or "ask the market makers" files step 5's command with `--order rfq` added and the
+  same total bound, never a price flag. The owner hears in one line, before approving, that the
+  makers have 20 seconds, the best quote inside the bound is taken, nothing trades otherwise,
+  and an RFQ never falls back to the book. After it: a no-maker refusal is never re-filed at a
+  looser bound without their yes, and the order book is the other offer. Step 5 points to it;
+  `venue.md` no longer says RFQ "is not used yet". Ships with bevo-server's RFQ PRs into
+  `feat/options-rfq`; until `OPTIONS_RFQ_ENABLED` is on, the server answers "takes no rfq
+  orders here" and the reference offers the book.
+
 ## 2.14.0
 
 - **Safeguards the owner can waive, and warnings, in place of hard refusals.** A quote's
