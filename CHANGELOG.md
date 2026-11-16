@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.14.0
+
+- **The owner picks the trade; a poor price warns instead of refusing.** The helpers'
+  quality gates are now `warnings` (Rysk: `notes`) the butler says as written before the
+  owner chooses: a spread over 5 vol points, fees over 15% of the premium, a premium
+  under $1, a best bid or ask smaller than the size (it may fill part-way), and on Rysk a
+  likely-exercised put or one paying under 4% a year. `tradeable: false` is left for what
+  the venue itself refuses: under its minimum, no bid or ask, a close whose fee is more
+  than the bid pays, a Paradex price outside its band, a Rysk quote about to die. The
+  owner's `--min-premium` and `--max-cost` bounds still cap every fill. A $1,000 BTC put
+  (2026-11-11) was refused when the best bid shrank to 0.01 under a 0.01538 note, and
+  every NVDA put (2026-11-16) for a spread of 5.1 to 13.8 vol points; both now quote.
+  SKILL.md's "never loosen a gate" rows go.
+
 ## 2.13.2
 
 - **The Platforms Cash line is spendable.** Files `options-account@5`: a resting order's line

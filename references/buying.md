@@ -91,7 +91,8 @@ $3.45 for every dollar below that; it only beats its cost below about $2,295."
 buyer gives away crossing the spread.
 
 - over 3: say the market is wide today and they are paying above fair value.
-- over 5: the helper refuses, with "you would be paying N% over fair value".
+- over 5: the quote warns "you would be paying N% over fair value": say it as
+  written, and file it if they still want it.
 
 ## A hedge
 

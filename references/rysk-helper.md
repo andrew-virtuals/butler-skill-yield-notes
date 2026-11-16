@@ -66,9 +66,11 @@ quote with `tradeable: false`, `size` 0 and `min_size`, the least Rysk prices; i
 reason, `collateral too small`, says what that needs, and what the same size needs at
 the day's lowest strike when a maker prices it there; it carries no premium and no
 `bad_case`: nothing was priced for the owner. Finding the minimum takes one ask per
-size step, so `screen` skips it and says only that Rysk would not price the amount. **Never offer a quote that is not
-`tradeable`**, always read the `notes`, and never soften either - they are written
-for an owner already.
+size step, so `screen` skips it and says only that Rysk would not price the amount.
+`tradeable: false` means Rysk will not take it (no maker size, under the minimum, or a
+quote about to die): nothing can be filed. A put likely to be exercised or paying under
+4% a year is a `note`, never a refusal. Always say the `notes`, and never soften either
+- they are written for an owner already.
 
 It contains a small WebSocket client because Rysk is RFQ over a socket and the
 container ships no websocket package. Nothing else in the script is unusual.

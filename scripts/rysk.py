@@ -57,16 +57,13 @@ BAD_CASE_FALL = 0.25
 #: the same 95% Butler's server applies when no floor is passed.
 MIN_PREMIUM_SHARE = 0.95
 
-# --- the gates -------------------------------------------------------------
-# Rysk has no spread to screen, so these are about the promise the owner is
-# making, not about execution quality.
+# --- the warnings ----------------------------------------------------------
+# Past these a quote carries a note, never a refusal: the owner picks the trade.
 
-#: How likely assignment is, as delta. Past this an owner is being sold an
-#: option that will probably be exercised, which is a different conversation
-#: from "earn on idle cash".
+#: How likely assignment is, as delta. Past this the put will probably be
+#: exercised, which the owner should hear before choosing it.
 MAX_ASSIGNMENT_DELTA = 0.35
 
-#: Below this the premium does not pay for the attention it costs.
 MIN_APR_PCT = 4.0
 
 #: Rysk takes fixed size steps that differ per asset and are not published in
@@ -555,12 +552,12 @@ def quote(asset, collateral_usd, tenor="monthly", otm_pct=10.0, target_delta=Non
             "round amount rarely lands exactly"
             % (format(collateral, ",.0f"), format(collateral_usd, ",.0f")))
     if abs(combo.get("delta") or 0) > MAX_ASSIGNMENT_DELTA:
-        q["reasons"].append(
+        q["notes"].append(
             "this is close enough to the money that it will probably be exercised "
             "(delta %.2f) - a likely purchase, not idle cash earning"
             % abs(combo["delta"]))
     if apr < MIN_APR_PCT:
-        q["reasons"].append(
+        q["notes"].append(
             "%.1f%% a year does not pay for locking the money up until %s"
             % (apr, combo.get("expiry")))
     if left < MIN_QUOTE_SECONDS_LEFT:

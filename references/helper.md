@@ -49,9 +49,11 @@ by ticker alone, never a guess at what it is.
 
 `quote` is the sell side unless `--side buy`, `--side close` or `--side buyback` says
 otherwise. Every
-quote carries `tradeable` and, when false, `reasons` in plain English. **Never offer a
-trade whose quote is not `tradeable`**, and never rewrite a reason into something
-softer - they are already written for an owner.
+quote carries `tradeable` and `warnings`. `tradeable: false` is a limit the venue
+itself enforces (under its minimum, nobody bidding or asking), with `reasons` in plain
+English: nothing can be filed. `warnings` say what a poor price costs: say each as
+written and let the owner choose; never withhold a trade over one. Never rewrite either
+into something softer - they are already written for an owner.
 
 ## The minimum, before an amount
 
@@ -79,12 +81,12 @@ lowest strike, or `null` when the put is that one. Puts only.
 | `breakeven` | strike less the bid for a put, plus it for a call |
 | `bad_case` | put only: `price`, the asset `fall_pct` (25) below spot, and `loss_usd`, what the note is down at expiry there, premium already counted. The bad case is said with these, first |
 | `edge_vs_fair_vol_pts` | how far the bid sits under Derive's own mark; negative for a seller |
-| `bid_depth` | contracts on the best bid; a note bigger than this is refused |
+| `bid_depth` | contracts on the best bid; a note bigger than this warns it may fill part-way |
 | `valid_until` | 60 seconds after the read; quote again past it |
 
-Gates: the bid within 5 vol points of mark, fees at most 15% of the premium, a
-premium of at least $1, and the best bid covering the whole note. Size is always what
-the collateral **fully** covers, rounded down to Derive's step.
+Warnings, never refusals: the bid more than 5 vol points under mark, fees over 15% of
+the premium, a premium under $1, or the best bid smaller than the note. Size is always
+what the collateral **fully** covers, rounded down to Derive's step.
 
 ## The buy quote, field by field
 
@@ -112,10 +114,10 @@ it is refused with the strikes it does.
 | `budget_usd` | the budget asked for (absent with `--size`) |
 | `valid_until` | 60 seconds after the read |
 
-Buyer gates, each a reason in `reasons`: no live ask; the ask thinner than the size;
-the ask more than 5 vol points over mark ("you would be paying N% over fair value");
-fees over 15% of the premium; a budget (or size) under Derive's minimum, with what the
-minimum costs.
+A buy is refused only with no live ask, or a budget (or size) under Derive's minimum,
+with what the minimum costs. It warns when the ask is thinner than the size, more than
+5 vol points over mark ("you would be paying N% over fair value"), or fees are over 15%
+of the premium.
 
 ## The close quote, field by field
 
@@ -133,9 +135,9 @@ Prices selling back `--size` contracts of `--instrument`, an option the owner ho
 | `edge_vs_fair_vol_pts` | how far the bid sits under mark; negative is the spread |
 | `warnings` | the market is wide, or fees take a big share: say so, it does not stop a close |
 
-A close is refused (`tradeable: false`) only when there is no bid, the bid is thinner
-than the size, or the fee is more than the bid pays. An owner cutting a loss may accept
-a wide market; tell them it is wide.
+A close is refused (`tradeable: false`) only when there is no bid or the fee is more
+than the bid pays; a bid thinner than the size warns it may fill part-way. An owner
+cutting a loss may accept a wide market; tell them it is wide.
 
 ## The buy-back quote, field by field
 
@@ -158,6 +160,7 @@ what they got for it: `netPremiumUsd` from the open's outcome, or the lifecycle 
 | `overpay_vs_fair_vol_pts` | how far the ask sits over mark; positive is the spread |
 | `warnings` | the market is wide, or the buy-back costs more than the note brought in |
 
-A buy-back is refused only when there is no ask or the ask is thinner than the size. An
-owner getting out of a falling put may accept a wide market; tell them it is wide.
+A buy-back is refused only when there is no ask; an ask thinner than the size warns it
+may fill part-way. An owner getting out of a falling put may accept a wide market; tell
+them it is wide.
 

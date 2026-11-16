@@ -55,9 +55,8 @@ V = {"id": "derive", "name": "Derive"}
 VENUES = {"derive": {"id": "derive", "name": "Derive"},
           "paradex": {"id": "paradex", "name": "Paradex"}}
 
-# Calibrated against measured spreads and fees; see README.md, Measurements.
-# ETH and BTC bids sit a few vol points under mark, every other listed asset
-# 10 to 60. Do not lower this to 2: that rejects every fill, good ones too.
+# Past these a quote carries a warning, never a refusal: the owner picks the
+# trade and hears what it costs them. See README.md, Measurements.
 MAX_VOL_GAP_PTS = 5.0
 MAX_FEE_DRAG = 0.15
 MIN_PREMIUM_USD = 1.00
@@ -435,6 +434,7 @@ def build_quote(product, underlying, collateral_usd, tenor="monthly",
         },
         "tradeable": False,
         "reasons": [],
+        "warnings": [],
     }
 
     if size < min_amt or size <= 0:
@@ -479,21 +479,20 @@ def build_quote(product, underlying, collateral_usd, tenor="monthly",
         }
 
     if bid_sz < size:
-        q["reasons"].append(
-            "the bid is only %s contracts and this note needs %s - it would fill "
-            "part-way or walk the book" % (plain(bid_sz), plain(size)))
+        q["warnings"].append(
+            "the best bid is only %s contracts and this note is %s - it may fill "
+            "part-way" % (plain(bid_sz), plain(size)))
     if gap > MAX_VOL_GAP_PTS:
-        q["reasons"].append(
-            "the market is %.1f vol points wide against the seller (limit %.1f): "
-            "selling here hands over %d%% of the option's value"
-            % (gap, MAX_VOL_GAP_PTS, int(math.floor((1 - bid / mark) * 100 + 0.5)) if mark else 0))
+        q["warnings"].append(
+            "the market is %.1f vol points wide against the seller: selling here "
+            "hands over %d%% of the option's value"
+            % (gap, int(math.floor((1 - bid / mark) * 100 + 0.5)) if mark else 0))
     if gross < MIN_PREMIUM_USD:
-        q["reasons"].append("premium is $%.2f - too small to be worth a trade" % gross)
+        q["warnings"].append("the premium is only $%.2f" % gross)
     elif fee / gross > MAX_FEE_DRAG:
-        q["reasons"].append(
-            "fees are %d%% of the premium (limit %d%%): too small a ticket, or "
-            "too short a tenor" % (int(math.floor(fee / gross * 100 + 0.5)),
-                                   int(math.floor(MAX_FEE_DRAG * 100 + 0.5))))
+        q["warnings"].append(
+            "fees are %d%% of the premium: a bigger ticket or a longer tenor keeps "
+            "more of it" % int(math.floor(fee / gross * 100 + 0.5)))
 
     q["tradeable"] = not q["reasons"]
     return q
@@ -586,6 +585,7 @@ def build_buy_quote(product, underlying, budget_usd=None, tenor="monthly",
         "delta": rnd(num(op.get("d")), 4),
         "tradeable": False,
         "reasons": [],
+        "warnings": [],
     }
     if budget_usd is not None:
         q["budget_usd"] = rnd(budget_usd, 2)
@@ -647,19 +647,18 @@ def build_buy_quote(product, underlying, budget_usd=None, tenor="monthly",
     })
 
     if ask_sz < size:
-        q["reasons"].append(
-            "the ask is only %s contracts and this buy needs %s - it would fill "
-            "part-way or walk the book" % (plain(ask_sz), plain(size)))
+        q["warnings"].append(
+            "the best ask is only %s contracts and this buy is %s - it may fill "
+            "part-way" % (plain(ask_sz), plain(size)))
     if gap > MAX_VOL_GAP_PTS:
-        q["reasons"].append(
-            "the market is %.1f vol points wide against the buyer (limit %.1f): "
-            "you would be paying %d%% over fair value"
-            % (gap, MAX_VOL_GAP_PTS, int(math.floor((ask / mark - 1) * 100 + 0.5)) if mark else 0))
+        q["warnings"].append(
+            "the market is %.1f vol points wide against the buyer: you would be "
+            "paying %d%% over fair value"
+            % (gap, int(math.floor((ask / mark - 1) * 100 + 0.5)) if mark else 0))
     if fee / gross > MAX_FEE_DRAG:
-        q["reasons"].append(
-            "fees are %d%% of the premium (limit %d%%): too small a ticket, or "
-            "too short a tenor" % (int(math.floor(fee / gross * 100 + 0.5)),
-                                   int(math.floor(MAX_FEE_DRAG * 100 + 0.5))))
+        q["warnings"].append(
+            "fees are %d%% of the premium: a bigger ticket or a longer tenor keeps "
+            "more of it" % int(math.floor(fee / gross * 100 + 0.5)))
 
     q["tradeable"] = not q["reasons"]
     return q
@@ -758,9 +757,9 @@ def build_close_quote(instrument, size):
         "valid_until": iso(now + QUOTE_TTL_SEC),
     })
     if bid_sz < size:
-        q["reasons"].append(
-            "the bid is only %s contracts and this close is %s - close %s or less"
-            % (plain(bid_sz), plain(size), plain(bid_sz)))
+        q["warnings"].append(
+            "the best bid is only %s contracts and this close is %s - it may fill "
+            "part-way" % (plain(bid_sz), plain(size)))
     if net <= 0:
         q["reasons"].append(
             "%s's fee ($%.2f) is more than the bid pays ($%.2f): closing gets nothing back"
@@ -831,9 +830,9 @@ def build_buyback_quote(instrument, size, premium_received=None):
                 "buying back costs $%.2f, more than the $%.2f the note brought in: a $%.2f loss taken now"
                 % (total, premium_received, total - premium_received))
     if ask_sz < size:
-        q["reasons"].append(
-            "the ask is only %s contracts and this buy-back is %s - buy back %s or less"
-            % (plain(ask_sz), plain(size), plain(ask_sz)))
+        q["warnings"].append(
+            "the best ask is only %s contracts and this buy-back is %s - it may fill "
+            "part-way" % (plain(ask_sz), plain(size)))
     if gap > MAX_VOL_GAP_PTS:
         q["warnings"].append(
             "the market is %.1f vol points wide: buying back here pays %d%% over fair value"

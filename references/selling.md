@@ -15,7 +15,8 @@ and keeping the fee. The premium is certain. What they own at expiry is not.
 - **Which asset is theirs to name.** `screen` says which assets can carry a note today;
   it is not a menu. Never lay out APRs of assets or strikes side by side (one asset on
   several venues is `references/which-venue.md`). If more than one is `tradeable`,
-  name them and ask which they would happily own lower, then quote that one.
+  name them and ask which they would happily own lower, then quote that one, with its
+  `warnings`.
 - **How much is theirs to name.** No amount yet: quote nothing, not even at a round
   number or their whole balance. Each venue's `minimum` says what the smallest put
   needs there; say those and ask (`references/which-venue.md`).
@@ -117,7 +118,8 @@ negative for a seller - that is the spread, and it is what a market maker keeps.
 
 - worse than -3: say the market is wide today and they are not getting a great
   price.
-- worse than -5: the helper refuses. Say nothing is worth doing and why.
+- worse than -5: the quote warns how much of the option's value the spread takes. Say
+  it as written, before the ownership question; the choice is theirs.
 
 An owner who hears "16% a year" without hearing that the spread took part of the
 premium has been told half of it.
@@ -189,8 +191,8 @@ Never auto-roll without a fresh yes.
 The smallest note is the quote's `min_size` x the strike, so it moves with the strike; a
 smaller one is refused with what the minimum needs (`collateral too small`). Fees make
 anything near it poor value.
-Monthly by default: weeklies lose far more of the premium to fees and the spread,
-and the fee gate refuses them on small notes.
+Monthly by default: weeklies lose far more of the premium to fees and the spread, and
+the quote warns when fees pass 15% of it.
 
 ## Say to the owner
 
@@ -203,5 +205,5 @@ October?"
 A no to that, and nothing after it: "Then a put is not for this money - every one is a
 promise to buy. I won't file anything."
 
-Nothing clears: "Nothing worth doing today - the market is wide; you would give away
-too much to get filled."
+A wide market: "You can sell it, but the spread is wide today: selling here hands over
+16% of the option's value. Still want it?"

@@ -45,7 +45,7 @@ python3 ~/skills/options-trading/scripts/rysk.py chain --asset <ASSET> [--expiry
 takes it from there. Its quote carries the Derive helper's field names
 (`instrument`, `size`, `collateral.amount`, `net_premium_usd`, `fee_usd`,
 `min_premium_usd`, `apr_pct`, `bad_case`), so steps 3 and 5 read it unchanged. Offer
-only `tradeable: true`, and always say its `notes`. Use `--delta 0.20` instead when
+only `tradeable: true`, and always say its `notes`, which never stop it. Use `--delta 0.20` instead when
 the owner wants the odds of assignment held steady rather than the distance from spot.
 
 A strike or day the owner named goes in as `--strike` and `--expiry`, as

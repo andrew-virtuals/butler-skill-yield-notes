@@ -1,7 +1,7 @@
 ---
 name: options-trading
 description: Trade options on Derive, Paradex or Rysk - earn on idle USDC by selling cash-secured puts, buy a call or a put, close before expiry, and check or withdraw USDC and positions.
-version: 2.13.2
+version: 2.14.0
 metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","withdraw","withdraw my usdc","derive","my options","options account","options positions","free usdc","derive positions","my option positions","withdraw from derive","withdraw my free usdc","paradex","paradex options","paradex positions","rysk","rysk options","rysk positions","physically settled","hyperevm","limit order","resting order","at my price","or better","leave it on the book","cancel my order"],"requires":{"bins":["python3","bevo-read","acp"]}}}
 ---
 
@@ -22,7 +22,7 @@ Your owner wants one of four things on Derive, Paradex or Rysk options:
   cash), "my positions": step 1, then stop. "Withdraw my free USDC": step 8, never an
   `acp trade` (`references/account.md`). Listing: `references/listing.md`.
 
-Not this skill: covered calls, spreads, leverage, or a trade the helper refuses.
+Not this skill: covered calls, spreads or leverage.
 
 ## Before you start
 
@@ -87,10 +87,11 @@ this chat. One missing: ask, and file nothing this turn.
    `--budget` the most they will spend. Closing: instrument and size from `positions`;
    positive is `--side close`; negative, `--side buyback` with the size positive and
    `--premium-received` the note's `netPremiumUsd` (or its duty's PREMIUM_USD) scaled
-   to it. **Offer only `tradeable: true`**; give the `reasons` as written. A strike or
+   to it. `tradeable: false` is a venue limit: give its `reasons` as written. A strike or
    day they named: `buying.md`.
 
-3. [ADAPT] Offer it using **only** quote fields; never compute a number:
+3. [ADAPT] Offer it using **only** quote fields, its `warnings` said as written and
+   never a reason to withhold it; never compute a number:
    - **Sell:** `bad_case` first, then `net_premium_usd`, `fee_usd`, the lock to
      `expiry`; `apr_pct` last. Then, on its own: *"Happy to own 0.13 ETH at $2,200 on
      30 October?"* A no or a vague answer ends it: no other strike, tenor or asset.
@@ -98,9 +99,9 @@ this chat. One missing: ask, and file nothing this turn.
    - **Buy:** not yield; `max_cost_usd` is the most they pay and can lose, all of it;
      `breakeven` is where it pays at expiry. Get an explicit yes to *"you can lose the whole $199.54"*.
    - **Close (sell back):** `net_proceeds_usd` now, against what they paid (the duty's
-     PREMIUM_USD); `warnings` as written. Ask the floor (`min_proceeds_usd` suggested).
+     PREMIUM_USD). Ask the floor (`min_proceeds_usd` suggested).
    - **Close (buy back):** `total_cost_usd` now, then `result_usd` (what the note made
-     or lost); `warnings` as written; it frees `frees`. Ask the ceiling (`max_cost_usd`
+     or lost); it frees `frees`. Ask the ceiling (`max_cost_usd`
      suggested). Waiting costs nothing: say so when `result_usd` is negative.
 
 4. [FIXED] With all four met, fund a sell or a buy only when `freeForNewPutsUsd` is below
@@ -195,10 +196,7 @@ failed: re-read `acp options account` and wait. Look up `:home` with `--route tr
 
 | Outcome | What to do |
 | --- | --- |
-| Nothing `tradeable` | Say nothing is worth doing today and why. Never loosen a gate. |
 | `no live bid` / `no live ask` | Opening: another strike, expiry or asset, or stop. Closing: nobody bids for theirs now; holding costs nothing. |
-| `vol points wide`, `paying N% over fair value` | A poor price; say so, never trade it. |
-| `fees are N% of the premium` | Too small or too short. Offer monthly or bigger. |
 | `collateral too small`, `budget too small` | Under the minimum. Give the reason's figures, work out no others, and stop unless they name another strike, expiry or amount. |
 | An `OPTIONS_*` refusal | Nothing filed: follow its hint; never raise a bound the owner agreed. |
 | No fill | Nobody took it at the agreed bound (never "no liquidity"); nothing moved. Re-quote, re-ask, never re-file the same bound. |

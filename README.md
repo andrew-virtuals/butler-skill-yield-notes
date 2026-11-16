@@ -27,7 +27,7 @@ to outcome:
 - **Look or withdraw:** read the venue account (free USDC, positions) and withdraw free
   USDC to the owner's wallet.
 
-Not covered: covered calls, spreads, leverage, and any trade the helper refuses.
+Not covered: covered calls, spreads or leverage.
 
 ## Venues
 
@@ -79,32 +79,33 @@ setting.
 - **Full collateral.** A put's size is what the collateral fully covers; none of the
   venues' margin is used.
 
-## The gates
+## Warnings, not gates
 
-The helper gates at quote time instead of keeping an allowlist, because on most days only
-a few books can be crossed by a retail-sized trade:
+The owner picks the trade. A quote is refused (`tradeable: false`) only where the venue
+itself would refuse it: under its minimum size, nobody bidding or asking, a close whose
+fee is more than the bid pays, a Paradex price outside the market's band, or a Rysk
+quote about to die. Everything below is a warning the butler says as written before the
+owner chooses; none stops a trade, and the owner's `--min-premium` or `--max-cost`
+bound still caps what a fill can cost them:
 
-| Gate | Default | Side | Why |
+| Warning | Default | Side | Why |
 | --- | --- | --- | --- |
 | `MAX_VOL_GAP_PTS` | 5.0 | both | Bid under mark (selling) or ask over mark (buying). ETH's and BTC's own spreads are a few points wide; a 2-point guard would reject every fill. |
 | `MAX_FEE_DRAG` | 15% | both | Derive's $0.50 base fee is charged per order and is uncapped, so it swamps small tickets and weeklies. Paradex charges no base fee. |
 | `MIN_PREMIUM_USD` | $1 | sell | Below it the premium rounds to nothing. |
-| depth ≥ size | - | both | The best bid (selling) or ask (buying) must cover the whole size, or the order walks the book. |
+| depth < size | - | both | The best bid (selling) or ask (buying) is smaller than the size, so the order may fill part-way. |
 | `MAX_COST_HEADROOM` | 1.05 | buy | `max_cost_usd` is the total cost plus 5%, and a budget buy is sized so that ceiling fits inside the budget. |
 
-These match Butler's server's reference quote engine; keep the constants and the
-`reasons` strings in step with it. A close is refused only with no bid, a bid thinner
-than the size, or a fee larger than the proceeds; a buy-back only with no ask or an ask
-thinner than the size. A wide market is a warning there, since an owner cutting a loss
-may accept it. On Paradex a price outside the market's price band counts as no price.
-Rysk's helper has its own gates (`references/rysk-helper.md`).
+On Paradex a price outside the market's price band counts as no price. Rysk's helper
+notes a put likely to be exercised (delta over 0.35) or paying under 4% a year
+(`references/rysk-helper.md`).
 
 ## Measurements
 
 Apart from Derive's $10 minimum deposit and the Base bridge's ~$0.10 (in
 `references/venue.md`), nothing a butler reads states a venue figure: fees, minimums,
 sizes, times and which assets clear come from the quote, the account read, the card or
-its outcome, so they cannot go stale in the skill. What was measured, for the people tuning the gates, is
+its outcome, so they cannot go stale in the skill. What was measured, for the people tuning the warnings, is
 here only; re-measure before relying on a spread or a depth.
 
 Derive v3 mainnet, 7 October 2026 (selling) and 9 October 2026 (buying):

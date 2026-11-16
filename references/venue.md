@@ -79,17 +79,15 @@ taker fee = base_fee + min(taker_fee_rate x index x size, mark_price_fee_rate_ca
 
 Each term is read from the instrument, and the quote's `fee_usd` is the result. The base
 fee is per order and uncapped, which is what makes small tickets and short tenors
-pointless: the helper refuses a sell or a buy whose fee is over 15% of the premium.
+poor value: a sell or a buy whose fee is over 15% of the premium carries a warning.
 
 ## Spreads: what decides which trades clear
 
 The gap between Derive's mark IV and the bid IV is what a seller crossing the spread
 gives away; the gap between the ask IV and mark IV is what a buyer gives away. The
-helper refuses either over **5 vol points**; a 2-point guard would reject every fill,
-good ones included.
+helper warns past **5 vol points**; outside ETH and BTC most books sit wider than that.
 
-The offerable set is an output of the gates, not a list: it changes as books deepen or
-thin, often within a day. A single empty read just after an expiry rolls is not evidence
+Spreads and depth change as books deepen or thin, often within a day. A single empty read just after an expiry rolls is not evidence
 an asset is dead - quote fresh, never cache a book, and never say which assets clear from
 memory.
 
