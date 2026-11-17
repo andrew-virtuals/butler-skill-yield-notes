@@ -56,7 +56,7 @@ model. If a sentence needs a number the quote does not carry, the sentence is wr
 | the date | `expiry` |
 | how much of the asset | `size` |
 | what is locked | `collateral.amount` (`collateral.usd` in dollars) |
-| fees | `fee_usd`, always its own line |
+| fees | `fee_usd`, always its own line, split when `platform_fee_usd` is above 0: "$0.65 in fees: $0.62 to Derive and $0.03 Virtuals platform fee". At 0: "$0.62 in fees, all Derive's; no Virtuals platform fee". Always the words "Virtuals platform fee", never "platform" alone, and never Butler's. The receipt after the fill says it the same way, at 0 too |
 | how good the price is | `edge_vs_fair_vol_pts` |
 
 ## The shape

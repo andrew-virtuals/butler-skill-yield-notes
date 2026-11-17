@@ -23,6 +23,14 @@ python3 ~/skills/options-trading/scripts/quote.py quote --venue paradex --side b
 python3 ~/skills/options-trading/scripts/quote.py quote --venue paradex --side close --instrument ETH-USD-27NOV26-2600-C --size 0.1
 ```
 
+**A Derive quote or screen reads the Virtuals platform fee itself**: `platformFeeRate`
+from `acp options account --venue derive --json`, a share of the premium (`0` is none;
+absent, an older server charging 0.5%: `0.005`). If that read fails, the quote stops
+with exit 1 and `could not read the Virtuals platform fee`: say Butler cannot price
+the fee right now, and quote nothing. The fee is in `fee_usd` and every total, as on
+the card, and is `platform_fee_usd`; how to say it is in `buying.md` and `selling.md`.
+Paradex takes none.
+
 `--venue paradex` (any command) reads Paradex instead, and every field below means the
 same there: names like `ETH-USD-27NOV26-2600-C`, sizes in the asset on the market's own
 step with Paradex's own order minimum (both in `size_step` and `min_size`), Paradex's fee, and only
@@ -72,7 +80,8 @@ lowest strike, or `null` when the put is that one. Puts only.
 | `collateral.amount` | what the note locks: USDC for a put, units of the asset for a call; passed to `--max-collateral` |
 | `collateral.usd` | the same in dollars |
 | `premium_usd` | the bid times the size, before fees |
-| `fee_usd` | Derive's taker fee for the whole note |
+| `fee_usd` | the whole fee: Derive's taker fee plus the Virtuals platform fee |
+| `venue_fee_usd`, `platform_fee_usd` | `fee_usd` in its two parts: Derive's, and the Virtuals platform fee (`0`: none). Every quote carries them |
 | `net_premium_usd` | what the owner receives: `premium_usd` less `fee_usd` |
 | `min_premium_usd` | 95% of `net_premium_usd`, rounded down to the cent; passed to `--min-premium` |
 | `apr_pct` | the net premium over the collateral, annualised - "if you kept doing this" |
@@ -101,7 +110,7 @@ it is refused with the strikes it does.
 | `size` | contracts; passed to `--size`. From a budget: the most the budget buys at the ask plus fee **with 5% room**, floored to Derive's step |
 | `ask_price`, `ask_depth` | the best offer per contract, and how many contracts sit on it |
 | `premium_usd` | the ask times the size |
-| `fee_usd` | Derive's taker fee for the whole buy |
+| `fee_usd` | Derive's taker fee plus the Virtuals platform fee, split as on a sell |
 | `total_cost_usd` | `premium_usd` plus `fee_usd`: what the owner pays at today's ask |
 | `max_loss_usd` | the same number: a bought option can lose all of what it cost, and no more |
 | `max_cost_usd` | about 5% over `total_cost_usd`, rounded up to the cent, never over the budget; passed to `--max-cost`. It is what the owner agrees they can lose |
@@ -126,7 +135,7 @@ Prices selling back `--size` contracts of `--instrument`, an option the owner ho
 | --- | --- |
 | `bid_price`, `bid_depth` | the best bid per contract, and its size |
 | `proceeds_usd` | the bid times the size, before fees |
-| `fee_usd` | Derive's fee for the sale |
+| `fee_usd` | Derive's fee for the sale plus the Virtuals platform fee, split as on a sell |
 | `net_proceeds_usd` | what the owner receives: `proceeds_usd` less `fee_usd` |
 | `min_proceeds_usd` | 95% of `net_proceeds_usd`, rounded down; the suggested `--min-proceeds` |
 | `fair_value_usd` | Derive's mark times the size |
@@ -148,7 +157,7 @@ what they got for it: `netPremiumUsd` from the open's outcome, or the lifecycle 
 | --- | --- |
 | `ask_price`, `ask_depth` | the best offer per contract, and its size |
 | `cost_usd` | the ask times the size, before fees |
-| `fee_usd` | Derive's fee for the buy-back |
+| `fee_usd` | Derive's fee for the buy-back plus the Virtuals platform fee, split as on a sell |
 | `total_cost_usd` | `cost_usd` plus `fee_usd`: what ending the note costs at today's ask |
 | `max_cost_usd` | about 5% over `total_cost_usd`, rounded up to the cent; the suggested `--max-cost` |
 | `premium_received_usd` | as given (absent without `--premium-received`) |

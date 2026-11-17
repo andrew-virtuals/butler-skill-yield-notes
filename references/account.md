@@ -19,6 +19,7 @@ back to `bevo-read assets`, and never report an unreadable account as empty.
 | Field | Meaning |
 | --- | --- |
 | `signerReady` | `false`: Butler's signer is not enabled, so nothing can be filed. Reads still answer. |
+| `platformFeeRate` | The Virtuals platform fee on a Derive order, a share of its premium (`0`: none). The helper reads it itself; an older server without it charges 0.5%. |
 | `account.exists` | `false`: no Derive account yet. The first deposit creates it. |
 | `account.usdc` | All USDC on Derive, across every account below: free plus locked. |
 | `account.lockedForPutsUsd` | USDC backing sold puts. It cannot leave until the put settles or is bought back. |

@@ -1,5 +1,40 @@
 # Changelog
 
+## 2.13.3
+
+- **A Derive quote's fee is the fee the fill charges, and the owner hears whose it is.**
+  Seen live: the quote said "$6.28 premium plus $0.62 fee, $6.90 all in", the card
+  said a fee of about $0.65, and the fill charged $0.6548. `quote.py` priced Derive's
+  taker fee alone ($0.6234) and left out the Virtuals platform fee ($0.0314, 0.5%),
+  which the server sends with the order as Derive's `extra_fee` (Derive's "builder
+  fee") and counts on the card. A Derive quote or screen now reads the rate itself,
+  `platformFeeRate` from `acp options account --venue derive --json` (0.5% when an older
+  server leaves it out), and stops with exit 1 when it cannot: a fee guessed low is
+  this bug again. There is no flag for the model to pass or forget; a first cut had one,
+  and 3 of 9 eval agents left it off their first quote. The fee is inside `fee_usd`,
+  every total and net, the size a budget buys and the fee gate, and is split into
+  `venue_fee_usd` and `platform_fee_usd`. Paradex, `chain` and `minimum` read nothing.
+  bevo-server charges no platform fee unless `DERIVE_BUILDER_FEE_RATE` is set
+  (bevo-server #1656).
+- **Every offer and every receipt splits the fee.** Step 3 gives the words: "$0.65 in
+  fees: $0.62 to Derive, $0.03 Virtuals platform fee", or at 0 "no Virtuals platform
+  fee"; `buying.md` and `selling.md` say the same for the receipt, and step 6 gives the
+  fees as the outcome's `summary` splits them, Virtuals named, at 0 too.
+  Live-model eval (virtuals-agent `options-fees` on an image built from bf92809, the
+  commit production runs; deepseek-v4-1-flash; an ETH call on Derive with $20 at live
+  quotes): 2.13.2 at 0.5% quoted $0.69 against a $0.78 fill in 3 of 3 trials and named
+  no Virtuals fee in any offer. 2.13.3 passed 8 of 8 (4 at 0.5%, 4 at 0): every buy
+  filed, quote fee equal to the fill's, and offer and receipt both splitting it ("$0.78
+  in fees ($0.69 to Derive, $0.09 Virtuals platform fee)"; "$0.69 in fees, all Derive's,
+  with no Virtuals platform fee"). An earlier cut whose step 6 left out "Virtuals named"
+  missed the split in 1 zero-rate receipt.
+- `SKILL.md` stays under 12,000 characters by wording cuts with no rule changed: bare
+  reference names where the rest of the file already uses them, and a few sentences
+  tightened. "One of four things" is gone; the list has five.
+- `tests/test_quote_platform_fee.py`: the rate read from the account, an older server's
+  0.5%, an unreadable account or a bad rate stopping the quote, the fee in every total,
+  parts that add up, a budget buying less, and no read on Paradex, `chain` or `minimum`.
+
 ## 2.13.2
 
 - **The Platforms Cash line is spendable.** Files `options-account@5`: a resting order's line
