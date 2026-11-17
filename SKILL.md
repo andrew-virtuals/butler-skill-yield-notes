@@ -7,20 +7,20 @@ metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","m
 
 ## When to use
 
-Your owner wants one of four things on Derive, Paradex or Rysk options:
+Your owner wants, on Derive, Paradex or Rysk options:
 
 - **Earn** - "earn on my USDC", "get paid to buy the dip": **sell** one cash-secured
   put, fully collateralised in USDC. They keep the premium and may end up buying the
-  asset at the strike (`references/selling.md`).
+  asset at the strike (`selling.md`).
 - **Buy** - "buy an ETH call", "hedge my ETH with a put": **buy** one call or put.
-  Not yield: they pay up front and can lose all of it (`references/buying.md`).
+  Not yield: they pay up front and can lose all of it (`buying.md`).
 - **Close** - before expiry: "sell my call back" **sells back** an option they
   **bought**; "get out of my put", "free my collateral" **buys back** a note they
   **sold**.
 - **At their price** - "or better", "cancel my order": `references/resting.md`.
 - **Look or withdraw** - "my free USDC in Derive" (`freeForNewPutsUsd`, not wallet
   cash), "my positions": step 1, then stop. "Withdraw my free USDC": step 8, never an
-  `acp trade` (`references/account.md`). Listing: `references/listing.md`.
+  `acp trade` (`account.md`). Listing: `listing.md`.
 
 Not this skill: covered calls, spreads or leverage.
 
@@ -29,21 +29,21 @@ Not this skill: covered calls, spreads or leverage.
 1. **Which one.** Earning and buying are different promises; never blur them.
    Selling fits only USDC whose owner would happily buy the asset lower; a no to that
    ends selling, every put on it.
-2. **Sizes are in the asset:** say "0.16 ETH", never "contracts", and never convert;
+2. **Sizes are in the asset:** say "0.16 ETH", never "contracts", never convert;
    `min_size` is only its minimum.
 3. **The bad case first, in their words, before any upside number:** selling, from
    `bad_case`; buying, that what it costs is gone.
 4. **First time for that kind of trade:** the plain yes answers in
-   `references/selling.md` or `buying.md`. A no or a vague answer stops it.
+   `selling.md` or `buying.md`. A no or a vague answer stops it.
 5. **Figures come only from this turn's reads:** sizes, prices and positions
-   from `acp options account` and quotes, never memory; a note that disagrees is wrong:
-   fix it. `bevo-read assets` has none.
+   from `acp options account` and quotes, never memory; fix a note that
+   disagrees. `bevo-read assets` has none.
 6. **Venue.** Quote an open on each venue offering it, unless they name one; the
    rest where it is. `--venue` it everywhere.
 
 ### Never file without all four
 
-Before any `acp options` deposit, open, buy or close, from the owner's own words in
+Before any `acp options` deposit, open, buy or close, from the owner's words in
 this chat. One missing: ask, and file nothing this turn.
 
 1. **They chose it.** Asset and amount to open; option and size to close. Never fill
@@ -66,12 +66,12 @@ this chat. One missing: ask, and file nothing this turn.
    ```
 
    `signerReady: false` - stop: the owner must enable Butler's signer first. Fields:
-   `references/account.md`. An unreadable account is not an empty one. On
+   `account.md`. An unreadable account is not an empty one. On
    `exists: true` on any venue, step 9.
 
 2. [FIXED] Run the helper in place; never write, copy or edit a script, or trim its
    output. Missing: say so, and stop. Quote with the line for the intent
-   (`references/helper.md`); the strike is a rule or theirs:
+   (`helper.md`); the strike is a rule or theirs:
 
    ```sh
    python3 ~/skills/options-trading/scripts/quote.py screen --collateral <USD>
@@ -93,10 +93,11 @@ this chat. One missing: ask, and file nothing this turn.
 
 3. [ADAPT] Offer it using **only** quote fields, its `warnings` said as written and
    never a reason to withhold it; never compute a number:
-   - **Sell:** `bad_case` first, then `net_premium_usd`, `fee_usd`, the lock to
+   - **Fees:** "$0.65 in fees: $0.62 to Derive, $0.03 Virtuals platform fee"; 0: "no Virtuals platform fee".
+   - **Sell:** `bad_case` first, then `net_premium_usd`, the lock to
      `expiry`; `apr_pct` last. Then, on its own: *"Happy to own 0.13 ETH at $2,200 on
      30 October?"* A no or a vague answer ends it: no other strike, tenor or asset.
-     Butler buys the asset afterwards only if they ask now.
+     Butler buys the asset later only if they ask now.
    - **Buy:** not yield; `max_cost_usd` is the most they pay and can lose, all of it;
      `breakeven` is where it pays at expiry. Get an explicit yes to *"you can lose the whole $199.54"*.
    - **Close (sell back):** `net_proceeds_usd` now, against what they paid (the duty's
@@ -114,14 +115,14 @@ this chat. One missing: ask, and file nothing this turn.
    acp options deposit --amount <DEPOSIT_USDC> --idempotency-key <KEY>:deposit
    ```
 
-   On any venue the bot gathers stablecoins from **every chain**, not one.
+   The bot gathers stablecoins from **every chain**, any venue.
    `--from 1` only when `ethereum.usdc` covers it alone. Never ask about gas or an
-   address. Re-read `acp options account` until free USDC covers the trade, and do step
+   address. Re-read the account until free USDC covers the trade, and do step
    9; if short, re-quote smaller and re-offer. Free USDC spans their Derive
    accounts (`account.md`).
 
 5. [FIXED] Run the quote again now, after their last answer. With all four met, file
-   the one command, with that quote's fields and the bound they agreed:
+   the command, with that quote's fields and the bound they agreed:
 
    ```sh
    acp options open --instrument <instrument> --size <size> --min-premium <min_premium_usd> --max-collateral <collateral.amount> [--waive <waive>] --idempotency-key <KEY>:open
@@ -133,8 +134,8 @@ this chat. One missing: ask, and file nothing this turn.
    One bound per close. The reply is an approval card, not a fill: tell the owner to
    approve it in the app. At their price: `resting.md`.
 
-6. [FIXED] Wait for the outcome; never re-run the command to find it. The server nudges
-   you here when the card lands. Then:
+6. [FIXED] Wait for the outcome; never re-run the command for it. The server nudges
+   you when the card lands. Then:
 
    ```sh
    bevo-read request <KEY>:<OP> --route options
@@ -142,7 +143,7 @@ this chat. One missing: ask, and file nothing this turn.
 
    `approvalStatus: confirmed` - `approvalOutcome` holds the fill, maybe partial:
    `filledSize`, plus open `netPremiumUsd`, `collateral`; buy `totalCostUsd`; close
-   `direction`, `netProceedsUsd` or `totalCostUsd`; `funding`: USDC moved first, say so.
+   `direction`, `netProceedsUsd` or `totalCostUsd`; `funding`: USDC moved first, say so; fees split as `summary` does, Virtuals named, at 0 too.
    `failed` or `rejected` - nothing traded; give `approvalFailureReason` as written.
    `pending` or `signed` - still waiting.
 
@@ -159,7 +160,7 @@ this chat. One missing: ask, and file nothing this turn.
    Sold put: PRODUCT `cash_secured_put`, PREMIUM_USD `netPremiumUsd`, COLLATERAL_USD
    `collateral`. Bought: PRODUCT `long_call` or `long_put`, PREMIUM_USD `totalCostUsd`,
    COLLATERAL_USD 0. Resting: `resting.md`. Asked in step 3 to own the asset: `options-put-delivery@1`
-   (`references/selling.md`). After a close, `duty_delete` that instrument's duty; if
+   (`selling.md`). After a close, `duty_delete` that instrument's duty; if
    part is still open, file it again with SIZE from `positions` (positive) and
    PREMIUM_USD and COLLATERAL_USD scaled to it. Never file for an unknown or failed
    trade. A second options duty in one chat needs
@@ -191,7 +192,7 @@ Derive one key per trade, such as `ot:eth:20261030:2600c:1`, with `:deposit`,
 `:open`, `:buy`, `:close`, `:withdraw`, `:home`. On an error, a timeout or an unclear
 answer, **do not re-run** the command: a retry can buy or bridge twice. Look it up as
 in step 6: `not_found` means nothing was filed. A deposit still crediting has not
-failed: re-read `acp options account` and wait. Look up `:home` with `--route trade`.
+failed: re-read the account and wait. Look up `:home` with `--route trade`.
 
 ## Failure handling
 

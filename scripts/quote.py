@@ -9,7 +9,9 @@ Four sides:
   close   sell back an option the owner bought, before expiry
   buyback buy back a note the owner sold, before expiry
 
-Read-only and keyless. Trading is `acp options`, never this file.
+Read-only. Prices come from the venues' public APIs; the one private read is the
+Virtuals platform fee rate on Derive, from `acp options account`. Trading is
+`acp options`, never this file.
 
 The model never picks an instrument, a strike or a price. It passes an
 intent - side, product, underlying, money, tenor, strike rule - and gets back
@@ -32,13 +34,15 @@ Usage:
 
 Every command takes --venue derive (the default) or --venue paradex. A buy or
 sell quote and chain take --expiry YYYY-MM-DD for the day the owner named, and a
-buy or sell quote --strike for the strike they named.
+buy or sell quote --strike for the strike they named. A Derive quote or screen
+reads the Virtuals platform fee rate itself, and stops if it cannot.
 """
 
 import argparse
 import datetime
 import json
 import math
+import subprocess
 import sys
 import time
 import urllib.error
@@ -52,6 +56,13 @@ UA = "butler-options-trading/2.0"
 # The venue this run reads: set once from --venue, then read by every function
 # whose answer depends on it. The quote logic itself is the same on both.
 V = {"id": "derive", "name": "Derive"}
+# The Virtuals platform fee on a Derive order, a share of its premium charged on top
+# of Derive's fee as the order's `extra_fee` (Derive calls it a builder fee): read
+# from the owner's account by platform_rate(). Paradex takes none.
+PLATFORM = {"rate": 0.0}
+# What a server too old to report `platformFeeRate` charges.
+LEGACY_PLATFORM_RATE = 0.005
+MAX_PLATFORM_RATE = 0.05
 VENUES = {"derive": {"id": "derive", "name": "Derive"},
           "paradex": {"id": "paradex", "name": "Paradex"}}
 
@@ -366,6 +377,41 @@ def taker_fee(inst, index, size, mark):
         num(inst.get("mark_price_fee_rate_cap")) * mark * size)
 
 
+def platform_rate():
+    """The Virtuals platform fee rate on the owner's Derive orders, as the server
+    charges it. An account that cannot be read stops the quote: a fee guessed low
+    is a quote under what the fill charges."""
+    why = "could not read the Virtuals platform fee from `acp options account`"
+    try:
+        run = subprocess.run(["acp", "options", "account", "--venue", "derive", "--json"],
+                             capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise RuntimeError("%s: %s" % (why, exc))
+    if run.returncode != 0:
+        raise RuntimeError("%s: %s" % (why, (run.stderr or run.stdout).strip()[:300]))
+    try:
+        body = json.loads(run.stdout)
+    except ValueError:
+        raise RuntimeError("%s: not JSON" % why)
+    rate = body.get("platformFeeRate", LEGACY_PLATFORM_RATE)
+    if isinstance(rate, bool) or not isinstance(rate, (int, float)) or not 0 <= rate <= MAX_PLATFORM_RATE:
+        raise RuntimeError("%s: platformFeeRate %r is not a share from 0 to %s" % (why, rate, MAX_PLATFORM_RATE))
+    return float(rate)
+
+
+def platform_fee(premium):
+    """The Virtuals platform fee on this premium (book price x size), rounded up to
+    Derive's 0.000001 USDC step, as the server sends it on the order."""
+    return max(0.0, math.ceil(premium * PLATFORM["rate"] * 1e6 - 1e-6) / 1e6)
+
+
+def fee_fields(venue_fee, ours):
+    """The fee the owner pays and its two parts, which add up to it to the cent
+    (the venue's is the rest, as on the card)."""
+    fee, mine = rnd(venue_fee + ours, 2), rnd(ours, 2)
+    return {"fee_usd": fee, "venue_fee_usd": rnd(fee - mine, 2), "platform_fee_usd": mine}
+
+
 def load_chain(underlying, opt_type, tenor, now, on=None):
     try:
         insts = active_options(underlying, opt_type)
@@ -500,14 +546,15 @@ def build_quote(product, underlying, collateral_usd, tenor="monthly",
         return q
 
     gross = bid * size
-    fee = taker_fee(inst, spot, size, mark)
+    venue_fee, ours = taker_fee(inst, spot, size, mark), platform_fee(gross)
+    fee = venue_fee + ours
     net = gross - fee
     gap = (mark_iv - bid_iv) * 100 if mark_iv > 0 else 0.0
     net_r = rnd(net, 2)
 
     q.update({
         "premium_usd": rnd(gross, 2),
-        "fee_usd": rnd(fee, 2),
+        **fee_fields(venue_fee, ours),
         "net_premium_usd": net_r,
         "min_premium_usd": math.floor(net_r * MIN_PREMIUM_SHARE * 100 + 1e-6) / 100,
         "fair_value_usd": rnd(mark * size, 2),
@@ -643,11 +690,13 @@ def build_buy_quote(product, underlying, budget_usd=None, tenor="monthly",
                             % inst["instrument_name"])
         return q
 
-    # The fee is base + size x min(rate x index, cap x mark): linear in size
-    # once the base is paid, so the largest affordable size has a closed form.
+    # The fee is base + size x min(rate x index, cap x mark), plus the platform
+    # rate on the premium: linear in size once the base is paid, so the largest
+    # affordable size has a closed form.
     base = num(inst.get("base_fee"))
-    per_contract = ask + min(num(inst.get("taker_fee_rate")) * spot,
-                             num(inst.get("mark_price_fee_rate_cap")) * mark)
+    per_contract = ask * (1 + PLATFORM["rate"]) + min(
+        num(inst.get("taker_fee_rate")) * spot,
+        num(inst.get("mark_price_fee_rate_cap")) * mark)
     size = 0.0
     if want_size is not None:
         if step > 0:
@@ -668,7 +717,8 @@ def build_buy_quote(product, underlying, budget_usd=None, tenor="monthly",
         return q
 
     gross = ask * size
-    fee = taker_fee(inst, spot, size, mark)
+    venue_fee, ours = taker_fee(inst, spot, size, mark), platform_fee(gross)
+    fee = venue_fee + ours
     # The total is the sum of the two lines the owner is shown, to the cent.
     total_r = rnd(rnd(gross, 2) + rnd(fee, 2), 2)
     per = total_r / size
@@ -681,7 +731,7 @@ def build_buy_quote(product, underlying, budget_usd=None, tenor="monthly",
         "ask_price": ask,
         "ask_depth": ask_sz,
         "premium_usd": rnd(gross, 2),
-        "fee_usd": rnd(fee, 2),
+        **fee_fields(venue_fee, ours),
         "total_cost_usd": total_r,
         "max_loss_usd": total_r,
         "max_cost_usd": max_cost,
@@ -783,7 +833,8 @@ def build_close_quote(instrument, size):
         return q
 
     gross = bid * size
-    fee = taker_fee(inst, spot, size, mark)
+    venue_fee, ours = taker_fee(inst, spot, size, mark), platform_fee(gross)
+    fee = venue_fee + ours
     net = gross - fee
     net_r = rnd(net, 2)
     gap = (mark_iv - bid_iv) * 100 if mark_iv > 0 and bid_iv > 0 else 0.0
@@ -791,7 +842,7 @@ def build_close_quote(instrument, size):
         "bid_price": bid,
         "bid_depth": bid_sz,
         "proceeds_usd": rnd(gross, 2),
-        "fee_usd": rnd(fee, 2),
+        **fee_fields(venue_fee, ours),
         "net_proceeds_usd": net_r,
         "min_proceeds_usd": max(0.0, math.floor(net_r * MIN_PREMIUM_SHARE * 100 + 1e-6) / 100),
         "edge_vs_fair_vol_pts": rnd(-gap, 2),
@@ -850,14 +901,15 @@ def build_buyback_quote(instrument, size, premium_received=None):
         return q
 
     gross = ask * size
-    fee = taker_fee(inst, spot, size, mark)
+    venue_fee, ours = taker_fee(inst, spot, size, mark), platform_fee(gross)
+    fee = venue_fee + ours
     total = rnd(gross + fee, 2)
     gap = (ask_iv - mark_iv) * 100 if mark_iv > 0 and ask_iv > 0 else 0.0
     q.update({
         "ask_price": ask,
         "ask_depth": ask_sz,
         "cost_usd": rnd(gross, 2),
-        "fee_usd": rnd(fee, 2),
+        **fee_fields(venue_fee, ours),
         "total_cost_usd": total,
         "max_cost_usd": math.ceil(total * MAX_COST_HEADROOM * 100 - 1e-6) / 100,
         "overpay_vs_fair_vol_pts": rnd(gap, 2),
@@ -1028,6 +1080,7 @@ def main():
         sp.add_argument("--venue", default="derive", choices=sorted(VENUES))
     a = p.parse_args()
     V.update(VENUES[a.venue])
+    PLATFORM["rate"] = platform_rate() if a.venue == "derive" and a.cmd in ("quote", "screen") else 0.0
 
     if a.cmd == "screen":
         out = screen(a.tenor, a.collateral, a.otm_pct)

@@ -52,7 +52,7 @@ Every number is a **field on the buy quote**. Never compute one.
 | --- | --- |
 | the most they pay, and the most they can lose | `max_cost_usd` (the card's "You pay at most") |
 | what it costs at today's price | `total_cost_usd` (`premium_usd` + `fee_usd`) |
-| fees | `fee_usd`, its own line |
+| fees | `fee_usd`, always its own line, split when `platform_fee_usd` is above 0: "$0.65 in fees: $0.62 to Derive and $0.03 Virtuals platform fee". At 0: "$0.62 in fees, all Derive's; no Virtuals platform fee". Always the words "Virtuals platform fee", never "platform" alone, and never Butler's. The receipt after the fill says it the same way, at 0 too |
 | where it starts paying at expiry | `breakeven` |
 | the price it turns on | `strike` |
 | the date | `expiry`, its time as given, never one from memory |
