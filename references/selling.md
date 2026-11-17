@@ -15,7 +15,8 @@ and keeping the fee. The premium is certain. What they own at expiry is not.
 - **Which asset is theirs to name.** `screen` says which assets can carry a note today;
   it is not a menu. Never lay out APRs of assets or strikes side by side (one asset on
   several venues is `references/which-venue.md`). If more than one is `tradeable`,
-  name them and ask which they would happily own lower, then quote that one.
+  name them and ask which they would happily own lower, then quote that one, with its
+  `warnings` and any safeguard.
 - **How much is theirs to name.** No amount yet: quote nothing, not even at a round
   number or their whole balance. Each venue's `minimum` says what the smallest put
   needs there; say those and ask (`references/which-venue.md`).
@@ -112,12 +113,13 @@ prices**". Never "16% APY", and never put it in a headline on its own.
 
 ## When the price is poor
 
-`edge_vs_fair_vol_pts` is how far below Derive's own mark the bid sits. It is
-negative for a seller - that is the spread, and it is what a market maker keeps.
+The bid under Derive's own mark is the spread, and it is what a market maker keeps.
 
-- worse than -3: say the market is wide today and they are not getting a great
-  price.
-- worse than -5: the helper refuses. Say nothing is worth doing and why.
+- over 10% of the option's value: a `warning`. Say it as written, before the ownership
+  question; the choice is theirs.
+- over 20%: the `spread` safeguard holds the note back until they waive it
+  (`references/helper.md` § Safeguards). A waived note still gets the bad case and the
+  ownership question.
 
 An owner who hears "16% a year" without hearing that the spread took part of the
 premium has been told half of it.
@@ -189,8 +191,8 @@ Never auto-roll without a fresh yes.
 The smallest note is the quote's `min_size` x the strike, so it moves with the strike; a
 smaller one is refused with what the minimum needs (`collateral too small`). Fees make
 anything near it poor value.
-Monthly by default: weeklies lose far more of the premium to fees and the spread,
-and the fee gate refuses them on small notes.
+Monthly by default: weeklies lose far more of the premium to fees and the spread, and
+the quote warns when fees pass 15% of it.
 
 ## Say to the owner
 
@@ -203,5 +205,8 @@ October?"
 A no to that, and nothing after it: "Then a put is not for this money - every one is a
 promise to buy. I won't file anything."
 
-Nothing clears: "Nothing worth doing today - the market is wide; you would give away
-too much to get filled."
+A wide market: "You can sell it, but the spread is wide today: selling here hands over
+16% of the option's value. Still want it?"
+
+A safeguard: "Butler has a safeguard here: selling now hands over 28% of the option's
+value to the spread. Still want to go ahead, and happy to own it at that price?"

@@ -1,5 +1,28 @@
 # Changelog
 
+## 2.14.0
+
+- **Safeguards the owner can waive, and warnings, in place of hard refusals.** A quote's
+  price checks were all refusals. Now:
+  - `reasons` (`tradeable: false`) are only what the venue refuses: under its minimum,
+    no bid or ask, a close whose fee beats the bid, a Paradex price outside its band, a
+    Rysk quote about to die.
+  - `safeguards` (`waivable: true`) hold a sell or buy back: the spread giving up over
+    20% of the option's value (`spread`), fees over 30% of the premium (`fees`), a Rysk
+    put with delta over 0.35 (`exercise`). The butler says the figure in the offer and
+    asks if they still want to go ahead; their yes re-quotes with `--waive <ids>`, and the open or buy passes
+    `--waive` to bevo-server, which records it on the intent and puts a "Safeguard"
+    line on the card (bevo-server `feat/options-safeguard-waive`).
+  - `warnings` never stop a trade: spread over 10%, fees over 15%, a premium under $1,
+    a best bid or ask smaller than the size, Rysk under 4% a year.
+- The spread is measured as the share of the option's value given away, not vol points,
+  and skipped under $1 in all. The flat 5-vol-point limit refused almost everything but
+  ETH and BTC: every NVDA put (2026-11-16) now quotes, the one-contract $150 put with a
+  fee warning. A $1,000 BTC put (2026-11-11) refused when its top bid shrank to 0.01
+  under a 0.01538 note now quotes with a part-fill warning.
+- Needs bevo-server with `--waive` on `acp options open` and `buy`: an older server
+  refuses the flag with nothing filed.
+
 ## 2.13.4
 
 - **A short gather is in the owner's wallet on the chain that gathered it, not always

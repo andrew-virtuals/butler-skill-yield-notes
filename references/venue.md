@@ -86,17 +86,18 @@ top of Derive's as the order's `extra_fee` (Derive's "builder fee"); its rate is
 means none. The quote gives both parts (`venue_fee_usd`,
 `platform_fee_usd`), as the card and the fill do (`venueFeeUsd`, `platformFeeUsd`). The
 base fee is per order and uncapped, which is what makes small tickets and short tenors
-pointless: the helper refuses a sell or a buy whose fee is over 15% of the premium.
+poor value: a fee over 15% of the premium warns, and over 30% is a safeguard the owner
+may waive.
 
 ## Spreads: what decides which trades clear
 
 The gap between Derive's mark IV and the bid IV is what a seller crossing the spread
 gives away; the gap between the ask IV and mark IV is what a buyer gives away. The
-helper refuses either over **5 vol points**; a 2-point guard would reject every fill,
-good ones included.
+helper measures it as a share of the option's value: over 10% warns, over 20% is a
+safeguard the owner may waive. Vol points are no measure across assets: at the 75-120%
+vols of alts and stocks, a 5-point gap is a small spread.
 
-The offerable set is an output of the gates, not a list: it changes as books deepen or
-thin, often within a day. A single empty read just after an expiry rolls is not evidence
+Spreads and depth change as books deepen or thin, often within a day. A single empty read just after an expiry rolls is not evidence
 an asset is dead - quote fresh, never cache a book, and never say which assets clear from
 memory.
 

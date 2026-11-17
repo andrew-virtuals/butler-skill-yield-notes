@@ -57,9 +57,29 @@ by ticker alone, never a guess at what it is.
 
 `quote` is the sell side unless `--side buy`, `--side close` or `--side buyback` says
 otherwise. Every
-quote carries `tradeable` and, when false, `reasons` in plain English. **Never offer a
-trade whose quote is not `tradeable`**, and never rewrite a reason into something
-softer - they are already written for an owner.
+quote carries `tradeable`, and three lists, each in plain English and said as written,
+never softened - they are already written for an owner:
+
+- `reasons`: a limit the venue itself enforces (under its minimum, nobody bidding or
+  asking). Nothing can be filed, and nothing waives it.
+- `safeguards` (sell and buy): a price poor enough that Butler holds the trade back,
+  with `waivable: true`. See **Safeguards** below.
+- `warnings`: a poor price that never stops a trade. Say each, then let the owner choose.
+
+## Safeguards
+
+Each safeguard is `id` (`spread` or `fees`; Rysk's `exercise`), `text` with the figure
+and the line it crossed, and `waived`.
+
+1. Offer the trade as step 3 says, with the bad case and the ownership question, and
+   say each `text` as written as Butler's safeguard, asking in that same question
+   whether they still want to go ahead. File nothing yet.
+2. Their yes to that waives it. Quote again with `--waive <ids>`, comma-separated; it
+   comes back `tradeable: true` with `waive`; file with `--waive <waive>`. The card and
+   the record name what was waived. A no files nothing.
+3. A waiver holds for that one quote. A new strike, expiry or size asks again.
+
+## The minimum, before an amount
 
 ## The minimum, before an amount
 
@@ -88,11 +108,14 @@ lowest strike, or `null` when the put is that one. Puts only.
 | `breakeven` | strike less the bid for a put, plus it for a call |
 | `bad_case` | put only: `price`, the asset `fall_pct` (25) below spot, and `loss_usd`, what the note is down at expiry there, premium already counted. The bad case is said with these, first |
 | `edge_vs_fair_vol_pts` | how far the bid sits under Derive's own mark; negative for a seller |
-| `bid_depth` | contracts on the best bid; a note bigger than this is refused |
+| `bid_depth` | contracts on the best bid; a note bigger than this warns it may fill part-way |
 | `valid_until` | 60 seconds after the read; quote again past it |
+| `waive` | present only when a safeguard was waived; passed to `--waive` |
 
-Gates: the bid within 5 vol points of mark, fees at most 15% of the premium, a
-premium of at least $1, and the best bid covering the whole note. Size is always what
+The spread is the share of the option's value the bid gives up (`1 - bid / mark`):
+over 10% warns, over 20% is the `spread` safeguard, and neither applies when it costs
+under $1 in all. Fees over 15% of the premium warn, over 30% are the `fees` safeguard.
+A premium under $1, or a best bid smaller than the note, only warns. Size is always what
 the collateral **fully** covers, rounded down to Derive's step.
 
 ## The buy quote, field by field
@@ -121,10 +144,11 @@ it is refused with the strikes it does.
 | `budget_usd` | the budget asked for (absent with `--size`) |
 | `valid_until` | 60 seconds after the read |
 
-Buyer gates, each a reason in `reasons`: no live ask; the ask thinner than the size;
-the ask more than 5 vol points over mark ("you would be paying N% over fair value");
-fees over 15% of the premium; a budget (or size) under Derive's minimum, with what the
-minimum costs.
+A buy is refused only with no live ask, or a budget (or size) under Derive's minimum,
+with what the minimum costs. The spread and fees are measured as for a sale, the ask
+over mark ("you would be paying N% over fair value"): a warning past the lower figure,
+a safeguard past the higher. An ask thinner than the size only warns. A waived buy
+passes `waive` to `--waive` the same way.
 
 ## The close quote, field by field
 
@@ -142,9 +166,9 @@ Prices selling back `--size` contracts of `--instrument`, an option the owner ho
 | `edge_vs_fair_vol_pts` | how far the bid sits under mark; negative is the spread |
 | `warnings` | the market is wide, or fees take a big share: say so, it does not stop a close |
 
-A close is refused (`tradeable: false`) only when there is no bid, the bid is thinner
-than the size, or the fee is more than the bid pays. An owner cutting a loss may accept
-a wide market; tell them it is wide.
+A close is refused (`tradeable: false`) only when there is no bid or the fee is more
+than the bid pays; a bid thinner than the size warns it may fill part-way. An owner
+cutting a loss may accept a wide market; tell them it is wide.
 
 ## The buy-back quote, field by field
 
@@ -167,6 +191,7 @@ what they got for it: `netPremiumUsd` from the open's outcome, or the lifecycle 
 | `overpay_vs_fair_vol_pts` | how far the ask sits over mark; positive is the spread |
 | `warnings` | the market is wide, or the buy-back costs more than the note brought in |
 
-A buy-back is refused only when there is no ask or the ask is thinner than the size. An
-owner getting out of a falling put may accept a wide market; tell them it is wide.
+A buy-back is refused only when there is no ask; an ask thinner than the size warns it
+may fill part-way. An owner getting out of a falling put may accept a wide market; tell
+them it is wide.
 

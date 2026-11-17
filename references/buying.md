@@ -87,11 +87,11 @@ $3.45 for every dollar below that; it only beats its cost below about $2,295."
 
 ## When the price is poor
 
-`overpay_vs_fair_vol_pts` is how far over Derive's own mark the ask sits: what the
-buyer gives away crossing the spread.
+The ask over Derive's own mark is what the buyer gives away crossing the spread.
 
-- over 3: say the market is wide today and they are paying above fair value.
-- over 5: the helper refuses, with "you would be paying N% over fair value".
+- over 10% of the option's value: a `warning`. Say it as written; the choice is theirs.
+- over 20%: the `spread` safeguard holds the buy back until they waive it
+  (`references/helper.md` § Safeguards).
 
 ## A hedge
 

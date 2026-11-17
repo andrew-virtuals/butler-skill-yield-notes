@@ -57,16 +57,15 @@ BAD_CASE_FALL = 0.25
 #: the same 95% Butler's server applies when no floor is passed.
 MIN_PREMIUM_SHARE = 0.95
 
-# --- the gates -------------------------------------------------------------
-# Rysk has no spread to screen, so these are about the promise the owner is
-# making, not about execution quality.
+# --- the safeguard and the notes ---------------------------------------------
 
-#: How likely assignment is, as delta. Past this an owner is being sold an
-#: option that will probably be exercised, which is a different conversation
-#: from "earn on idle cash".
+#: How likely assignment is, as delta. Past this the put will probably be
+#: exercised, a different promise from "earn on idle cash": the quote is held
+#: back until the owner waives it in chat.
 MAX_ASSIGNMENT_DELTA = 0.35
+SAFEGUARDS = ("exercise",)
 
-#: Below this the premium does not pay for the attention it costs.
+#: Below this a quote notes that the premium barely pays for the lock.
 MIN_APR_PCT = 4.0
 
 #: Rysk takes fixed size steps that differ per asset and are not published in
@@ -376,7 +375,8 @@ def _least(ask, asset, combo, combos, chosen, above=0.0):
 
 
 def quote(asset, collateral_usd, tenor="monthly", otm_pct=10.0, target_delta=None,
-          pay_with=None, chain_id=None, on=None, strike=None, probe=True, least_only=False):
+          pay_with=None, chain_id=None, on=None, strike=None, probe=True, least_only=False,
+          waived=()):
     """Ask real makers what they will pay for one cash-secured put.
 
     The returned price is signed and expires; `valid_for_seconds` is how long
@@ -539,6 +539,8 @@ def quote(asset, collateral_usd, tenor="monthly", otm_pct=10.0, target_delta=Non
         "tradeable": False,
         "reasons": [],
         "notes": [],
+        "safeguards": [],
+        "waivable": False,
     }
 
     if fee is None:
@@ -555,12 +557,15 @@ def quote(asset, collateral_usd, tenor="monthly", otm_pct=10.0, target_delta=Non
             "round amount rarely lands exactly"
             % (format(collateral, ",.0f"), format(collateral_usd, ",.0f")))
     if abs(combo.get("delta") or 0) > MAX_ASSIGNMENT_DELTA:
-        q["reasons"].append(
-            "this is close enough to the money that it will probably be exercised "
-            "(delta %.2f) - a likely purchase, not idle cash earning"
-            % abs(combo["delta"]))
+        q["safeguards"].append({
+            "id": "exercise",
+            "waived": "exercise" in waived,
+            "text": "this is close enough to the money that it will probably be exercised "
+                    "(delta %.2f, safeguard: %.2f) - a likely purchase, not idle cash earning"
+                    % (abs(combo["delta"]), MAX_ASSIGNMENT_DELTA),
+        })
     if apr < MIN_APR_PCT:
-        q["reasons"].append(
+        q["notes"].append(
             "%.1f%% a year does not pay for locking the money up until %s"
             % (apr, combo.get("expiry")))
     if left < MIN_QUOTE_SECONDS_LEFT:
@@ -568,7 +573,11 @@ def quote(asset, collateral_usd, tenor="monthly", otm_pct=10.0, target_delta=Non
             "this quote has %ds left and dies at %d - re-quote rather than act on it"
             % (max(left, 0), valid_until))
 
-    q["tradeable"] = not q["reasons"]
+    held = [sg for sg in q["safeguards"] if not sg["waived"]]
+    q["tradeable"] = not q["reasons"] and not held
+    q["waivable"] = not q["reasons"] and bool(held)
+    if q["tradeable"] and q["safeguards"]:
+        q["waive"] = ",".join(sg["id"] for sg in q["safeguards"])
     return q
 
 
@@ -701,6 +710,13 @@ def positions(address):
     return out
 
 
+def _safeguards(text):
+    named = [s for s in text.lower().split(",") if s]
+    if not named or any(s not in SAFEGUARDS for s in named):
+        raise argparse.ArgumentTypeError("--waive takes %s" % ", ".join(SAFEGUARDS))
+    return tuple(named)
+
+
 def _utc_day(text):
     try:
         return time.strftime("%Y-%m-%d", time.strptime(text.strip(), "%Y-%m-%d"))
@@ -721,6 +737,8 @@ def main():
     q.add_argument("--asset", required=True)
     q.add_argument("--collateral", type=float, required=True)
     q.add_argument("--tenor", default="monthly", choices=sorted(TENOR_DAYS))
+    q.add_argument("--waive", type=_safeguards, default=(),
+                   help="safeguards the owner chose to trade past (%s)" % ",".join(SAFEGUARDS))
     rule = q.add_mutually_exclusive_group()
     rule.add_argument("--otm-pct", type=float, default=10.0)
     rule.add_argument("--delta", type=float, default=None)
@@ -775,7 +793,8 @@ def main():
         print(json.dumps(rows, indent=2, ensure_ascii=False))
     else:
         print(json.dumps(quote(a.asset, a.collateral, a.tenor, a.otm_pct, a.delta,
-                               a.pay_with, a.chain, a.expiry, a.strike), indent=2, ensure_ascii=False))
+                               a.pay_with, a.chain, a.expiry, a.strike, waived=a.waive),
+                         indent=2, ensure_ascii=False))
 
 
 if __name__ == "__main__":

@@ -27,7 +27,7 @@ to outcome:
 - **Look or withdraw:** read the venue account (free USDC, positions) and withdraw free
   USDC to the owner's wallet.
 
-Not covered: covered calls, spreads, leverage, and any trade the helper refuses.
+Not covered: covered calls, spreads or leverage.
 
 ## Venues
 
@@ -79,32 +79,44 @@ setting.
 - **Full collateral.** A put's size is what the collateral fully covers; none of the
   venues' margin is used.
 
-## The gates
+## Venue limits, safeguards and warnings
 
-The helper gates at quote time instead of keeping an allowlist, because on most days only
-a few books can be crossed by a retail-sized trade:
+A quote sorts what stands in a trade's way three ways:
 
-| Gate | Default | Side | Why |
-| --- | --- | --- | --- |
-| `MAX_VOL_GAP_PTS` | 5.0 | both | Bid under mark (selling) or ask over mark (buying). ETH's and BTC's own spreads are a few points wide; a 2-point guard would reject every fill. |
-| `MAX_FEE_DRAG` | 15% | both | Derive's $0.50 base fee is charged per order and is uncapped, so it swamps small tickets and weeklies. Paradex charges no base fee. |
-| `MIN_PREMIUM_USD` | $1 | sell | Below it the premium rounds to nothing. |
-| depth ≥ size | - | both | The best bid (selling) or ask (buying) must cover the whole size, or the order walks the book. |
-| `MAX_COST_HEADROOM` | 1.05 | buy | `max_cost_usd` is the total cost plus 5%, and a budget buy is sized so that ceiling fits inside the budget. |
+- **Venue limits** (`reasons`, `tradeable: false`): what the venue itself refuses: under
+  its minimum size, nobody bidding or asking, a close whose fee is more than the bid
+  pays, a Paradex price outside the market's band, a Rysk quote about to die. Nothing
+  waives them.
+- **Safeguards** (`safeguards`, `waivable: true`): a price poor enough that the butler
+  holds the trade back, says why with the figure, and asks if they still want to go
+  ahead; their yes waives it. The quote is re-run with `--waive <ids>`, and the
+  open or buy passes `--waive` on, so the card and the approval's intent record it
+  (bevo-server `feat/options-safeguard-waive`).
+- **Warnings** (`warnings`; Rysk `notes`): said as written, never a stop.
 
-These match Butler's server's reference quote engine; keep the constants and the
-`reasons` strings in step with it. A close is refused only with no bid, a bid thinner
-than the size, or a fee larger than the proceeds; a buy-back only with no ask or an ask
-thinner than the size. A wide market is a warning there, since an owner cutting a loss
-may accept it. On Paradex a price outside the market's price band counts as no price.
-Rysk's helper has its own gates (`references/rysk-helper.md`).
+The owner's `--min-premium` or `--max-cost` bound still caps what any fill can cost.
+
+| Check | Warns past | Safeguard past | Side | Why |
+| --- | --- | --- | --- | --- |
+| spread (`1 - bid/mark`, `ask/mark - 1`) | 10% | 20% (`spread`) | sell, buy | Measured as the share of the option's value given away, not vol points: at the 75-120% vols of alts and stocks a 5-point gap is a small spread. Skipped when under $1 in all, where one price tick is a large share. |
+| fees / premium | 15% | 30% (`fees`) | sell, buy | Derive's $0.50 base fee is per order and uncapped, so it swamps small tickets and weeklies. Paradex charges no base fee. |
+| premium | under $1 | - | sell | Below it the premium rounds to nothing. |
+| depth < size | yes | - | all | The best bid or ask is smaller than the size: it may fill part-way, inside the owner's bound. |
+| Rysk delta | - | 0.35 (`exercise`) | sell | The put will probably be exercised: a likely purchase, not idle cash earning. |
+| Rysk APR | under 4% | - | sell | The premium barely pays for the lock. |
+
+A close or a buy-back only ever warns about price (over 5 vol points), since an owner
+cutting a loss may accept a wide market. `MAX_COST_HEADROOM` (1.05) sets `max_cost_usd`
+at the total cost plus 5%, and a budget buy is sized so that ceiling fits the budget.
+These figures come from four live cases (BTC and ZEC on 2026-11-11, NVDA on
+2026-11-16); tune them from how often safeguards hold trades and are waived.
 
 ## Measurements
 
 Apart from Derive's $10 minimum deposit and the Base bridge's ~$0.10 (in
 `references/venue.md`), nothing a butler reads states a venue figure: fees, minimums,
 sizes, times and which assets clear come from the quote, the account read, the card or
-its outcome, so they cannot go stale in the skill. What was measured, for the people tuning the gates, is
+its outcome, so they cannot go stale in the skill. What was measured, for the people tuning the warnings, is
 here only; re-measure before relying on a spread or a depth.
 
 Derive v3 mainnet, 7 October 2026 (selling) and 9 October 2026 (buying):
