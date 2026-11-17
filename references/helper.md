@@ -8,12 +8,12 @@ with `--venue paradex`, and nothing else. Selling, buying, closing, funding and 
 
 ```sh
 python3 ~/skills/options-trading/scripts/quote.py screen --tenor monthly --collateral 5000
-python3 ~/skills/options-trading/scripts/quote.py quote --product cash_secured_put --underlying ETH --collateral 5000 --tenor monthly --otm-pct 10 --platform-fee-rate 0
-python3 ~/skills/options-trading/scripts/quote.py quote --product cash_secured_put --underlying ETH --collateral 5000 --tenor monthly --delta 0.20 --platform-fee-rate 0
-python3 ~/skills/options-trading/scripts/quote.py quote --side buy --product call --underlying ETH --budget 200 --tenor monthly --otm-pct 5 --platform-fee-rate 0
-python3 ~/skills/options-trading/scripts/quote.py quote --side buy --product put --underlying ETH --size 1 --tenor monthly --delta 0.30 --platform-fee-rate 0
-python3 ~/skills/options-trading/scripts/quote.py quote --side close --instrument ETH-20261030-2600-C --size 2.95 --platform-fee-rate 0
-python3 ~/skills/options-trading/scripts/quote.py quote --side buyback --instrument ETH-20261030-2300-P --size 2 --premium-received 61.40 --platform-fee-rate 0
+python3 ~/skills/options-trading/scripts/quote.py quote --product cash_secured_put --underlying ETH --collateral 5000 --tenor monthly --otm-pct 10
+python3 ~/skills/options-trading/scripts/quote.py quote --product cash_secured_put --underlying ETH --collateral 5000 --tenor monthly --delta 0.20
+python3 ~/skills/options-trading/scripts/quote.py quote --side buy --product call --underlying ETH --budget 200 --tenor monthly --otm-pct 5
+python3 ~/skills/options-trading/scripts/quote.py quote --side buy --product put --underlying ETH --size 1 --tenor monthly --delta 0.30
+python3 ~/skills/options-trading/scripts/quote.py quote --side close --instrument ETH-20261030-2600-C --size 2.95
+python3 ~/skills/options-trading/scripts/quote.py quote --side buyback --instrument ETH-20261030-2300-P --size 2 --premium-received 61.40
 python3 ~/skills/options-trading/scripts/quote.py chain --underlying ETH --tenor monthly --type C
 python3 ~/skills/options-trading/scripts/quote.py minimum --underlying ETH
 python3 ~/skills/options-trading/scripts/quote.py minimum --venue paradex --underlying ETH --expiry 2026-11-27
@@ -23,11 +23,13 @@ python3 ~/skills/options-trading/scripts/quote.py quote --venue paradex --side b
 python3 ~/skills/options-trading/scripts/quote.py quote --venue paradex --side close --instrument ETH-USD-27NOV26-2600-C --size 0.1
 ```
 
-**Every Derive quote takes `--platform-fee-rate`**: `platformFeeRate` from `acp options
-account`, the Virtuals platform fee as a share of the premium (`0` is none; absent, an
-older server charging 0.5%: pass `0.005`). Without it a Derive quote stops with exit 2.
-The fee is in `fee_usd` and every total, as on the card, and is `platform_fee_usd`; how
-to say it is in `buying.md` and `selling.md`. Paradex takes none, so it needs no flag.
+**A Derive quote or screen reads the Virtuals platform fee itself**: `platformFeeRate`
+from `acp options account --venue derive --json`, a share of the premium (`0` is none;
+absent, an older server charging 0.5%: `0.005`). If that read fails, the quote stops
+with exit 1 and `could not read the Virtuals platform fee`: say Butler cannot price
+the fee right now, and quote nothing. The fee is in `fee_usd` and every total, as on
+the card, and is `platform_fee_usd`; how to say it is in `buying.md` and `selling.md`.
+Paradex takes none.
 
 `--venue paradex` (any command) reads Paradex instead, and every field below means the
 same there: names like `ETH-USD-27NOV26-2600-C`, sizes in the asset on the market's own

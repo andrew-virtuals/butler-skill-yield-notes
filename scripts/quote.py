@@ -9,7 +9,9 @@ Four sides:
   close   sell back an option the owner bought, before expiry
   buyback buy back a note the owner sold, before expiry
 
-Read-only and keyless. Trading is `acp options`, never this file.
+Read-only. Prices come from the venues' public APIs; the one private read is the
+Virtuals platform fee rate on Derive, from `acp options account`. Trading is
+`acp options`, never this file.
 
 The model never picks an instrument, a strike or a price. It passes an
 intent - side, product, underlying, money, tenor, strike rule - and gets back
@@ -32,14 +34,15 @@ Usage:
 
 Every command takes --venue derive (the default) or --venue paradex. A buy or
 sell quote and chain take --expiry YYYY-MM-DD for the day the owner named, and a
-buy or sell quote --strike for the strike they named. A Derive quote takes
---platform-fee-rate: `platformFeeRate` from `acp options account`, 0 for none.
+buy or sell quote --strike for the strike they named. A Derive quote or screen
+reads the Virtuals platform fee rate itself, and stops if it cannot.
 """
 
 import argparse
 import datetime
 import json
 import math
+import subprocess
 import sys
 import time
 import urllib.error
@@ -54,10 +57,12 @@ UA = "butler-options-trading/2.0"
 # whose answer depends on it. The quote logic itself is the same on both.
 V = {"id": "derive", "name": "Derive"}
 # The Virtuals platform fee on a Derive order, a share of its premium charged on top
-# of Derive's fee as the order's `extra_fee` (Derive calls it a builder fee): set from
-# --platform-fee-rate, which `acp options account` reports as `platformFeeRate`.
-# Paradex takes none.
+# of Derive's fee as the order's `extra_fee` (Derive calls it a builder fee): read
+# from the owner's account by platform_rate(). Paradex takes none.
 PLATFORM = {"rate": 0.0}
+# What a server too old to report `platformFeeRate` charges.
+LEGACY_PLATFORM_RATE = 0.005
+MAX_PLATFORM_RATE = 0.05
 VENUES = {"derive": {"id": "derive", "name": "Derive"},
           "paradex": {"id": "paradex", "name": "Paradex"}}
 
@@ -360,6 +365,28 @@ def taker_fee(inst, index, size, mark):
     return num(inst.get("base_fee")) + min(
         num(inst.get("taker_fee_rate")) * index * size,
         num(inst.get("mark_price_fee_rate_cap")) * mark * size)
+
+
+def platform_rate():
+    """The Virtuals platform fee rate on the owner's Derive orders, as the server
+    charges it. An account that cannot be read stops the quote: a fee guessed low
+    is a quote under what the fill charges."""
+    why = "could not read the Virtuals platform fee from `acp options account`"
+    try:
+        run = subprocess.run(["acp", "options", "account", "--venue", "derive", "--json"],
+                             capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise RuntimeError("%s: %s" % (why, exc))
+    if run.returncode != 0:
+        raise RuntimeError("%s: %s" % (why, (run.stderr or run.stdout).strip()[:300]))
+    try:
+        body = json.loads(run.stdout)
+    except ValueError:
+        raise RuntimeError("%s: not JSON" % why)
+    rate = body.get("platformFeeRate", LEGACY_PLATFORM_RATE)
+    if isinstance(rate, bool) or not isinstance(rate, (int, float)) or not 0 <= rate <= MAX_PLATFORM_RATE:
+        raise RuntimeError("%s: platformFeeRate %r is not a share from 0 to %s" % (why, rate, MAX_PLATFORM_RATE))
+    return float(rate)
 
 
 def platform_fee(premium):
@@ -999,19 +1026,9 @@ def main():
 
     for sp in (s, q, m, c):
         sp.add_argument("--venue", default="derive", choices=sorted(VENUES))
-    for sp in (s, q):
-        sp.add_argument("--platform-fee-rate", type=float, default=None,
-                        help="Derive: `platformFeeRate` from `acp options account`; "
-                             "required by a Derive quote")
     a = p.parse_args()
     V.update(VENUES[a.venue])
-    rate = getattr(a, "platform_fee_rate", None)
-    if rate is not None and not 0 <= rate <= 0.05:
-        p.error("--platform-fee-rate is a share of the premium, 0 to 0.05 (0.005 is 0.5%)")
-    if a.cmd == "quote" and a.venue == "derive" and rate is None:
-        p.error("a Derive quote needs --platform-fee-rate: `platformFeeRate` from "
-                "`acp options account` (0 means no Virtuals platform fee)")
-    PLATFORM["rate"] = (rate or 0.0) if a.venue == "derive" else 0.0
+    PLATFORM["rate"] = platform_rate() if a.venue == "derive" and a.cmd in ("quote", "screen") else 0.0
 
     if a.cmd == "screen":
         out = screen(a.tenor, a.collateral, a.otm_pct)

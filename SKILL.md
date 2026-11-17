@@ -1,7 +1,7 @@
 ---
 name: options-trading
 description: Trade options on Derive, Paradex or Rysk - earn on idle USDC by selling cash-secured puts, buy a call or a put, close before expiry, and check or withdraw USDC and positions.
-version: 2.14.0
+version: 2.13.3
 metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","withdraw","withdraw my usdc","derive","my options","options account","options positions","free usdc","derive positions","my option positions","withdraw from derive","withdraw my free usdc","paradex","paradex options","paradex positions","rysk","rysk options","rysk positions","physically settled","hyperevm","limit order","resting order","at my price","or better","leave it on the book","cancel my order"],"requires":{"bins":["python3","bevo-read","acp"]}}}
 ---
 
@@ -88,7 +88,7 @@ this chat. One missing: ask, and file nothing this turn.
    positive is `--side close`; negative, `--side buyback` with the size positive and
    `--premium-received` the note's `netPremiumUsd` (or its duty's PREMIUM_USD) scaled
    to it. **Offer only `tradeable: true`**; give the `reasons` as written. A strike or
-   day they named: `buying.md`. Derive: `--platform-fee-rate <platformFeeRate>`.
+   day they named: `buying.md`.
 
 3. [ADAPT] Offer it using **only** quote fields; never compute a number:
    - **Fees:** "$0.65 in fees: $0.62 to Derive, $0.03 Virtuals platform fee"; 0: "no Virtuals platform fee".
@@ -141,7 +141,7 @@ this chat. One missing: ask, and file nothing this turn.
 
    `approvalStatus: confirmed` - `approvalOutcome` holds the fill, maybe partial:
    `filledSize`, plus open `netPremiumUsd`, `collateral`; buy `totalCostUsd`; close
-   `direction`, `netProceedsUsd` or `totalCostUsd`; `funding`: USDC moved first, say so; fees split as `summary` does.
+   `direction`, `netProceedsUsd` or `totalCostUsd`; `funding`: USDC moved first, say so; fees split as `summary` does, Virtuals named, at 0 too.
    `failed` or `rejected` - nothing traded; give `approvalFailureReason` as written.
    `pending` or `signed` - still waiting.
 
