@@ -6,7 +6,7 @@ selling cash-secured puts, buying calls and puts, and closing them on **Derive**
 people maintaining the repo. A butler receives `SKILL.md`, `references/**/*.md` and
 `scripts/**/*.py`; the registry also serves the duty templates under `templates/`.
 
-- **Version:** 2.13.3 (`SKILL.md`), with `options-lifecycle` 11, `options-put-delivery` 1
+- **Version:** 2.13.4 (`SKILL.md`), with `options-lifecycle` 11, `options-put-delivery` 1
   and `options-account` 5.
   What changed in each release: `CHANGELOG.md`.
 - **Registry name:** `options-trading`, listed in the hub's `skills.json` from this repo.
