@@ -38,7 +38,7 @@ made knowingly. Derive is not a default for an open.
   named. All in the same turn, before anything is offered:
 
   ```sh
-  python3 ~/skills/options-trading/scripts/quote.py quote --product cash_secured_put --underlying <ASSET> --collateral <USD>
+  python3 ~/skills/options-trading/scripts/quote.py quote --product cash_secured_put --underlying <ASSET> --collateral <USD> --platform-fee-rate <platformFeeRate>
   python3 ~/skills/options-trading/scripts/quote.py quote --venue paradex --product cash_secured_put --underlying <ASSET> --collateral <USD>
   python3 ~/skills/options-trading/scripts/rysk.py quote --asset <ASSET> --collateral <USD> --pay-with <collateral.address>
   ```

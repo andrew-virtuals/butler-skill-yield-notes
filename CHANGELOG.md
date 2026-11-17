@@ -1,5 +1,34 @@
 # Changelog
 
+## 2.14.0
+
+- **A Derive quote's fee is the fee the fill charges, and the owner hears whose it is.**
+  Seen live: the quote said "$6.28 premium plus $0.62 fee, $6.90 all in", the card
+  said a fee of about $0.65, and the fill charged $0.6548. `quote.py` priced Derive's
+  taker fee alone ($0.6234) and left out the Virtuals platform fee ($0.0314, 0.5%),
+  which the server sends with the order as Derive's `extra_fee` (Derive's "builder
+  fee") and counts on the card. Every Derive quote now takes `--platform-fee-rate`, the
+  `platformFeeRate` that `acp options account` reports (`account.md`), and stops with
+  exit 2 without it. The fee is inside `fee_usd`, every total and net, the size a budget
+  buys and the fee gate, and is split into `venue_fee_usd` and `platform_fee_usd`.
+  Paradex takes none. bevo-server charges no platform fee unless
+  `DERIVE_BUILDER_FEE_RATE` is set (bevo-server #1656).
+- **Every offer and every receipt splits the fee.** Step 3 gives the words: "$0.65 in
+  fees: $0.62 to Derive, $0.03 Virtuals platform fee", or at 0 "no Virtuals platform
+  fee"; `buying.md` and `selling.md` say the same for the receipt, and step 6 gives the
+  fees as the outcome's `summary` splits them.
+  Live-model eval (virtuals-agent `options-fees`, deepseek-v4-1-flash, an ETH call on
+  Derive with $20 and live quotes): 2.13.2 at 0.5% quoted $0.09 under the fill in 3 of 3
+  trials, and named no Virtuals fee in any of 6 offers. 2.14.0 in 9 trials (6 at 0.5%,
+  3 at 0): every offer split the fee and named Virtuals, and in all 7 that filed a buy
+  the quote fee equalled the fill's and the receipt split it too. The other 2 asked
+  which of two monthlies "monthly expiry" meant, and the scripted owner never said.
+- `SKILL.md` stays under 12,000 characters by wording cuts with no rule changed: bare
+  reference names where the rest of the file already uses them, and a few sentences
+  tightened. "One of four things" is gone; the list has five.
+- `tests/test_quote_platform_fee.py`: the flag, its range, a zero rate, the fee in every
+  total, parts that add up, a budget buying less, and none on Paradex.
+
 ## 2.13.2
 
 - **The Platforms Cash line is spendable.** Files `options-account@5`: a resting order's line

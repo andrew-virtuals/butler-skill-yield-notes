@@ -30,7 +30,8 @@ python3 ~/skills/options-trading/scripts/quote.py quote --venue paradex --side b
 - **Sizes** are in the asset, on each market's own step (`size_step`), and an order has a
   minimum value of the underlying set by the market; the quote's `min_size` includes both.
 - **Fees**: Butler's orders are Paradex retail orders; the quote's `fee_usd` is what
-  applies, and it can be 0. They can also fill against quotes shown only to retail
+  applies, and it can be 0. Virtuals takes no platform fee on Paradex
+  (`platform_fee_usd` 0). They can also fill against quotes shown only to retail
   orders, so a fill at or better than the quoted price is normal.
 - **Price band**: an order may pay no more than the mark plus the market's price band, or
   sell for no less than the mark minus it; the helper reads each market's band. It leaves

@@ -74,11 +74,17 @@ contracts at the ask.
 ## Fees
 
 ```text
-taker fee = base_fee + min(taker_fee_rate x index x size, mark_price_fee_rate_cap x mark x size)
+taker fee    = base_fee + min(taker_fee_rate x index x size, mark_price_fee_rate_cap x mark x size)
+platform fee = platformFeeRate x book price x size
+fee_usd      = taker fee + platform fee
 ```
 
-Each term is read from the instrument, and the quote's `fee_usd` is the result. The base
-fee is per order and uncapped, which is what makes small tickets and short tenors
+Each taker term is read from the instrument. The platform fee is Virtuals', charged on
+top of Derive's as the order's `extra_fee` (Derive's "builder fee"); its rate is
+`platformFeeRate` in `acp options account`, passed to the helper as
+`--platform-fee-rate`, and `0` means none. The quote gives both parts (`venue_fee_usd`,
+`platform_fee_usd`), as the card and the fill do (`venueFeeUsd`, `platformFeeUsd`). The
+base fee is per order and uncapped, which is what makes small tickets and short tenors
 pointless: the helper refuses a sell or a buy whose fee is over 15% of the premium.
 
 ## Spreads: what decides which trades clear

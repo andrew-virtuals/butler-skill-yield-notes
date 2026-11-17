@@ -6,7 +6,7 @@ selling cash-secured puts, buying calls and puts, and closing them on **Derive**
 people maintaining the repo. A butler receives `SKILL.md`, `references/**/*.md` and
 `scripts/**/*.py`; the registry also serves the duty templates under `templates/`.
 
-- **Version:** 2.13.2 (`SKILL.md`), with `options-lifecycle` 11, `options-put-delivery` 1
+- **Version:** 2.14.0 (`SKILL.md`), with `options-lifecycle` 11, `options-put-delivery` 1
   and `options-account` 5.
   What changed in each release: `CHANGELOG.md`.
 - **Registry name:** `options-trading`, listed in the hub's `skills.json` from this repo.
@@ -110,7 +110,11 @@ here only; re-measure before relying on a spread or a depth.
 Derive v3 mainnet, 7 October 2026 (selling) and 9 October 2026 (buying):
 
 - **Fees:** $0.50 + min(0.03% of index notional, 12.5% of mark value) per order, matched
-  to a live fill to the cent. Paradex retail orders paid no option fee.
+  to a live fill to the cent. Paradex retail orders paid no option fee. On top, bevo-server
+  may send the Virtuals platform fee as Derive's `extra_fee` (`DERIVE_BUILDER_FEE_RATE`, a
+  share of the premium, unset by default: none); the account read's `platformFeeRate`
+  feeds the helper's `--platform-fee-rate`. Measured 2026-11-16 at 0.5%: a $6.28 premium
+  filled with a $0.6548 fee, $0.6234 Derive's and $0.0314 the platform's.
 - **Minimums:** ETH 0.1 contracts on a 0.01 step (~$230 of collateral at a ~10% OTM
   monthly strike), BTC 0.01 on 0.00001 (~$750). A 5% OTM monthly ETH call cost about
   $7.40 at the minimum, where the base fee was about 9% of the premium. Paradex: $20 of
@@ -141,11 +145,11 @@ Run them from the repo against mainnet:
 python3 scripts/quote.py chain                                    # what Derive lists
 python3 scripts/quote.py chain --venue paradex                    # with name and kind
 python3 scripts/quote.py screen --collateral 5000
-python3 scripts/quote.py quote --product cash_secured_put --underlying ETH --collateral 5000
-python3 scripts/quote.py quote --side buy --product call --underlying ETH --budget 200
+python3 scripts/quote.py quote --product cash_secured_put --underlying ETH --collateral 5000 --platform-fee-rate 0
+python3 scripts/quote.py quote --side buy --product call --underlying ETH --budget 200 --platform-fee-rate 0
 python3 scripts/quote.py quote --venue paradex --side buy --product call --underlying ETH --budget 10 --expiry 2026-11-27
-python3 scripts/quote.py quote --side close --instrument ETH-20261127-2600-C --size 1
-python3 scripts/quote.py quote --side buyback --instrument ETH-20261127-2300-P --size 0.1 --premium-received 3
+python3 scripts/quote.py quote --side close --instrument ETH-20261127-2600-C --size 1 --platform-fee-rate 0
+python3 scripts/quote.py quote --side buyback --instrument ETH-20261127-2300-P --size 0.1 --premium-received 3 --platform-fee-rate 0
 ```
 
 Check these by hand after any change to the helper:
