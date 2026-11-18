@@ -1,7 +1,7 @@
 ---
 name: options-trading
 description: Trade options on Derive, Paradex or Rysk - earn on idle USDC by selling cash-secured puts, buy a call or a put, close before expiry, and check or withdraw USDC and positions.
-version: 2.14.0
+version: 2.15.0
 metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","withdraw","withdraw my usdc","derive","my options","options account","options positions","free usdc","derive positions","my option positions","withdraw from derive","withdraw my free usdc","paradex","paradex options","paradex positions","rysk","rysk options","rysk positions","physically settled","hyperevm","limit order","resting order","at my price","or better","leave it on the book","cancel my order"],"requires":{"bins":["python3","bevo-read","acp"]}}}
 ---
 
@@ -132,7 +132,7 @@ this chat. One missing: ask, and file nothing this turn.
    ```
 
    One bound per close. The reply is an approval card, not a fill: tell the owner to
-   approve it in the app. At their price: `resting.md`.
+   approve it in the app. At their price: `resting.md`; by RFQ: `rfq.md`.
 
 6. [FIXED] Wait for the outcome; never re-run the command for it. The server nudges
    you when the card lands. Then:
@@ -210,8 +210,8 @@ failed: re-read the account and wait. Look up `:home` with `--route trade`.
 
 ## Limits
 
-- Selling locks collateral until expiry or a buy-back; buying is paid in full, nothing
-  borrowed. No rolling without a fresh yes.
+- Selling locks collateral until expiry or a buy-back; buying is paid in full. No rolling
+  without a fresh yes.
 - **Cash settled** on Derive and Paradex, kept there till withdrawn; Rysk delivers the asset.
 - Not advice: never rank or recommend.
 
