@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.15.1
+
+- **A duty wallet's Derive row stays on the Platforms tab.** Files `options-account@6`. A duty
+  that trades options from its own wallet now has its Derive account as a Platforms row that
+  Butler's server writes ("Derive · <duty name>", Virtual-Protocol/bevo-server#1685). The
+  account duty removed every Derive row that was not one of the main wallet's subaccounts, so it
+  would have deleted that row every 10 minutes. It now skips any row the list marks
+  `serverKept`. Step 9 updates a duty on `@5` or older in place. Ships with that server change;
+  before it, no row is marked and nothing changes.
+
 ## 2.15.0
 
 - **RFQ when the owner asks.** New `references/rfq.md`: on Derive or Paradex, "RFQ", "request

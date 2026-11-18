@@ -128,6 +128,12 @@ class Subaccounts(unittest.TestCase):
         fake = run([0], {"/options/account": accounts(split_derive(), paradex("5", 5))}, platforms=existing)
         self.assertEqual(fake.removed, ["old", "alt"])
 
+    def test_a_row_the_server_keeps_is_never_retired(self):
+        kept = dict(platform("duty", DERIVE, "0x00000000000000000000000000000000000000d7"), serverKept=True)
+        existing = [platform("old", DERIVE, WALLET), kept, platform("prime", DERIVE, "PRIME")]
+        fake = run([0], {"/options/account": accounts(split_derive())}, platforms=existing)
+        self.assertEqual(fake.removed, ["old"])
+
     def test_nothing_is_retired_while_a_subaccount_row_is_unsaved(self):
         fake = run([0], {"/options/account": accounts(split_derive())},
                    platforms=[platform("old", DERIVE, WALLET)], refuse={"RWA"})

@@ -15,7 +15,8 @@ universes) gets one row per subaccount instead, keyed by its name ("PRIME",
 "RWA"), at the subaccount's own worth, listing its cash first and then its
 positions. Once every one of them is written, the venue's other rows (the
 single row it had before, a subaccount it no longer has) are removed, so the
-wallet never counts an account twice.
+wallet never counts an account twice. A row Butler's server keeps (`serverKept`:
+a Butler wallet's own account, which the server writes) is never removed.
 
 A venue that fails to read, or reads with no worth, writes nothing, so its row
 keeps its last good value; the other venues are written regardless. Zero is
@@ -190,7 +191,7 @@ def subaccount_rows(subs, unread=False, shown=None):
 
 
 def retire(site, keep):
-    """Remove the site's rows whose account is not in `keep`."""
+    """Remove the site's rows whose account is not in `keep`, never one the server keeps."""
     host = site_host(site)
     try:
         rows = bevo.platform_balances()
@@ -199,6 +200,8 @@ def retire(site, keep):
         return
     for row in rows:
         if row.get("siteHost") != host or row.get("account") in keep or not row.get("id"):
+            continue
+        if row.get("serverKept"):
             continue
         try:
             done = subprocess.run(["bevo-platforms", "remove", str(row["id"])],
