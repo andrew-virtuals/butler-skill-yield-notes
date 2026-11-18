@@ -56,7 +56,7 @@ setting.
 | Quotes | `scripts/quote.py` (Derive, Paradex) and `scripts/rysk.py` (Rysk), run in place with `python3 "$HOME/skills/options-trading/scripts/<script>.py"`; fields in `references/helper.md` and `rysk-helper.md` | Read-only and keyless, against each venue's public API. Lists what a venue trades (`chain`, with each underlying's `name` and `kind`), and prices sells, buys, closes and buy-backs with every bound already worked out. `minimum` gives the smallest put a venue takes and the USDC it locks, for an owner who has named no amount yet. |
 | Account | `acp options account` | Every venue at once, or one with `--venue`: free USDC, positions (positive size is bought), each account's worth, and whether Butler's signer is ready. |
 | Funding | `acp options deposit` | One approval card. |
-| Trading | `acp options open`, `buy`, `close` | One approval card each. After approval the order is an immediate-or-cancel limit order, inside the bound on the card (`--min-premium`, `--max-cost`, `--min-proceeds`). Rysk's card is good for 5 minutes and is re-quoted against its floor. With `--order gtc` or `post-only` (Derive and Paradex) it is instead a resting order at the owner's price per contract, and `acp options cancel` files a card to take it off the book (`references/resting.md`). |
+| Trading | `acp options open`, `buy`, `close` | One approval card each. After approval the order is an immediate-or-cancel limit order, inside the bound on the card (`--min-premium`, `--max-cost`, `--min-proceeds`). Rysk's card is good for 5 minutes and is re-quoted against its floor. With `--order gtc` or `post-only` (Derive and Paradex) it is instead a resting order at the owner's price per contract, and `acp options cancel` files a card to take it off the book (`references/resting.md`). With `--order rfq` (Derive and Paradex, when the owner asks) the run asks the market makers for up to 20 seconds and takes the best quote inside the same bound (`references/rfq.md`). |
 | Outcome | `bevo-read request <key> --route options` | `approvalStatus`, then `approvalOutcome` (the fill) or `approvalFailureReason`. |
 | Withdrawing | `acp options withdraw` | One approval card. A Derive withdrawal also takes an `acp trade` home to Base. |
 | Watching to expiry | the `options-lifecycle@11` duty, `templates/options-lifecycle/` | Filed after a confirmed open or buy, from the fill, or when a resting order is placed (`ORDER_ID`), which it waits on until it fills. Sends a heads-up the day before expiry and the outcome once the option settles. Runs no command, so it is filed with `movesFunds: false` and no pocket. Deleted after a confirmed close. |
@@ -253,6 +253,7 @@ references/
   which-venue.md            quoting every venue for an open, and offering them side by side
   selling.md, buying.md     what to say and ask for each kind of trade
   resting.md                a resting order at the owner's price, and cancelling it
+  rfq.md                    an RFQ to the market makers, when the owner asks for one
   account.md                the account read, subaccounts, withdrawals
   venue.md                  Derive's facts: fees, sizes, spreads, settlement
   paradex.md, rysk.md       what differs on each of those venues

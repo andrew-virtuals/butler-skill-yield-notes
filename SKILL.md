@@ -132,7 +132,7 @@ this chat. One missing: ask, and file nothing this turn.
    ```
 
    One bound per close. The reply is an approval card, not a fill: tell the owner to
-   approve it in the app. At their price: `resting.md`.
+   approve it in the app. At their price: `resting.md`; by RFQ: `rfq.md`.
 
 6. [FIXED] Wait for the outcome; never re-run the command for it. The server nudges
    you when the card lands. Then:
@@ -210,8 +210,8 @@ failed: re-read the account and wait. Look up `:home` with `--route trade`.
 
 ## Limits
 
-- Selling locks collateral until expiry or a buy-back; buying is paid in full, nothing
-  borrowed. No rolling without a fresh yes.
+- Selling locks collateral until expiry or a buy-back; buying is paid in full. No rolling
+  without a fresh yes.
 - **Cash settled** on Derive and Paradex, kept there till withdrawn; Rysk delivers the asset.
 - Not advice: never rank or recommend.
 

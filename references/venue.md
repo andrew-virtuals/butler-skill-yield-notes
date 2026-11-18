@@ -105,8 +105,8 @@ memory.
 
 Every trade is an immediate-or-cancel **limit** order on the public book, never a
 market order and never left resting. A no-fill trades nothing, spends nothing and
-locks nothing. Derive's RFQ path usually prices better for size and is not used yet,
-so a quote here is the worst case.
+locks nothing. An RFQ to the market makers (`rfq.md`) is used only when the owner
+asks; it often prices better for size, so a quote here is the worst case.
 
 - **open** (sell): priced from the owner's minimum net premium plus the fee.
 - **buy**: refused unless free USDC (what is not backing a sold note) covers
