@@ -1,5 +1,15 @@
 # Changelog
 
+## 6
+
+- **A Butler wallet's own Derive row stays.** A duty that trades options from its own wallet has
+  its Derive account on the Platforms tab as a row Butler's server writes ("Derive · <duty
+  name>", keyed by the wallet's address). The check removed every Derive row that was not one of
+  the main wallet's subaccounts, so it would have deleted that row every 10 minutes. It now
+  skips any row the list marks `serverKept` (bevo-server, Virtual-Protocol/bevo-server#1685,
+  which also refuses the delete for an older duty).
+- Supersedes `options-account@5`: SKILL.md step 9 updates an older or forked duty in place.
+
 ## 5
 
 - **Cash is what can be spent.** A resting order's line now carries the cash it holds back

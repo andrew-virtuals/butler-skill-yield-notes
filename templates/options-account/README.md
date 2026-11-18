@@ -4,7 +4,7 @@ Keeps the owner's account on every options venue on the wallet's Platforms tab: 
 
 ## How it is filed
 
-`{"recipe": "options-account@5", "title": "Options accounts", "triggers": [{"kind": "timer", "intervalSeconds": 600}]}`. No settings. One per owner: a second writes the same rows. An owner still running `derive-account` has it removed when this one is filed, so each row has one writer. An older or forked one is updated in place with `duty_update {"recipe": "options-account@5"}`.
+`{"recipe": "options-account@6", "title": "Options accounts", "triggers": [{"kind": "timer", "intervalSeconds": 600}]}`. No settings. One per owner: a second writes the same rows. An owner still running `derive-account` has it removed when this one is filed, so each row has one writer. An older or forked one is updated in place with `duty_update {"recipe": "options-account@6"}`.
 
 ## What it does
 
@@ -23,7 +23,7 @@ The worth is the venue's own `worthUsd`, written as it stands: Paradex's is its 
 
 ## Subaccounts
 
-A venue that splits the account (`account.accounts`, Derive's risk universes) gets one row per subaccount instead, under the venue's name and site, keyed by the subaccount's name (`PRIME`), at its own `worthUsd` (Derive's `subaccount_value`). The first line is `Cash`, the subaccount's `usdc`, then its positions. Every subaccount is priced or none is written. Once all of them are saved, the venue's other rows on that site are removed: the single row keyed by the wallet that `@1` wrote, and any subaccount that is gone. A check where a row was not saved, or the rows could not be listed, removes nothing.
+A venue that splits the account (`account.accounts`, Derive's risk universes) gets one row per subaccount instead, under the venue's name and site, keyed by the subaccount's name (`PRIME`), at its own `worthUsd` (Derive's `subaccount_value`). The first line is `Cash`, the subaccount's `usdc`, then its positions. Every subaccount is priced or none is written. Once all of them are saved, the venue's other rows on that site are removed: the single row keyed by the wallet that `@1` wrote, and any subaccount that is gone. A check where a row was not saved, or the rows could not be listed, removes nothing. A row Butler's server keeps is never removed: a Butler wallet's own Derive account (a duty trading from its own wallet) has a row the server writes, `Derive · <duty name>`, marked `serverKept` on the list.
 
 ## The one note
 
