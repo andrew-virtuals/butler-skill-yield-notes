@@ -40,7 +40,7 @@ Not this skill: covered calls, spreads or leverage.
    `selling.md` or `buying.md`. A no or a vague answer stops it.
 6. **Figures come only from this turn's reads:** sizes, prices and positions
    from `acp options account` and quotes, never memory; fix a note that
-   disagrees.
+   disagrees. `bevo-read assets` has none.
 7. **Venue.** Quote an open on each venue offering it, unless they name one; the
    rest where it is. `--venue` it everywhere.
 
@@ -121,7 +121,8 @@ this chat. One missing: ask, and file nothing this turn.
    The bot gathers stablecoins from **every chain**, any venue.
    `--from 1` only when `ethereum.usdc` covers it alone. Never ask about gas or an
    address. Re-read the account until free USDC covers it, and do step 9; if
-   short, re-quote smaller and re-offer.
+   short, re-quote smaller and re-offer. Free USDC spans their Derive accounts
+   (`account.md`).
 
 5. [FIXED] Run the quote again now, after their last answer. With all four met, file
    the command, with that quote's fields and the bound they agreed:
@@ -136,7 +137,8 @@ this chat. One missing: ask, and file nothing this turn.
    One bound per close. The reply is an approval card, not a fill: tell the owner to
    approve it in the app. At their price: `resting.md`; by RFQ: `rfq.md`.
 
-6. [FIXED] Wait for the outcome; never re-run the command for it. Then:
+6. [FIXED] Wait for the outcome; never re-run the command for it. The server nudges
+   you when the card lands. Then:
 
    ```sh
    bevo-read request <KEY>:<OP> --route options
@@ -161,11 +163,9 @@ this chat. One missing: ask, and file nothing this turn.
    Sold put: PRODUCT `cash_secured_put`, PREMIUM_USD `netPremiumUsd`, COLLATERAL_USD
    `collateral`. Bought: PRODUCT `long_call` or `long_put`, PREMIUM_USD `totalCostUsd`,
    COLLATERAL_USD 0. Resting: `resting.md`. Asked in step 3 to own the asset: `options-put-delivery@1`
-   (`selling.md`). After a close, `duty_delete` that instrument's duty; if
-   part is still open, file it again with SIZE from `positions` (positive) and
-   PREMIUM_USD and COLLATERAL_USD scaled to it. Never file for an unknown or failed
-   trade. A second options duty in one chat needs
-   `"alongside": [<this chat's earlier ones>]`; step 9's needs none.
+   (`selling.md`). After a close, `duty_delete` that instrument's duty. Never file for
+   an unknown or failed trade. Part still open, or a second duty in one chat:
+   `lifecycle.md`.
 
 8. [FIXED] Withdraw only when asked, only free USDC: at most this turn's
    `freeForNewPutsUsd`, rounded down to the cent. It lands on Ethereum in its card's

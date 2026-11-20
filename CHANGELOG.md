@@ -8,7 +8,9 @@
   later.**", which has Butler read `duty.md` before its first reply. Any trade the owner
   wants to happen later is a duty, never a trade filed now; a condition already met, or
   a date that may be the expiry, is asked about. The other Before you start checks are
-  renumbered, and `resting.md`'s pointer is shortened to fit the body cap.
+  renumbered. To fit the body cap, `resting.md`'s pointer is shortened, and step 7's
+  two rarer cases (part of a position still open after a close, a second options duty
+  in one chat) move to a new `references/lifecycle.md`; nothing else is cut.
   - **The first reply has a fixed shape**, ahead of any quote or question about the
     rule, even when it also clears up the rule: (1) Butler recommends a wallet (the
     duty's own, or the main one) with one reason from the chat, and offers the other;
@@ -17,13 +19,13 @@
   - **Its own wallet:** `bevo-wallet create`, then `duty_create` with `walletId` and
     `fundUsdc` (one funding card): the amount set aside plus 2%, rounded up to the dollar
     ($10 is $11), and no other headroom; at least $10 set aside, the venue's minimum
-    deposit, else Butler recommends the main wallet. Hands-free, kept apart from the owner's account, and
-    copyable.
+    deposit, else Butler recommends the main wallet. Hands-free, kept apart from the
+    owner's account, and copyable.
   - **The main wallet:** Butler deposits the gap now, as step 4 does (none when free USDC
     already covers the amount set aside), then files the duty with `pocketUsdc` set to that
     amount and `spendBasis`, so its one Start card proposes the owner's own figure and is
-    never asked about in chat. Once held, each trade it covers runs with no card; not
-    copyable.
+    never asked about in chat. Once held, each trade it covers runs with no card;
+    `pocketUsdc` 0 only when the owner asked for a card on every trade. Not copyable.
   - **Its code starts from a program in `duty.md`**; Butler writes only `trigger()` and
     `order()`. The rest is fixed: whatever USDC lands in its own wallet (the funding
     card, a later top-up) is deposited on the venue in a run that trades nothing; it says
@@ -46,9 +48,10 @@
     argv. Checked against virtuals-agent's own `prepare()`: both wallets file with no
     refusal and no warning. Before, each duty cost Butler several refused `duty_create`
     calls and a read of the platform's duty guide.
-  - **Its timer runs from the moment it is filed**, every minute until done, never a
-    `startsAt` or an `at`: the time, day or price is in `trigger()`, so the runs before it
-    move the money onto the venue. A 14:55 duty that only started at 14:55 deposited then.
+  - **Its timer runs from the moment it is filed** until done (every 60 seconds for a
+    set time, every 300 for a price or a schedule), never a `startsAt` or an `at`: the
+    time, day or price is in `trigger()`, so the runs before it move the money onto the
+    venue. A 14:55 duty that only started at 14:55 deposited then.
   - **Never filed in the turn it is asked**, even when the ask names the time, venue and
     money and free USDC covers it: the first reply recommends the wallet and waits.
   - **A new ask is a new duty, and a fast first reply.** In that turn Butler never opens,
@@ -56,6 +59,16 @@
     earlier duty was filed; one that bears on the money gets one line. When the owner
     named the money (a budget, the collateral, a size), the first reply comes before any
     tool call after reading `duty.md`, and the quote waits for filing.
+  - **A wallet still empty after 30 minutes is said once**, with a push ("its wallet is
+    still empty, so it has not started"), and its status reads "Waiting for its funding
+    card": a funding card declined or left waiting no longer shows "Setting up" for good.
+  - **By RFQ**, only when the owner asked for it, on Derive or Paradex, from either
+    wallet: `order()` adds `--order rfq` with the same bound. `rfq.md` now says makers
+    may not quote a small order at all, and to offer the order book for one.
+  - The first reply reads a price trigger's condition before it answers (the one read
+    allowed ahead of it), and its worked example asks the set-aside question in the
+    required words. The main wallet is offered as "one approval for its limit", no longer
+    "approve each trade".
   - An own-wallet duty's short note asks for at least $10, the venue's minimum deposit,
     since its wallet moves nothing smaller onto the venue; a top-up is never under $10.
   - On a short note, Butler asks the owner in chat whether to top up and by how much:

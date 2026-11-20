@@ -255,6 +255,7 @@ references/
   selling.md, buying.md     what to say and ask for each kind of trade
   resting.md                a resting order at the owner's price, and cancelling it
   rfq.md                    an RFQ to the market makers, when the owner asks for one
+  lifecycle.md              the lifecycle duty after a partial close, and a second duty in one chat
   duty.md                   a duty whose own code trades: its money first, its notes, topping it up
   account.md                the account read, subaccounts, withdrawals
   venue.md                  Derive's facts: fees, sizes, spreads, settlement

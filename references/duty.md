@@ -28,8 +28,9 @@ and the money, and free USDC already covers it: the wallet is the owner's to pic
 this reply recommends one and waits for their answer.
 
 When they named the money (a budget, the collateral, a size), this reply comes before any
-tool call after reading this file: that figure is one trade's need, and the quote waits for filing. Without one,
-read only what the floor needs (one quote) and reply.
+tool call after reading this file, but the one read a condition needs (its price now):
+that figure is one trade's need, and the quote waits for filing. Without one, read only
+what the floor needs (one quote) and reply.
 
 A duty's money is on the venue before it can trade: a Derive or Paradex deposit takes
 minutes, and the price that set it off may be gone by then. So the first reply settles
@@ -39,8 +40,8 @@ rule:
 
 1. **The wallet, as your recommendation:** "I recommend **its own wallet**, because …"
    (or **your main wallet**), with one reason from this chat (the table below). Then the
-   other in one line, and that they can pick it instead: "Or your main wallet, if you'd
-   rather approve each trade."
+   other in one line, and that they can pick it instead: "Or your main wallet, to use
+   the USDC already in your options account, with one approval for its limit."
 2. **How much to set aside for it, in total,** asked in these words: "How much do you
    want to set aside for this duty in total?" One dollar figure the duty works with for
    every trade it makes; never "per put" or "per trade" in its place (each trade's size
@@ -59,17 +60,17 @@ answer already gives a figure or a wallet, confirm it in place of asking.
 
 | | Its own wallet | The main wallet |
 | --- | --- | --- |
-| Trades | Hands-free, no card | Hands-free once the owner holds its Start card, up to the limit on it |
+| Trades | Hands-free, no card | Hands-free up to the limit on its Start card, once held |
 | Deposits | The duty makes them, hands-free | A card now, in chat; each top-up a card |
 | Its money | Its own account and Platforms row, apart from the owner's | The owner's main account |
 | Copyable | Yes | No: its trades are never copied |
 
 Recommend **its own wallet** for anything that runs unattended, repeats, waits for a
 price, or may be published or copied: the reason is that it trades the moment it fires,
-with no card to miss. Recommend **the main wallet** when they want to approve each
-trade, or to trade free USDC already in their main options account
-(`acp options account`). Either is a recommendation, asked in the first reply. Their pick
-stands; never argue it twice.
+with no card to miss. Recommend **the main wallet** to trade free USDC already in their
+main options account (`acp options account`), or when they want a card for every trade.
+Either is a recommendation, asked in the first reply. Their pick stands; never argue it
+twice.
 
 ## Filing it
 
@@ -97,7 +98,8 @@ stands; never argue it twice.
    they set aside**. That files one Start card proposing that limit; the owner's hold is
    the approval. Never ask them for a limit in chat: they named it. Say that once they
    hold it, each trade it covers runs with no card; until then a trade it covers is
-   skipped, and a bigger one asks with its own card.
+   skipped, and a bigger one asks with its own card. Only when they asked for a card on
+   every trade: `"pocketUsdc": 0`.
 
 ### What `duty_create` gets, either way
 
@@ -115,6 +117,7 @@ the first time:
   "statusTemplate": {
     "moving": "Moving ${amount} to {venue}",
     "setting_up": "Setting up: ${free} of ${allocation} on {venue}",
+    "unfunded": "Waiting for its funding card",
     "watching": "{seen} · ${free} free on {venue}",
     "short": "${gap} short on {venue} · top it up to trade",
     "placed": "Placed: {order} · waiting on {venue}",
@@ -211,7 +214,8 @@ def order():
     `acp options`, a line saying it), e.g. (["open", "--instrument", i, "--size", s,
     "--min-premium", p, "--max-collateral", c], "sell a 0.5 ETH $1,500 put for at least
     $41"); a buy is ["buy", ..., "--max-cost", m]. (None, why) when the quote failed or
-    is not tradeable."""
+    is not tradeable. By RFQ, only when the owner asked for it: the same argv and bound
+    with "--order", "rfq" added."""
 
 
 def move_in(free):
@@ -282,11 +286,20 @@ for tick in bevo.ticks():
     arriving = OWN and (not S.get("deposits") or (free <= S["free_before"] + 1
                                                    and time.time() - S["deposit_at"] < 1800))
     if free < NEED and arriving:
-        bevo.status("setting_up", free=round(free), allocation=round(ALLOCATION), venue=WHERE)
+        if S.get("deposits") or time.time() - S.setdefault("born", time.time()) < 1800:
+            bevo.status("setting_up", free=round(free), allocation=round(ALLOCATION), venue=WHERE)
+            continue
+        if not S.get("unfunded"):  # funding card declined or never answered
+            S["unfunded"] = True
+            bevo.notify(f"{NAME}: its wallet is still empty, so it has not started. Approve "
+                        f"its funding card, or ask Butler to fund it.",
+                        push=f"{NAME} is not funded")
+        bevo.status("unfunded")
         continue
     if not S.get("ready") and free >= NEED:
         S["ready"] = True
-        bevo.notify(f"{NAME}: ${free:,.0f} ready on {WHERE}. Watching now.", push=f"{NAME} is ready")
+        bevo.notify(f"{NAME}: ${free:,.0f} ready on {WHERE}. Watching now.",
+                    push=f"{NAME} is ready")
     met, seen = trigger()
     if free < NEED:
         short(free, met, seen)
@@ -311,8 +324,9 @@ What each part keeps:
 
 - **Set up** (its own wallet): whatever USDC lands in its wallet (the funding card, a
   top-up) it deposits on the venue, and trades nothing in that run. Once it is there it
-  says `ready`, and only then reads the trigger. A main-wallet duty's money was deposited
-  in chat.
+  says `ready`, and only then reads the trigger. A wallet still empty after 30 minutes
+  (a funding card declined or left waiting) is said once, with a push. A main-wallet
+  duty's money was deposited in chat.
 - **Short** is checked on every run once it is ready, before the trigger matters: the
   owner hears it while there is still time to top up, and again if it fires while short.
   It never deposits on its own past setting up.
@@ -320,6 +334,14 @@ What each part keeps:
   re-fire reuses it and the server never runs it twice. `bevo.settled` reads how it
   ended; never send it again under a new key.
 - **Its limit:** `TIMES` trades, then `bevo.done`.
+
+## By RFQ
+
+Only when the owner asked for it (`rfq.md`), on Derive or Paradex, from either wallet:
+`order()` adds `"--order", "rfq"` to the same argv, with the same bound. Makers have 20
+seconds; when none quotes inside the bound nothing trades (`OPTIONS_NOT_FILLED`), and the
+duty tries again on its next trigger. Say first that makers may not quote a small size
+(`rfq.md`), and offer the order book for it.
 
 ## Topping it up
 
@@ -357,9 +379,10 @@ Arbitrum (Paradex), less the venue's fee.
 First reply: "I can set that up as a duty that trades by itself when ETH drops below
 $1,500. Three things first:
 1. **Wallet:** I recommend its own wallet, because it then sells the moment ETH crosses,
-   with no card for you to approve in time. Or your main wallet, if you'd rather approve
-   each trade.
-2. **How much to set aside for it?** One 0.5 ETH put at $1,500 needs about $750.
+   with no card for you to approve in time. Or your main wallet, to use the USDC already
+   in your options account, with one approval for its limit.
+2. **How much do you want to set aside for this duty in total?** One 0.5 ETH put at
+   $1,500 needs about $750.
 3. **Venue:** Derive, unless you'd like Paradex.
 And for the put itself: which strike, what size, and once or each time it drops?"
 
