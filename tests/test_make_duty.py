@@ -65,8 +65,8 @@ class Build(unittest.TestCase):
         self.assertEqual(duty["title"], "{NAME}")
         self.assertEqual(duty["triggers"], [{"kind": "timer", "intervalSeconds": 300, "untilDone": True}])
         self.assertEqual(duty["spendBasis"], {"perTrade": "NEED_USD", "times": "TIMES"})
-        self.assertEqual(duty["statusTemplate"], make_duty.STATUS)
-        self.assertEqual(duty["params"], {
+        self.assertEqual(json.loads(duty["statusTemplate"]), make_duty.STATUS)
+        self.assertEqual(json.loads(duty["params"]), {
             "NAME": "Sell ETH puts below $1,500", "VENUE": "derive", "OWN_WALLET": True,
             "ALLOCATION_USD": 1000.0, "NEED_USD": 750.0, "TIMES": 1,
             "QUOTE_PY": os.path.join(os.path.realpath(SCRIPTS), "quote.py"), "STRIKE": 1500})
@@ -99,7 +99,7 @@ class Build(unittest.TestCase):
         _, answer, _ = self.run_it("--wallet", "main", "--free", "1000")
         duty = answer["duty_create"]
         self.assertEqual(duty["pocketUsdc"], 1000.0)
-        self.assertFalse(duty["params"]["OWN_WALLET"])
+        self.assertFalse(json.loads(duty["params"])["OWN_WALLET"])
         self.assertNotIn("walletId", duty)
         self.assertNotIn("fundUsdc", duty)
 
@@ -110,7 +110,7 @@ class Build(unittest.TestCase):
     def test_a_set_time_runs_every_minute_and_paradex_is_carried(self):
         _, answer, _ = self.run_it("--wallet", "main", "--free", "1000", "--every", "60", "--venue", "paradex")
         self.assertEqual(answer["duty_create"]["triggers"][0]["intervalSeconds"], 60)
-        self.assertEqual(answer["duty_create"]["params"]["VENUE"], "paradex")
+        self.assertEqual(json.loads(answer["duty_create"]["params"])["VENUE"], "paradex")
 
     def refused(self, *args):
         code, _, err = self.run_it(*args)
@@ -126,6 +126,8 @@ class Build(unittest.TestCase):
         self.assertIn("--free", self.refused("--wallet", "main"))
         self.assertIn("set by this script", self.refused(*own, "--param", "NEED_USD=1"))
         self.assertIn("no figures", self.refused(*own, "--slug", "eth-puts-2"))
+        self.assertIn("single quotes", self.refused(*own, "--name", "ETH call at ,850"))
+        self.assertIn("single quotes", self.refused(*own, "--spec", "when ETH goes above ,740, buy"))
 
     def test_rule_refusals(self):
         own = ("--wallet", "own", "--wallet-label", "w")

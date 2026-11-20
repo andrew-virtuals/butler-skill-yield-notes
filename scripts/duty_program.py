@@ -28,10 +28,26 @@ HELD = {"pocket_pending": "is waiting for you to hold its Start card",
 
 
 def acp(key, *args):
-    """Runs it; returns which of HELD refused it, or ""."""
+    """Runs it. A refusal the server gave outright (nothing filed, nothing ran) comes back
+    as [code, why]; anything else, an outage included, as None: the ledger tells."""
+    if VENUE != "derive" and "--venue" not in args:
+        args = (*args, "--venue", VENUE)
     run = subprocess.run(["acp", "options", *args, "--idempotency-key", key],
                          capture_output=True, text=True, timeout=170, check=False)
-    return next((code for code in HELD if code in run.stdout + run.stderr), "")
+    text = run.stdout + run.stderr
+    held = next((code for code in HELD if code in text), None)
+    if held:
+        return [held, HELD[held]]
+    try:
+        answer = json.loads(run.stdout[run.stdout.index("{"):])
+    except ValueError:
+        return None
+    status = answer.get("httpStatus")
+    if (run.returncode == 0 or answer.get("status") not in ("refused", "conflict")
+            or not isinstance(status, int) or status >= 500 or status == 429
+            or str(answer.get("code")).startswith("IDEMPOTEN")):  # the key is on the ledger
+        return None
+    return [str(answer.get("code") or "refused"), str(answer.get("error") or "refused")[:160]]
 
 
 def say(kind, text, push):
@@ -47,6 +63,8 @@ def quote(*args):
     """The helper (helper.md), e.g. quote("quote", "--side", "buy", ...): its JSON, or
     {"error": why} when it failed."""
     try:
+        if VENUE != "derive" and "--venue" not in args:
+            args = (*args, "--venue", VENUE)
         run = subprocess.run([sys.executable, QUOTE_PY, *args], capture_output=True,
                              text=True, timeout=120, check=False)
         if run.returncode == 0:
@@ -120,12 +138,16 @@ def follow_up():
         return True
     line = S.pop("placing", "the order")
     del S["key"]
-    held = HELD.get(S.pop("refused", ""))
-    if fate == "dropped" or held:  # a held-back trade never ran, whatever the ledger says
+    refused = S.pop("refused", None)
+    if fate != "executed" and (fate == "dropped" or refused):  # a refused order never ran
         S["tries"], S["retry_at"] = S.get("tries", 0) + 1, time.time() + 300
-        if held:
-            say("held", f"{NAME}: {line} was not placed: it {held}. Nothing traded.",
+        if refused and refused[0] in HELD:
+            say("held", f"{NAME}: {line} was not placed: it {refused[1]}. Nothing traded.",
                 f"{NAME} needs you")
+        elif refused and refused[0] != "OPTIONS_NOT_FILLED":
+            say("refused", f"{NAME}: {line} was refused ({refused[1]}). Nothing traded. It "
+                f"tries again every five minutes; stop it if this cannot clear.",
+                f"{NAME}: refused")
         else:
             say("missed", f"{NAME}: {line} did not fill at its bound; nothing traded. It "
                 f"keeps trying while its trigger holds.", f"{NAME}: not filled")

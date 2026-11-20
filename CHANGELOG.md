@@ -42,7 +42,10 @@
     `--max-collateral`, or `--max-cost`) or names a resting price; one whose `trigger()`
     answers anything but `(True or False, "a line")`; and one that reads the clock's hour
     or weekday, which the agent refuses under an interval timer (`duty.md` shows a
-    schedule by timestamps, and `traded_at`, which the program sets on a fill).
+    schedule by timestamps, and `traded_at`, which the program sets on a fill). It
+    prints `statusTemplate` and `params` as JSON text, the type `duty_create` declares,
+    and refuses a `--name` or `--spec` the shell ate a `$` figure from (`duty.md` puts
+    both in single quotes).
     Checked against virtuals-agent's own `prepare()`: both wallets file with no refusal
     and no warning. In evals a program copied from `duty.md` by hand was rewritten or cut
     in about one duty in ten, and a main-wallet deposit was sized to one trade.
@@ -74,7 +77,11 @@
     tries again every five minutes and says each kind of trouble once: an order nobody
     took; a trade the server held back, named as such (a Start card or an earlier card
     still waiting, a limit used up), where it used to say "did not fill at its floor"; a
-    quote that failed three times running (a blip is only logged). Repeats go to its log
+    quote that failed three times running (a blip is only logged); an order the server
+    refused outright, with the server's own reason. A refused order is never counted as
+    a trade: before, one that left no ledger row read as "may have gone through" and the
+    duty stopped without trading. The program names the venue on every command itself,
+    so a Paradex rule that leaves `--venue` out still files on Paradex. Repeats go to its log
     and its "retrying" status; a fill, or the trigger passing, clears them. Before, each
     run could push the same note again.
   - **By RFQ**, only when the owner asked for it, on Derive or Paradex, from either

@@ -6,7 +6,7 @@ saves the program in the workspace and prints the whole `duty_create` payload: t
 title, the timer, the status lines, the settings and what funds it. Stdlib only, no
 network, no secret; it files nothing and moves nothing.
 
-  python3 make_duty.py --name "ETH puts below $1,500" --spec "<the owner's ask>" \\
+  python3 make_duty.py --name 'ETH puts below $1,500' --spec '<the owner ask>' \\
       --wallet own --wallet-label eth-puts --set-aside 1000 --need 750 --times 1 \\
       --every 300 --rule ~/duties/eth-puts/rule.py --param STRIKE=1500 --param SIZE=0.5
 
@@ -132,6 +132,10 @@ def build(a):
     if not name or len(name) > NAME_MAX:
         raise Refused("--name is the duty's title: 1 to %d characters, what it does and when "
                       "(got %d)" % (NAME_MAX, len(name)))
+    for flag, text in (("--name", name), ("--spec", a.spec)):
+        if re.search(r"(^|\s),\d{3}\b", text):
+            raise Refused("%s reads %r: the shell ate a $ figure. Put --name and --spec in "
+                          "single quotes" % (flag, text))
     if a.need <= 0 or a.set_aside <= 0 or a.times < 1:
         raise Refused("--need and --set-aside are dollars above 0, --times at least 1")
     if a.need > a.set_aside:
@@ -191,8 +195,9 @@ def build(a):
         "movesFunds": True,
         "triggers": [{"kind": "timer", "intervalSeconds": a.every, "untilDone": True}],
         "spendBasis": {"perTrade": "NEED_USD", "times": "TIMES"},
-        "statusTemplate": STATUS,
-        "params": params,
+        # Both as JSON text: that is the type the duty_create tool declares for them.
+        "statusTemplate": json.dumps(STATUS, ensure_ascii=False),
+        "params": json.dumps(params, ensure_ascii=False),
         "codePath": os.path.relpath(os.path.realpath(path), os.path.realpath(os.path.expanduser("~"))),
     }
     if own:
@@ -232,7 +237,7 @@ def main(argv=None):
     p.add_argument("--out", help="where to save duty.py; ~/duties/<slug> when left out")
     a = p.parse_args(argv)
     try:
-        print(json.dumps(build(a), indent=2))
+        print(json.dumps(build(a), indent=2, ensure_ascii=False))
     except Refused as exc:
         print("error: %s" % exc, file=sys.stderr)
         return 2

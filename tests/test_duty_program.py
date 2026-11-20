@@ -70,16 +70,20 @@ def run(world, ticks, **settings):
 
     def fake_run(argv, **kwargs):
         commands.append(" ".join(argv))
-        out = "{}"
+        out, code = "{}", 0
         if argv[2] == "deposit":
             amount = float(argv[4])
             world["cash"] -= amount
             world["landing"] = (world["tick"] + 2, amount * 0.99)
         elif world["refuse"]:
-            out = json.dumps({"code": world["refuse"].pop(0)})
+            answer = world["refuse"].pop(0)
+            if isinstance(answer, dict):
+                out, code = json.dumps(answer), 1
+            else:
+                out = json.dumps({"code": answer})
         elif world["fates"][:1] == ["executed"]:
             world["free"] -= settings.get("NEED_USD", SETTINGS["NEED_USD"])
-        return types.SimpleNamespace(stdout=out, stderr="", returncode=0)
+        return types.SimpleNamespace(stdout=out, stderr="", returncode=code)
 
     program = make_duty.read(make_duty.PROGRAM)
     code = make_duty.RULE.sub(lambda _: RULE, program)
@@ -168,6 +172,39 @@ class MainWallet(unittest.TestCase):
         notes, _, _ = run(world, 2, OWN_WALLET=False)
         self.assertEqual(count(notes, "may have gone through"), 0)
         self.assertNotIn("DONE", notes)
+
+    def test_an_order_the_server_refused_outright_is_never_counted(self):
+        no = {"status": "refused", "ok": False, "code": "OPTIONS_BAD_COMMAND", "httpStatus": 400,
+              "error": "no such instrument on Derive"}
+        world = {"free": 1000, "cash": 0, "px": 1480, "met": lambda w: True,
+                 "fates": ["unknown"] * 3 + ["executed"], "refuse": [no] * 3}
+        notes, _, commands = run(world, 12, OWN_WALLET=False)
+        self.assertEqual(count(notes, "was refused (no such instrument on Derive)"), 1)
+        self.assertEqual(count(notes, "may have gone through"), 0)
+        self.assertEqual(len(commands), 4)
+        self.assertEqual(count(notes, "done,"), 1)
+
+    def test_an_outage_answer_is_left_to_the_ledger(self):
+        down = {"status": "refused", "ok": False, "code": "HTTP_503", "httpStatus": 503, "error": "x"}
+        world = {"free": 1000, "cash": 0, "px": 1480, "met": lambda w: True,
+                 "fates": ["unknown"], "refuse": [down]}
+        notes, _, commands = run(world, 4, OWN_WALLET=False)
+        self.assertEqual(len(commands), 1)
+        self.assertEqual(count(notes, "may have gone through"), 1)
+
+    def test_a_key_the_ledger_already_holds_is_left_to_the_ledger(self):
+        twice = {"status": "conflict", "ok": False, "code": "IDEMPOTENCY_KEY_REUSED", "httpStatus": 409,
+                 "error": "This idempotency key was already used for a different request"}
+        world = {"free": 1000, "cash": 0, "px": 1480, "met": lambda w: True,
+                 "fates": ["executed"], "refuse": [twice]}
+        notes, _, commands = run(world, 4, OWN_WALLET=False)
+        self.assertEqual(len(commands), 1)
+        self.assertEqual(count(notes, "done,"), 1)
+
+    def test_another_venue_is_named_on_every_command(self):
+        world = {"free": 1000, "cash": 0, "px": 1480, "met": lambda w: True, "fates": ["executed"]}
+        _, _, commands = run(world, 3, OWN_WALLET=False, VENUE="paradex")
+        self.assertIn("--venue paradex --idempotency-key", commands[0])
 
     def test_a_missed_order_is_said_once_and_retried_under_new_keys(self):
         world = {"free": 1000, "cash": 0, "px": 1480, "met": lambda w: True,

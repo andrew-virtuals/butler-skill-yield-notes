@@ -89,13 +89,14 @@ write only the rule, then run it.
 3. **Build it:**
 
    ```sh
-   python3 ~/skills/options-trading/scripts/make_duty.py --name "<TITLE>" --spec "<THEIR ASK>" \
+   python3 ~/skills/options-trading/scripts/make_duty.py --name '<TITLE>' --spec '<THEIR ASK>' \
      --wallet own --wallet-label <name> --set-aside <USD> --need <USD> --times <N> \
      --venue derive --every 300 --rule ~/duties/<name>/rule.py --param STRIKE=1500
    ```
 
    - `--name`: its title, what it does and when, at most 38 characters, no chain, size or
-     count: "ETH calls every 30 min", "Sell ETH puts below $1,500".
+     count: "ETH calls every 30 min", "Sell ETH puts below $1,500". It and `--spec` go in
+     single quotes: in double quotes the shell eats `$1,500`.
    - `--set-aside`: **the amount they set aside**, never one trade's need. `--need`: what
      one trade needs, as in the first reply. `--times`: how many trades, then it stops.
    - `--every`: 60 for a set time, 300 for a price or a schedule. It runs from the moment
