@@ -6,7 +6,9 @@ later, without them in the chat: set off by a condition (a price, a move, any si
 a set time, or on a schedule, once or again and again. That is a duty whose own code
 trades, never a trade filed from chat now.
 
-When it is asked, check the condition (the price, the day). Not met: a duty. Already met:
+When it is asked, check the condition (the price, the day). A price is the helper's
+`spot` (`quote.py minimum --underlying <ASSET>`), never a token search; unread, say so and
+ask whether it is already true, never assume it is not. Not met: a duty. Already met:
 say so, and ask whether they want the trade now (SKILL.md's steps) or the duty for the
 next time; file nothing until they answer. Unsure whether they mean now or later (a date
 that may be the expiry or the day to trade): ask which, in the reply below.

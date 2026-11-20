@@ -73,7 +73,7 @@
     wallet: `order()` adds `--order rfq` with the same bound. `rfq.md` now says makers
     may not quote a small order at all, and to offer the order book for one.
   - The first reply reads a price trigger's condition before it answers (the one read
-    allowed ahead of it), and its worked example asks the set-aside question in the
+    allowed ahead of it, the helper's `spot`; unread, it asks rather than assume), and its worked example asks the set-aside question in the
     required words. The main wallet is offered as "one approval for its limit", no longer
     "approve each trade".
   - An own-wallet duty's short note asks for at least $10, the venue's minimum deposit,
