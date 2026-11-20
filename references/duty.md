@@ -133,8 +133,7 @@ program does all four.
 - `trigger()` returns `(True, "ETH at $1,480")` to trade now, else
   `(False, "ETH at $1,790")`: what it saw, said as the owner would read it. A price is
   `quote("minimum", "--underlying", "ETH").get("spot")`; unread, return
-  `(False, "ETH unread")`. A repeat keeps in `S` when it last traded, so one trigger
-  trades once.
+  `(False, "ETH unread")`.
 - `order()` prices the trade now with `quote("quote", ...)` and returns
   `(argv, "a line saying it")`, the argv being what follows `acp options`, without a key:
   `["open", "--instrument", i, "--size", s, "--min-premium", p, "--max-collateral", c]`
@@ -165,6 +164,28 @@ def order():
              "--max-collateral", f"{q['collateral']['amount']:g}"],
             f"sell a {q['size']:g} ETH ${STRIKE:,.0f} put for at least ${q['min_premium_usd']}")
 ```
+
+A time or a schedule compares timestamps, never the clock's hour or weekday (the agent
+refuses that under this timer), and reads `S.get("traded_at", 0)`, when the program last
+traded: it is set on a fill, never on a miss, so a run a minute later does not trade
+again while a missed order is still retried. A set time is one epoch in a `--param`
+(`time.time() >= AT`, and `S.get("traded_at", 0) < AT`). A schedule counts from an anchor:
+
+```python
+WEEK = 7 * 86400
+ANCHOR = 4 * 86400 + 9 * 3600  # a Monday 09:00 UTC (5 January 1970)
+
+
+def trigger():
+    due = ANCHOR + (time.time() - ANCHOR) // WEEK * WEEK  # this week's Monday 09:00 UTC
+    if S.get("traded_at", 0) >= due or time.time() - due > 6 * 3600:
+        return False, "next sale Monday 09:00 UTC"
+    return True, "Monday 09:00 UTC"
+```
+
+`make_duty.py` refuses a rule whose `order()` leaves out the quote's bound
+(`--min-premium` and `--max-collateral` on a sale, `--max-cost` on a buy), or whose
+`trigger()` answers anything but `(True or False, "a line")`.
 
 ## What the program does
 

@@ -136,9 +136,14 @@ class Build(unittest.TestCase):
             ("def trigger():\n    return True, 'x'\n\ndef order():\n    return ['buy'], 'x'\n", "quote("),
             (RULE + "\nimport bevo\nbevo.notify('hi')\n", "bevo.notify"),
             (RULE.replace('"sell a put"', '"python3 x"'), "python3"),
+            (RULE.replace('"--min-premium",', '"--limit",'), "without --min-premium"),
+            (RULE + "\nHOUR = time.gmtime().tm_hour\n", "compare timestamps"),
+            (RULE.replace('"--max-collateral"', '"--min-price"').replace('"--min-premium",', '"--min-premium", "--max-collateral",'), "--min-price"),
+            (RULE.replace("return spot < STRIKE,", "return {'otm': 10} if spot < STRIKE else None,"), "trigger() answered"),
+            ("def trigger():\n    return True, 'x'\n\ndef order():\n    q = quote('quote')\n    return ['buy', '--instrument', 'i'], 'x'\n", "without --max-cost"),
         ):
             self.write(text)
-            self.assertIn(why, self.refused(*own))
+            self.assertIn(why, self.refused(*own, "--param", "STRIKE=1500"))
 
 
 if __name__ == "__main__":

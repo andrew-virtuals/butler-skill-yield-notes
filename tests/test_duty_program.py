@@ -43,7 +43,7 @@ def run(world, ticks, **settings):
     bevo = types.ModuleType("bevo")
     bevo.BevoError = Exception
     bevo.SERVICE_ID = "svc"
-    bevo.state = {}
+    bevo.state = world["state"] = {}
     bevo.key = lambda *parts: ":".join(str(p) for p in parts)
     bevo.read = lambda path, q=None: {"account": {"exists": world["free"] is not None,
                                                   "freeForNewPutsUsd": world["free"] or 0}}
@@ -110,6 +110,15 @@ class OwnWallet(unittest.TestCase):
         self.assertEqual(order, sorted(order))
         self.assertEqual(notes[-1], "DONE")
         self.assertIn("setting_up", statuses)
+
+    def test_a_fill_is_timed_for_the_rule_and_a_miss_is_not(self):
+        missed = {"free": 1000, "cash": 0, "px": 1480, "met": lambda w: True, "fates": ["dropped"] * 3}
+        run(missed, 3, OWN_WALLET=False)
+        self.assertNotIn("traded_at", missed["state"])
+        filled = {"free": 1000, "cash": 0, "px": 1480, "met": lambda w: True, "fates": ["executed"]}
+        run(filled, 3, OWN_WALLET=False)
+        self.assertGreater(filled["state"]["traded_at"], 0)
+
 
     def test_never_deposits_in_the_run_that_trades(self):
         world = {"free": None, "cash": 1020, "px": 1480, "fates": ["executed"], "met": lambda w: True}

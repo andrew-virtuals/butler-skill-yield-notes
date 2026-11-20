@@ -22,6 +22,8 @@ import math
 import os
 import re
 import sys
+import time
+import types
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 PROGRAM = os.path.join(HERE, "duty_program.py")
@@ -69,7 +71,23 @@ def check_rule(source):
     calls = {n.func.id for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
     if "quote" not in calls:
         raise Refused("order() must price the trade now with quote(...), the helper's own figures")
-    for banned, why in (("quote.py", "call quote(...), never the helper by a path"),
+    for verb, bounds in (("open", ("--min-premium", "--max-collateral")), ("buy", ("--max-cost",))):
+        if '"%s"' % verb in source or "'%s'" % verb in source:
+            for flag in bounds:
+                if flag not in source:
+                    raise Refused("order() files `%s` without %s: every order carries the bound "
+                                  "from its quote" % (verb, flag))
+    if not any('"%s"' % v in source or "'%s'" % v in source for v in ("open", "buy", "close")):
+        raise Refused("order() returns no `open`, `buy` or `close` argv")
+    for clock in ("tm_hour", "tm_wday", "tm_mday", ".hour", ".weekday(", "strftime("):
+        if clock in source:
+            raise Refused("the rule reads the clock with `%s`, which the agent refuses under this "
+                          "timer: compare timestamps (time.time() against an epoch, or an anchor "
+                          "plus whole periods), as duty.md's schedule does" % clock)
+    for banned, why in (("--limit", "a duty takes the order book or an RFQ at the quote's bound"),
+                        ("--min-price", "a resting order is filed from chat (resting.md)"),
+                        ("--max-price", "a resting order is filed from chat (resting.md)"),
+                        ("quote.py", "call quote(...), never the helper by a path"),
                         ("python3", "call quote(...), never python3"),
                         ("bevo.notify", "the program sends the notes; return the line to say"),
                         ("bevo.status", "the program writes the status; return what trigger() saw"),
@@ -77,6 +95,24 @@ def check_rule(source):
                         ("idempotency", "the program adds the key; order() returns the argv without one")):
         if banned in source:
             raise Refused("the rule file has `%s`: %s" % (banned, why))
+
+
+def try_trigger(rule, params):
+    """Runs trigger() once against stand-ins: it must answer (True or False, a line to say).
+    A rule that cannot run on stand-in figures is left to its first real run."""
+    stand_in = types.SimpleNamespace(read=lambda *a, **k: {}, BevoError=Exception,
+                                     balance=lambda: types.SimpleNamespace(cash_usd=0.0))
+    scope = {"P": dict(params), "S": {}, "time": time, "math": math, "json": json, "bevo": stand_in,
+             "quote": lambda *a: {"spot": 1.0, "error": "a stand-in"}}
+    try:
+        exec(compile(rule, "rule.py", "exec"), scope)
+        answer = scope["trigger"]()
+    except Exception:
+        return
+    if not (isinstance(answer, tuple) and len(answer) == 2 and isinstance(answer[0], bool)
+            and isinstance(answer[1], str) and answer[1].strip()):
+        raise Refused("trigger() answered %r: it returns (True or False, \"what it saw\"), "
+                      "True only at the moment to trade" % (answer,))
 
 
 def setting(text):
@@ -126,6 +162,9 @@ def build(a):
                    "once the account shows it free" % (a.set_aside, a.free, a.venue.title()),
         }}
 
+    extra = dict(setting(p) for p in a.param)
+    try_trigger(rule, extra)
+
     program = read(PROGRAM)
     if len(RULE.findall(program)) != 1:
         raise Refused("duty_program.py has lost its rule marks; reinstall the skill")
@@ -144,7 +183,7 @@ def build(a):
 
     params = {"NAME": name, "VENUE": a.venue, "OWN_WALLET": own, "ALLOCATION_USD": a.set_aside,
               "NEED_USD": a.need, "TIMES": a.times, "QUOTE_PY": QUOTE_PY}
-    params.update(dict(setting(p) for p in a.param))
+    params.update(extra)
     payload = {
         "name": slug,
         "spec": a.spec,

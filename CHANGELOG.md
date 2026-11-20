@@ -37,7 +37,12 @@
     it: `fundUsdc`, the amount set aside plus 2%, for its own wallet; `pocketUsdc`, the
     amount set aside, for the main one. A main wallet short on the venue gets
     `deposit_first`, sized to the amount set aside, in place of a payload. It refuses a
-    rule that sends notes, runs the helper by a path or redefines the program's parts.
+    rule that sends notes, runs the helper by a path or redefines the program's parts;
+    one whose `order()` leaves out the quote's bound (`--min-premium` and
+    `--max-collateral`, or `--max-cost`) or names a resting price; one whose `trigger()`
+    answers anything but `(True or False, "a line")`; and one that reads the clock's hour
+    or weekday, which the agent refuses under an interval timer (`duty.md` shows a
+    schedule by timestamps, and `traded_at`, which the program sets on a fill).
     Checked against virtuals-agent's own `prepare()`: both wallets file with no refusal
     and no warning. In evals a program copied from `duty.md` by hand was rewritten or cut
     in about one duty in ten, and a main-wallet deposit was sized to one trade.

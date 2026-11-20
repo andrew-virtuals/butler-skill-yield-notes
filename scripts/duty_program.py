@@ -131,7 +131,7 @@ def follow_up():
                 f"keeps trying while its trigger holds.", f"{NAME}: not filled")
         return False
     S.pop("said", None)
-    S["done"] = S.get("done", 0) + 1
+    S["done"], S["traded_at"] = S.get("done", 0) + 1, time.time()  # a rule reads traded_at
     if fate == "executed":
         bevo.notify(f"{NAME}: done, {line}. Trade {S['done']} of {TIMES}.", push=f"{NAME}: filled")
     else:
