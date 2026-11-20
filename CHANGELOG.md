@@ -28,7 +28,12 @@
     again if it fires while short; it says when it fired and how the order ended
     (`bevo.settled`, route `options`), retrying a not-filled order under a new key and
     never resending an unclear one; it stops at `TIMES` with `bevo.done`. Params:
-    `NAME`, `VENUE`, `OWN_WALLET`, `ALLOCATION_USD`, `NEED_USD`, `TIMES`.
+    `NAME`, `VENUE`, `OWN_WALLET`, `ALLOCATION_USD`, `NEED_USD`, `TIMES`, `QUOTE_PY`.
+  - **A duty quotes through `quote()`, from the helper's full path (`QUOTE_PY`)**, which
+    Butler reads in chat with `realpath` when it files. A duty runs in its own folder
+    with only its launchers on its path, so `python3 ~/skills/options-trading/scripts/quote.py`
+    finds neither the skill nor `python3` there; `quote()` runs the helper with the duty's
+    own interpreter and returns `{"error": why}` when it fails.
   - On a short note, Butler asks the owner in chat whether to top up and by how much:
     `bevo-wallet fund` (one card; the duty deposits it on its next run) for its own
     wallet, a step 4 deposit for the main wallet.

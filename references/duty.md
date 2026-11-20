@@ -80,8 +80,10 @@ trade, or to trade free USDC already in their main options account
 
 Either way, its code is the program below, filled in; `"movesFunds": true`, a timer input (every 5 minutes for a price; the day and
 time for a schedule), and `params` with at least `NAME`, `VENUE`, `OWN_WALLET`,
-`ALLOCATION_USD`, `NEED_USD` (one trade's need, as in the first reply) and `TIMES`, plus
-the rule's figures. It gets no `options-lifecycle` duty: it follows its own trades.
+`ALLOCATION_USD`, `NEED_USD` (one trade's need, as in the first reply), `TIMES` and
+`QUOTE_PY`, plus the rule's figures. `QUOTE_PY` is the helper's full path, read in chat
+with `realpath ~/skills/options-trading/scripts/quote.py`: a duty runs in its own folder,
+where `~/skills` is not this skill and `python3` is not on its path. It gets no `options-lifecycle` duty: it follows its own trades.
 
 ## Its code
 
@@ -92,7 +94,7 @@ it warns (with a push) when it is short of the next trade, and it says when it f
 how that ended. Never write a duty that trades options any other way.
 
 ```python
-import json, math, os, subprocess, time
+import json, math, os, subprocess, sys, time
 import bevo
 
 P = json.loads(os.environ.get("PARAMS") or "{}")
@@ -102,6 +104,7 @@ OWN = bool(P.get("OWN_WALLET"))
 ALLOCATION = float(P["ALLOCATION_USD"])
 NEED = float(P["NEED_USD"])
 TIMES = int(P.get("TIMES", 1))
+QUOTE_PY = P["QUOTE_PY"]
 Q = {} if VENUE == "derive" else {"venue": VENUE}
 FROM = ["--from", "8453"] if VENUE == "derive" else ["--venue", VENUE]
 WHERE = VENUE.title()
@@ -115,6 +118,19 @@ def acp(*args):
         return json.loads(out or "{}")
     except ValueError:
         return {}
+
+
+def quote(*args):
+    """The helper (helper.md), e.g. quote("quote", "--side", "buy", ...): its JSON, or
+    {"error": why} when it failed."""
+    try:
+        run = subprocess.run([sys.executable, QUOTE_PY, *args], capture_output=True,
+                             text=True, timeout=120, check=False)
+        if run.returncode == 0:
+            return json.loads(run.stdout)
+        return {"error": (run.stderr or "no answer").strip()[-200:]}
+    except (OSError, ValueError, subprocess.TimeoutExpired) as exc:
+        return {"error": str(exc)[:200]}
 
 
 def free_on_venue():
@@ -134,10 +150,11 @@ def trigger():
 
 
 def order():
-    """The trade, quoted now with the helper (helper.md): (argv after `acp options`, a line
-    saying it), e.g. (["open", "--instrument", i, "--size", s, "--min-premium", p,
-    "--max-collateral", c], "sell a 0.5 ETH $1,500 put for at least $41"); a buy is
-    ["buy", ..., "--max-cost", m]. (None, why) when the quote is not tradeable."""
+    """The trade, quoted now with quote(), never another path to the helper: (argv after
+    `acp options`, a line saying it), e.g. (["open", "--instrument", i, "--size", s,
+    "--min-premium", p, "--max-collateral", c], "sell a 0.5 ETH $1,500 put for at least
+    $41"); a buy is ["buy", ..., "--max-cost", m]. (None, why) when the quote failed or
+    is not tradeable."""
 
 
 def move_in(free):
