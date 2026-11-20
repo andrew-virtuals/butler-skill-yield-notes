@@ -1,8 +1,8 @@
 ---
 name: options-trading
 description: Trade options on Derive, Paradex or Rysk - earn on idle USDC by selling cash-secured puts, buy a call or a put, close before expiry, and check or withdraw USDC and positions.
-version: 2.15.1
-metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","withdraw","withdraw my usdc","derive","my options","options account","options positions","free usdc","derive positions","my option positions","withdraw from derive","withdraw my free usdc","paradex","paradex options","paradex positions","rysk","rysk options","rysk positions","physically settled","hyperevm","limit order","resting order","at my price","or better","leave it on the book","cancel my order"],"requires":{"bins":["python3","bevo-read","acp"]}}}
+version: 2.16.0
+metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","withdraw","withdraw my usdc","derive","my options","options account","options positions","free usdc","derive positions","my option positions","withdraw from derive","withdraw my free usdc","paradex","paradex options","paradex positions","rysk","rysk options","rysk positions","physically settled","hyperevm","limit order","resting order","at my price","or better","leave it on the book","cancel my order","options duty","automate options","options strategy"],"requires":{"bins":["python3","bevo-read","acp"]}}}
 ---
 
 ## When to use
@@ -17,7 +17,8 @@ Your owner wants, on Derive, Paradex or Rysk options:
 - **Close** - before expiry: "sell my call back" **sells back** an option they
   **bought**; "get out of my put", "free my collateral" **buys back** a note they
   **sold**.
-- **At their price** - "or better", "cancel my order": `references/resting.md`.
+- **At their price** - "or better", "cancel my order": `resting.md`.
+- **Later** - on a condition, time or schedule: a duty.
 - **Look or withdraw** - "my free USDC in Derive" (`freeForNewPutsUsd`, not wallet
   cash), "my positions": step 1, then stop. "Withdraw my free USDC": step 8, never an
   `acp trade` (`account.md`). Listing: `listing.md`.
@@ -26,19 +27,21 @@ Not this skill: covered calls, spreads or leverage.
 
 ## Before you start
 
-1. **Which one.** Earning and buying are different promises; never blur them.
+1. **Now or later.** A trade that waits, or may (a condition, time, schedule), is a duty:
+   read `duty.md` before your first reply; lead with its three.
+2. **Which one.** Earning and buying are different promises; never blur them.
    Selling fits only USDC whose owner would happily buy the asset lower; a no to that
    ends selling, every put on it.
-2. **Sizes are in the asset:** say "0.16 ETH", never "contracts", never convert;
+3. **Sizes are in the asset:** say "0.16 ETH", never "contracts", never convert;
    `min_size` is only its minimum.
-3. **The bad case first, in their words, before any upside number:** selling, from
+4. **The bad case first, in their words, before any upside number:** selling, from
    `bad_case`; buying, that what it costs is gone.
-4. **First time for that kind of trade:** the plain yes answers in
+5. **First time for that kind of trade:** the plain yes answers in
    `selling.md` or `buying.md`. A no or a vague answer stops it.
-5. **Figures come only from this turn's reads:** sizes, prices and positions
+6. **Figures come only from this turn's reads:** sizes, prices and positions
    from `acp options account` and quotes, never memory; fix a note that
-   disagrees. `bevo-read assets` has none.
-6. **Venue.** Quote an open on each venue offering it, unless they name one; the
+   disagrees.
+7. **Venue.** Quote an open on each venue offering it, unless they name one; the
    rest where it is. `--venue` it everywhere.
 
 ### Never file without all four
@@ -117,9 +120,8 @@ this chat. One missing: ask, and file nothing this turn.
 
    The bot gathers stablecoins from **every chain**, any venue.
    `--from 1` only when `ethereum.usdc` covers it alone. Never ask about gas or an
-   address. Re-read the account until free USDC covers the trade, and do step
-   9; if short, re-quote smaller and re-offer. Free USDC spans their Derive
-   accounts (`account.md`).
+   address. Re-read the account until free USDC covers it, and do step 9; if
+   short, re-quote smaller and re-offer.
 
 5. [FIXED] Run the quote again now, after their last answer. With all four met, file
    the command, with that quote's fields and the bound they agreed:
@@ -134,8 +136,7 @@ this chat. One missing: ask, and file nothing this turn.
    One bound per close. The reply is an approval card, not a fill: tell the owner to
    approve it in the app. At their price: `resting.md`; by RFQ: `rfq.md`.
 
-6. [FIXED] Wait for the outcome; never re-run the command for it. The server nudges
-   you when the card lands. Then:
+6. [FIXED] Wait for the outcome; never re-run the command for it. Then:
 
    ```sh
    bevo-read request <KEY>:<OP> --route options
@@ -213,7 +214,7 @@ failed: re-read the account and wait. Look up `:home` with `--route trade`.
 - Selling locks collateral until expiry or a buy-back; buying is paid in full. No rolling
   without a fresh yes.
 - **Cash settled** on Derive and Paradex, kept there till withdrawn; Rysk delivers the asset.
-- Not advice: never rank or recommend.
+- Not advice: never rank or recommend a trade.
 
 ## Say to the owner
 

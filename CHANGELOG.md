@@ -1,5 +1,45 @@
 # Changelog
 
+## 2.16.0
+
+- **A duty that trades options has its money in place before it can trade.** New
+  `references/duty.md`. `SKILL.md` routes to it twice: "**Later** - on a condition, time
+  or schedule" in When to use, and a new first check in Before you start, "**Now or
+  later.**", which has Butler read `duty.md` before its first reply. Any trade the owner
+  wants to happen later is a duty, never a trade filed now; a condition already met, or
+  a date that may be the expiry, is asked about. The other Before you start checks are
+  renumbered, and `resting.md`'s pointer is shortened to fit the body cap.
+  - **The first reply has a fixed shape**, ahead of any quote or question about the
+    rule, even when it also clears up the rule: (1) Butler recommends a wallet (the
+    duty's own, or the main one) with one reason from the chat, and offers the other;
+    (2) how much to set aside for the duty in total, with one trade's need as the
+    floor; (3) which venue. The owner's pick stands.
+  - **Its own wallet:** `bevo-wallet create`, then `duty_create` with `walletId` and
+    `fundUsdc` (one funding card). Hands-free, kept apart from the owner's account, and
+    copyable.
+  - **The main wallet:** Butler deposits now, as step 4 does, then files the duty with a
+    pocket proposal and `spendBasis`. Each trade is a card unless the pocket covers it; not
+    copyable.
+  - **Its code starts from a program in `duty.md`**; Butler writes only `trigger()` and
+    `order()`. The rest is fixed: whatever USDC lands in its own wallet (the funding
+    card, a later top-up) is deposited on the venue in a run that trades nothing; it says
+    it is ready once the money is there; on every run it checks its free USDC covers the
+    next trade (`NEED_USD`) and, when it does not, tells the owner once per balance and
+    again if it fires while short; it says when it fired and how the order ended
+    (`bevo.settled`, route `options`), retrying a not-filled order under a new key and
+    never resending an unclear one; it stops at `TIMES` with `bevo.done`. Params:
+    `NAME`, `VENUE`, `OWN_WALLET`, `ALLOCATION_USD`, `NEED_USD`, `TIMES`.
+  - On a short note, Butler asks the owner in chat whether to top up and by how much:
+    `bevo-wallet fund` (one card; the duty deposits it on its next run) for its own
+    wallet, a step 4 deposit for the main wallet.
+  - The refusals a duty can get (`OPTIONS_DUTY_OFF`, `OPTIONS_DUTY_NO_WALLET`,
+    `OPTIONS_DUTY_PAUSED`, `OPTIONS_DUTY_CARD_PENDING`, `pocket_empty`, `pocket_pending`),
+    and stopping: a delete is refused while its venue account holds money or a position.
+  - Limits: "never rank or recommend" is now "never rank or recommend a trade", since
+    the wallet recommendation is not one.
+  - Needs bevo-server with options duties (Virtual-Protocol/bevo-server#1724) and
+    `DUTY_WALLET_OPTIONS_ENABLED=true`; without them every duty trade is refused.
+
 ## 2.15.1
 
 - **A duty wallet's Derive row stays on the Platforms tab.** Files `options-account@6`. A duty
