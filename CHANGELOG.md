@@ -48,6 +48,8 @@
     earlier duty was filed; one that bears on the money gets one line. When the owner
     named the money (a budget, the collateral, a size), the first reply comes before any
     tool call after reading `duty.md`, and the quote waits for filing.
+  - An own-wallet duty's short note asks for at least $10, the venue's minimum deposit,
+    since its wallet moves nothing smaller onto the venue; a top-up is never under $10.
   - On a short note, Butler asks the owner in chat whether to top up and by how much:
     `bevo-wallet fund` (one card; the duty deposits it on its next run) for its own
     wallet, a step 4 deposit for the main wallet.

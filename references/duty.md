@@ -200,10 +200,11 @@ def move_in(free):
 def short(free, met, seen):
     """Short of the next trade: tell the owner once per balance, and once per missed fire."""
     gap = math.ceil(NEED - free)
+    ask = max(gap, 10) if OWN else gap  # its wallet moves nothing to the venue under $10
     if S.get("low_at") != round(free):
         S["low_at"] = round(free)
         bevo.notify(f"{NAME}: ${free:,.0f} free on {WHERE}; its next trade needs ${NEED:,.0f}. "
-                    f"Top it up by ${gap:,} and it carries on.", push=f"{NAME} is ${gap:,} short")
+                    f"Top it up by ${ask:,} and it carries on.", push=f"{NAME} is ${gap:,} short")
     if met and not S.get("missed"):
         S["missed"] = True
         bevo.notify(f"{NAME}: {seen}, but it is ${gap:,} short on {WHERE}, so nothing traded. "
@@ -294,8 +295,9 @@ What each part keeps:
 On a short note, in chat: say what it is short and ask if they want to top it up, and by
 how much. Nothing moves without their yes.
 
-- **Its own wallet:** `bevo-wallet fund --wallet "<label>" --amount <usd>`, one card from
-  the main wallet; the duty moves it to the venue on its next run.
+- **Its own wallet:** `bevo-wallet fund --wallet "<label>" --amount <usd>`, at least $10
+  (the venue's minimum deposit: less stays in the wallet and never reaches the venue), one
+  card from the main wallet; the duty moves it to the venue on its next run.
 - **The main wallet:** deposit as SKILL.md step 4; raise the pocket only if they ask.
 
 ## What comes back
