@@ -77,10 +77,14 @@ stands; never argue it twice.
 
 1. `bevo-wallet create --chain ethereum --label <duty name>`: an empty wallet.
 2. `duty_create` with `"walletId": "<that label>"`, `"fundUsdc"`: **the amount they set
-   aside** (never one trade's collateral in its place), plus 2% for the bridge, rounded
-   up. No `fundUsdc` is refused (`fund_amount_required`). One funding card moves it from
-   the main wallet to the duty's wallet on Base; nothing moves until the owner approves
-   it. Say so.
+   aside** (never one trade's collateral in its place), plus 2% for the bridge fee and its
+   slippage bound, rounded up to the dollar: $10 is 11, $15 is 16, $100 is 102. Add
+   nothing else, no headroom of your own: whatever is left stays idle in that wallet.
+   `ALLOCATION_USD` is the amount they set aside. Its own wallet needs at least $10 set
+   aside, the venue's minimum deposit; under that, recommend the main wallet. No
+   `fundUsdc` is refused (`fund_amount_required`). One funding card moves it from the
+   main wallet to the duty's wallet on Base; nothing moves until the owner approves it.
+   Say so.
 3. The duty sets itself up (below) and tells the owner once its money is on the venue.
 
 ### The main wallet

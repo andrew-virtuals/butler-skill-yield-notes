@@ -15,7 +15,9 @@
     (2) how much to set aside for the duty in total, with one trade's need as the
     floor; (3) which venue. The owner's pick stands.
   - **Its own wallet:** `bevo-wallet create`, then `duty_create` with `walletId` and
-    `fundUsdc` (one funding card). Hands-free, kept apart from the owner's account, and
+    `fundUsdc` (one funding card): the amount set aside plus 2%, rounded up to the dollar
+    ($10 is $11), and no other headroom; at least $10 set aside, the venue's minimum
+    deposit, else Butler recommends the main wallet. Hands-free, kept apart from the owner's account, and
     copyable.
   - **The main wallet:** Butler deposits the gap now, as step 4 does (none when free USDC
     already covers the amount set aside), then files the duty with `pocketUsdc` set to that
