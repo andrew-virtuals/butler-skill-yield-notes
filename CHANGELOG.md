@@ -36,6 +36,8 @@
     with only its launchers on its path, so `python3 ~/skills/options-trading/scripts/quote.py`
     finds neither the skill nor `python3` there; `quote()` runs the helper with the duty's
     own interpreter and returns `{"error": why}` when it fails.
+  - **Never filed in the turn it is asked**, even when the ask names the time, venue and
+    money and free USDC covers it: the first reply recommends the wallet and waits.
   - **A new ask is a new duty, and a fast first reply.** In that turn Butler never opens,
     checks, edits or fixes the owner's other duties, orders or cards, nor copies how an
     earlier duty was filed; one that bears on the money gets one line. When the owner

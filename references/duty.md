@@ -23,6 +23,10 @@ holds part of the free USDC), say so in one line; touch it only when they ask.
 
 ## Your first reply
 
+Never file a duty in the turn it is asked, even when the ask names the time, the venue
+and the money, and free USDC already covers it: the wallet is the owner's to pick, so
+this reply recommends one and waits for their answer.
+
 When they named the money (a budget, the collateral, a size), this reply comes before any
 tool call after reading this file: that figure is one trade's need, and the quote waits for filing. Without one,
 read only what the floor needs (one quote) and reply.
@@ -64,7 +68,8 @@ Recommend **its own wallet** for anything that runs unattended, repeats, waits f
 price, or may be published or copied: the reason is that it trades the moment it fires,
 with no card to miss. Recommend **the main wallet** when they want to approve each
 trade, or to trade free USDC already in their main options account
-(`acp options account`). Their pick stands; never argue it twice.
+(`acp options account`). Either is a recommendation, asked in the first reply. Their pick
+stands; never argue it twice.
 
 ## Filing it
 

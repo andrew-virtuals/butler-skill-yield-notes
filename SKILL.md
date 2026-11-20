@@ -28,7 +28,7 @@ Not this skill: covered calls, spreads or leverage.
 ## Before you start
 
 1. **Now or later.** A trade that waits, or may (a condition, time, schedule), is a duty:
-   read `duty.md` before your first reply; lead with its three.
+   read `duty.md`, and file nothing in the turn they ask it.
 2. **Which one.** Earning and buying are different promises; never blur them.
    Selling fits only USDC whose owner would happily buy the asset lower; a no to that
    ends selling, every put on it.
