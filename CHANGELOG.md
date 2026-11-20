@@ -34,6 +34,11 @@
     with only its launchers on its path, so `python3 ~/skills/options-trading/scripts/quote.py`
     finds neither the skill nor `python3` there; `quote()` runs the helper with the duty's
     own interpreter and returns `{"error": why}` when it fails.
+  - **A new ask is a new duty, and a fast first reply.** In that turn Butler never opens,
+    checks, edits or fixes the owner's other duties, orders or cards, nor copies how an
+    earlier duty was filed; one that bears on the money gets one line. When the owner
+    named the money (a budget, the collateral, a size), the first reply comes before any
+    tool call after reading `duty.md`, and the quote waits for filing.
   - On a short note, Butler asks the owner in chat whether to top up and by how much:
     `bevo-wallet fund` (one card; the duty deposits it on its next run) for its own
     wallet, a step 4 deposit for the main wallet.

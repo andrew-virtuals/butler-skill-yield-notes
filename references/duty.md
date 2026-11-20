@@ -16,7 +16,16 @@ of each trade, its floor or ceiling, and how many times it may trade. Never fill
 ask. Say the bad case as for one trade (`selling.md`, `buying.md`), and how it will ask
 before trading, or that it won't.
 
+A new ask is a new duty, filed as this file says. In that turn, never open, check, edit or
+fix the owner's other duties, orders or cards, even a failing one or a card still waiting,
+and never copy how an earlier duty was filed. When one bears on the money (a waiting card
+holds part of the free USDC), say so in one line; touch it only when they ask.
+
 ## Your first reply
+
+When they named the money (a budget, the collateral, a size), this reply comes before any
+tool call after reading this file: that figure is one trade's need, and the quote waits for filing. Without one,
+read only what the floor needs (one quote) and reply.
 
 A duty's money is on the venue before it can trade: a Derive or Paradex deposit takes
 minutes, and the price that set it off may be gone by then. So the first reply settles
