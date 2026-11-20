@@ -100,8 +100,11 @@ stands; never argue it twice.
    trade it covers runs with no card; until then a trade it covers is skipped, and a
    bigger one asks with its own card.
 
-Either way, its code is the program below, filled in; `"movesFunds": true`, a timer input (every 5 minutes for a price; the day and
-time for a schedule), and `params` with at least `NAME`, `VENUE`, `OWN_WALLET`,
+Either way, its code is the program below, filled in; `"movesFunds": true`, and one timer
+input, `{"kind": "timer", "intervalSeconds": 60, "untilDone": true}` (300 for a price or a
+schedule), running from the moment it is filed: never a `startsAt` or an `at`, even for a
+set time. The time, the day or the price is in `trigger()`; the runs before it are when
+its money reaches the venue. Then `params` with at least `NAME`, `VENUE`, `OWN_WALLET`,
 `ALLOCATION_USD`, `NEED_USD` (one trade's need, as in the first reply), `TIMES` and
 `QUOTE_PY`, plus the rule's figures. `QUOTE_PY` is the helper's full path, read in chat
 with `realpath ~/skills/options-trading/scripts/quote.py`: a duty runs in its own folder,

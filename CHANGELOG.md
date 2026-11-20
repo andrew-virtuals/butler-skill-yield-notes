@@ -38,6 +38,9 @@
     with only its launchers on its path, so `python3 ~/skills/options-trading/scripts/quote.py`
     finds neither the skill nor `python3` there; `quote()` runs the helper with the duty's
     own interpreter and returns `{"error": why}` when it fails.
+  - **Its timer runs from the moment it is filed**, every minute until done, never a
+    `startsAt` or an `at`: the time, day or price is in `trigger()`, so the runs before it
+    move the money onto the venue. A 14:55 duty that only started at 14:55 deposited then.
   - **Never filed in the turn it is asked**, even when the ask names the time, venue and
     money and free USDC covers it: the first reply recommends the wallet and waits.
   - **A new ask is a new duty, and a fast first reply.** In that turn Butler never opens,
