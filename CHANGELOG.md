@@ -26,28 +26,31 @@
     amount and `spendBasis`, so its one Start card proposes the owner's own figure and is
     never asked about in chat. Once held, each trade it covers runs with no card;
     `pocketUsdc` 0 only when the owner asked for a card on every trade. Not copyable.
-  - **Its code starts from a program in `duty.md`**; Butler writes only `trigger()` and
-    `order()`. The rest is fixed: whatever USDC lands in its own wallet (the funding
-    card, a later top-up) is deposited on the venue in a run that trades nothing; it says
-    it is ready once the money is there; on every run it checks its free USDC covers the
-    next trade (`NEED_USD`) and, when it does not, tells the owner once per balance and
+  - **Its program is a file, never retyped.** `scripts/duty_program.py` is the one program
+    every such duty runs, and `scripts/make_duty.py` builds a duty from it: Butler writes
+    only the rule (`trigger()` and `order()`, in a `rule.py`), and the script saves the
+    whole program in the workspace and prints the complete `duty_create` payload, which
+    names it by `codePath`. The script sets the title (`{NAME}`, at most 38 characters),
+    the timer, `spendBasis`, the status lines, the settings, the helper's full path
+    (`QUOTE_PY`: a duty runs in its own folder, where `~/skills` and `python3` are not
+    found, so `quote()` runs the helper with the duty's own interpreter), and what funds
+    it: `fundUsdc`, the amount set aside plus 2%, for its own wallet; `pocketUsdc`, the
+    amount set aside, for the main one. A main wallet short on the venue gets
+    `deposit_first`, sized to the amount set aside, in place of a payload. It refuses a
+    rule that sends notes, runs the helper by a path or redefines the program's parts.
+    Checked against virtuals-agent's own `prepare()`: both wallets file with no refusal
+    and no warning. In evals a program copied from `duty.md` by hand was rewritten or cut
+    in about one duty in ten, and a main-wallet deposit was sized to one trade.
+  - **What the program does, for every duty:** whatever USDC lands in its own wallet (the
+    funding card, a later top-up) is deposited on the venue in a run that trades nothing;
+    it says it is ready once the money is there; on every run it checks its free USDC
+    covers the next trade and, when it does not, tells the owner once per balance and
     again if it fires while short; it says when it fired and how the order ended
     (`bevo.settled`, route `options`), retrying a not-filled order under a new key and
-    never resending an unclear one; it stops at `TIMES` with `bevo.done`. Params:
-    `NAME`, `VENUE`, `OWN_WALLET`, `ALLOCATION_USD`, `NEED_USD`, `TIMES`, `QUOTE_PY`.
-  - **A duty quotes through `quote()`, from the helper's full path (`QUOTE_PY`)**, which
-    Butler reads in chat with `realpath` when it files. A duty runs in its own folder
-    with only its launchers on its path, so `python3 ~/skills/options-trading/scripts/quote.py`
-    finds neither the skill nor `python3` there; `quote()` runs the helper with the duty's
-    own interpreter and returns `{"error": why}` when it fails.
-  - **It files the first time.** `duty.md` gives the exact `duty_create` fields for both
-    wallets: `title` `{NAME}` (a name of at most 38 characters), `spendBasis`
-    (`NEED_USD` x `TIMES`, which the agent requires of every duty that spends), the timer,
-    the params, and a `statusTemplate` whose states the program's `bevo.status()` calls
-    name, as the agent requires; the program's `acp()` puts `--idempotency-key` in its
-    argv. Checked against virtuals-agent's own `prepare()`: both wallets file with no
-    refusal and no warning. Before, each duty cost Butler several refused `duty_create`
-    calls and a read of the platform's duty guide.
+    never resending an unclear one; it stops after `--times` trades.
+  - `tests/test_duty_program.py` runs the program against a fake duty runtime (set-up,
+    short and top-up, an unfunded wallet, a held-back trade, a missed order, a failing
+    quote, an unclear order); `tests/test_make_duty.py` covers the payload and refusals.
   - **Its timer runs from the moment it is filed** until done (every 60 seconds for a
     set time, every 300 for a price or a schedule), never a `startsAt` or an `at`: the
     time, day or price is in `trigger()`, so the runs before it move the money onto the

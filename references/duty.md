@@ -55,7 +55,10 @@ rule:
    trades only from chat (`OPTIONS_VENUE_NOT_DUTY`).
 
 Then the rule's own questions (strike, size, how many times, now or later), the bad case,
-and any quote. A reply with only the rule's questions is not this reply. When their
+and any quote. A reply with only the rule's questions is not this reply, and neither is
+one that only asks what they meant (sell or buy, now or on that date): the three come
+first, that question after them, in the same reply. Per-venue minimums never stand in
+for the set-aside question. When their
 answer already gives a figure or a wallet, confirm it in place of asking.
 
 ### Which wallet to recommend
@@ -76,302 +79,114 @@ twice.
 
 ## Filing it
 
-### Its own wallet
+Never type the duty's program or its `duty_create` fields yourself: `scripts/make_duty.py`
+builds both from `scripts/duty_program.py`, the one program every such duty runs. You
+write only the rule, then run it.
 
-1. `bevo-wallet create --chain ethereum --label <duty name>`: an empty wallet.
-2. `duty_create` with `"walletId": "<that label>"`, `"fundUsdc"`: **the amount they set
-   aside** (never one trade's collateral in its place), plus 2% for the bridge fee and its
-   slippage bound, rounded up to the dollar: $10 is 11, $15 is 16, $100 is 102. Add
-   nothing else, no headroom of your own: whatever is left stays idle in that wallet.
-   `ALLOCATION_USD` is the amount they set aside. Its own wallet needs at least $10 set
-   aside, the venue's minimum deposit; under that, recommend the main wallet. No
-   `fundUsdc` is refused (`fund_amount_required`). One funding card moves it from the
-   main wallet to the duty's wallet on Base; nothing moves until the owner approves it.
-   Say so.
-3. The duty sets itself up (below) and tells the owner once its money is on the venue.
+1. **The rule.** Save one file, `~/duties/<name>/rule.py`, with two functions (below).
+2. **Its own wallet only:** `bevo-wallet create --chain ethereum --label <name>`: an
+   empty wallet.
+3. **Build it:**
 
-### The main wallet
+   ```sh
+   python3 ~/skills/options-trading/scripts/make_duty.py --name "<TITLE>" --spec "<THEIR ASK>" \
+     --wallet own --wallet-label <name> --set-aside <USD> --need <USD> --times <N> \
+     --venue derive --every 300 --rule ~/duties/<name>/rule.py --param STRIKE=1500
+   ```
 
-1. When free USDC there (`acp options account`) is short of the amount set aside,
-   deposit the gap now, as SKILL.md step 4 does (`--venue` for Paradex): ask the owner to
-   approve the deposit card, and file nothing more in that turn. When it already covers
-   it, go on to 2 in this turn.
-2. Once it shows free, `duty_create` with no `walletId` and `"pocketUsdc"`: **the amount
-   they set aside**. That files one Start card proposing that limit; the owner's hold is
-   the approval. Never ask them for a limit in chat: they named it. Say that once they
-   hold it, each trade it covers runs with no card; until then a trade it covers is
-   skipped, and a bigger one asks with its own card. Only when they asked for a card on
-   every trade: `"pocketUsdc": 0`.
-
-### What `duty_create` gets, either way
-
-Besides `walletId` and `fundUsdc`, or `pocketUsdc`, these fields, as written, so it files
-the first time:
-
-```json
-{
-  "name": "<a slug>",
-  "spec": "<the owner's ask, in their words>",
-  "title": "{NAME}",
-  "movesFunds": true,
-  "triggers": [{"kind": "timer", "intervalSeconds": 60, "untilDone": true}],
-  "spendBasis": {"perTrade": "NEED_USD", "times": "TIMES"},
-  "statusTemplate": {
-    "moving": "Moving ${amount} to {venue}",
-    "setting_up": "Setting up: ${free} of ${allocation} on {venue}",
-    "unfunded": "Waiting for its funding card",
-    "watching": "{seen} · ${free} free on {venue}",
-    "short": "${gap} short on {venue} · top it up to trade",
-    "placed": "Placed: {order} · waiting on {venue}",
-    "retrying": "{seen} · not placed yet, trying again",
-    "unreadable": "Couldn't read the options account · retrying"
-  },
-  "params": {"NAME": "...", "VENUE": "derive", "OWN_WALLET": true, "ALLOCATION_USD": 0,
-             "NEED_USD": 0, "TIMES": 1, "QUOTE_PY": "...", "...": "the rule's figures"},
-  "code": "<the program below, filled in>"
-}
-```
-
-- `NAME`: what it does and when, at most 38 characters, no chain, size or count: "ETH
-  calls every 30 min", "Sell ETH puts below $1,500". The title is `{NAME}` alone.
-- `intervalSeconds`: 60 for a set time, 300 for a price or a schedule. It runs from the
-  moment it is filed, never a `startsAt` or an `at`, even for a set time: the time, day
-  or price is in `trigger()`, and the runs before it are when its money reaches the venue.
-- `OWN_WALLET`: true for its own wallet, false for the main one. `ALLOCATION_USD`: the
-  amount set aside. `NEED_USD`: one trade's need, as in the first reply. `TIMES`: how
-  many trades.
-- `QUOTE_PY`: the helper's full path, read in chat with
-  `realpath ~/skills/options-trading/scripts/quote.py`: a duty runs in its own folder,
-  where `~/skills` is not this skill and `python3` is not on its path.
-- The rule's own figures go in `params` too, each read from `P` in `trigger()` or
-  `order()`, never written into the code.
+   - `--name`: its title, what it does and when, at most 38 characters, no chain, size or
+     count: "ETH calls every 30 min", "Sell ETH puts below $1,500".
+   - `--set-aside`: **the amount they set aside**, never one trade's need. `--need`: what
+     one trade needs, as in the first reply. `--times`: how many trades, then it stops.
+   - `--every`: 60 for a set time, 300 for a price or a schedule. It runs from the moment
+     it is filed; the time, day or price is in `trigger()`, and the runs before it are
+     when its money reaches the venue.
+   - `--param KEY=VALUE`: each of the rule's figures, read from `P` in the rule, never
+     written into it.
+   - **The main wallet:** `--wallet main --free <freeForNewPutsUsd>` from this turn's
+     `acp options account`, and no `--wallet-label`; `--card-each-trade` only when they
+     asked for a card on every trade.
+4. **Do what it prints:**
+   - `duty_create`: pass that object to the `duty_create` tool exactly as printed. It
+     names the saved program by `codePath`; never send `code`, never change a field.
+     Then say its `say` line: one funding card (its own wallet: the amount set aside plus
+     2%, moved to the duty's wallet on Base, then deposited by the duty), or one Start
+     card proposing the amount set aside as its limit (the main wallet). Never ask them
+     for a limit in chat: they named it.
+   - `deposit_first` (the main wallet, short on the venue): deposit that amount as
+     SKILL.md step 4 does (`--venue` for Paradex), ask the owner to approve its card, and
+     file nothing more in that turn. Once `acp options account` shows it free, build
+     again with the new `--free`.
+   - `error: …`: nothing was built; fix what it names. Under $10 set aside, its own
+     wallet cannot deposit: recommend the main wallet.
 
 It gets no `options-lifecycle` duty: it follows its own trades.
 
-## Its code
+## The rule
 
-Start from this program, for either wallet. Write only `trigger()` and `order()`; keep
-every other line as written, its notes' words and pushes too, since each is a promise to
-the owner: its money is on the venue before it watches, it never deposits when it fires,
-it warns (with a push) when it is short of the next trade, and it says when it fired and
-how that ended. Never write a duty that trades options any other way.
+`rule.py` is plain Python, put into the program as written. It may read `P` (the
+`--param` settings), `S` (state kept between runs), `time`, `bevo.read`, and `quote()`,
+which runs the helper (`helper.md`) with the same arguments and returns its JSON, or
+`{"error": why}`. It never sends a note, writes a status, runs `acp`, or adds a key: the
+program does all four.
+
+- `trigger()` returns `(True, "ETH at $1,480")` to trade now, else
+  `(False, "ETH at $1,790")`: what it saw, said as the owner would read it. A price is
+  `quote("minimum", "--underlying", "ETH").get("spot")`; unread, return
+  `(False, "ETH unread")`. A repeat keeps in `S` when it last traded, so one trigger
+  trades once.
+- `order()` prices the trade now with `quote("quote", ...)` and returns
+  `(argv, "a line saying it")`, the argv being what follows `acp options`, without a key:
+  `["open", "--instrument", i, "--size", s, "--min-premium", p, "--max-collateral", c]`
+  for a sold put, `["buy", "--instrument", i, "--size", s, "--max-cost", m]` for a buy.
+  `(None, why)` when the quote failed, is not `tradeable`, or raises a safeguard.
 
 ```python
-import json, math, os, subprocess, sys, time
-import bevo
-
-P = json.loads(os.environ.get("PARAMS") or "{}")
-NAME = P["NAME"]
-VENUE = str(P.get("VENUE") or "derive").lower()
-OWN = bool(P.get("OWN_WALLET"))
-ALLOCATION = float(P["ALLOCATION_USD"])
-NEED = float(P["NEED_USD"])
-TIMES = int(P.get("TIMES", 1))
-QUOTE_PY = P["QUOTE_PY"]
-Q = {} if VENUE == "derive" else {"venue": VENUE}
-FROM = ["--from", "8453"] if VENUE == "derive" else ["--venue", VENUE]
-WHERE = VENUE.title()
-S = bevo.state
-
-
-HELD = {"pocket_pending": "is waiting for you to hold its Start card",
-        "pocket_empty": "has used up its limit; raise it and it carries on",
-        "OPTIONS_DUTY_CARD_PENDING": "is waiting for you to answer its last card"}
-
-
-def acp(key, *args):
-    """Runs it; returns which of HELD refused it, or ""."""
-    run = subprocess.run(["acp", "options", *args, "--idempotency-key", key],
-                         capture_output=True, text=True, timeout=170, check=False)
-    return next((code for code in HELD if code in run.stdout + run.stderr), "")
-
-
-def say(kind, text, push):
-    """One note per kind of trouble until it clears; a repeat goes to the log only."""
-    if kind in S.get("said", []):
-        bevo.log(text)
-        return
-    S["said"] = S.get("said", []) + [kind]
-    bevo.notify(text, push=push)
-
-
-def quote(*args):
-    """The helper (helper.md), e.g. quote("quote", "--side", "buy", ...): its JSON, or
-    {"error": why} when it failed."""
-    try:
-        run = subprocess.run([sys.executable, QUOTE_PY, *args], capture_output=True,
-                             text=True, timeout=120, check=False)
-        if run.returncode == 0:
-            return json.loads(run.stdout)
-        return {"error": (run.stderr or "no answer").strip()[-200:]}
-    except (OSError, ValueError, subprocess.TimeoutExpired) as exc:
-        return {"error": str(exc)[:200]}
-
-
-def free_on_venue():
-    """Its free USDC there: 0 before its first deposit, None when unread."""
-    try:
-        account = (bevo.read("/options/account", Q) or {}).get("account")
-    except bevo.BevoError:
-        return None
-    if not isinstance(account, dict):
-        return None
-    return float(account.get("freeForNewPutsUsd") or 0) if account.get("exists") else 0.0
+STRIKE = float(P["STRIKE"])
+SIZE = float(P["SIZE"])
 
 
 def trigger():
-    """The owner's rule. (True, "ETH at $1,480") to trade now, else (False, "ETH at $1,790").
-    A repeat keeps in S when it last traded, so one trigger trades once."""
+    spot = quote("minimum", "--underlying", "ETH").get("spot")
+    if spot is None:
+        return False, "ETH unread"
+    return spot < STRIKE, f"ETH at ${spot:,.0f}"
 
 
 def order():
-    """The trade, quoted now with quote(), never another path to the helper: (argv after
-    `acp options`, a line saying it), e.g. (["open", "--instrument", i, "--size", s,
-    "--min-premium", p, "--max-collateral", c], "sell a 0.5 ETH $1,500 put for at least
-    $41"); a buy is ["buy", ..., "--max-cost", m]. (None, why) when the quote failed or
-    is not tradeable. By RFQ, only when the owner asked for it: the same argv and bound
-    with "--order", "rfq" added."""
-
-
-def move_in(free):
-    """Its own wallet's USDC onto the venue. True when it deposited: that run trades nothing."""
-    if not OWN or time.time() - S.get("deposit_at", 0) < 600:
-        return False
-    cash = bevo.balance().cash_usd
-    if cash is None or cash < 10:
-        return False
-    n = S.get("deposits", 0)
-    acp(bevo.key("deposit", bevo.SERVICE_ID, n), "deposit", "--amount", str(int(cash)), *FROM)
-    S["deposits"], S["deposit_at"], S["free_before"] = n + 1, time.time(), free
-    bevo.status("moving", amount=int(cash), venue=WHERE)
-    return True
-
-
-def short(free, met, seen):
-    """Short of the next trade: tell the owner once per balance, and once per missed fire."""
-    gap = math.ceil(NEED - free)
-    ask = max(gap, 10) if OWN else gap  # its wallet moves nothing to the venue under $10
-    if S.get("low_at") != round(free):
-        S["low_at"] = round(free)
-        bevo.notify(f"{NAME}: ${free:,.0f} free on {WHERE}; its next trade needs ${NEED:,.0f}. "
-                    f"Top it up by ${ask:,} and it carries on.", push=f"{NAME} is ${gap:,} short")
-    if met and not S.get("missed"):
-        S["missed"] = True
-        bevo.notify(f"{NAME}: {seen}, but it is ${gap:,} short on {WHERE}, so nothing traded. "
-                    f"Top it up and it trades the next time.", push=f"{NAME} fired, short ${gap:,}")
-    bevo.status("short", gap=gap, venue=WHERE)
-
-
-def follow_up():
-    """How a placed order ended, told once. True while it is still running."""
-    key = S.get("key")
-    if not key:
-        return False
-    fate = bevo.settled(key, route="options", wait=60)
-    if fate in ("waiting", "approval"):
-        bevo.status("placed", order=S.get("placing") or "the order", venue=WHERE)
-        return True
-    line = S.pop("placing", "the order")
-    del S["key"]
-    held = HELD.get(S.pop("refused", ""))
-    if fate == "dropped" or held:  # a held-back trade never ran, whatever the ledger says
-        S["tries"], S["retry_at"] = S.get("tries", 0) + 1, time.time() + 300
-        if held:
-            say("held", f"{NAME}: {line} was not placed: it {held}. Nothing traded.",
-                f"{NAME} needs you")
-        else:
-            say("missed", f"{NAME}: {line} did not fill at its bound; nothing traded. It "
-                f"keeps trying while its trigger holds.", f"{NAME}: not filled")
-        return False
-    S.pop("said", None)
-    S["done"] = S.get("done", 0) + 1
-    if fate == "executed":
-        bevo.notify(f"{NAME}: done, {line}. Trade {S['done']} of {TIMES}.", push=f"{NAME}: filled")
-    else:
-        bevo.notify(f"{NAME}: {line} may have gone through; your options account on {WHERE} "
-                    f"says for sure. It is counted, never sent again.", push=f"{NAME}: unclear")
-    return False
-
-
-for tick in bevo.ticks():
-    if follow_up():
-        continue
-    if S.get("done", 0) >= TIMES:
-        bevo.done(f"{NAME}: all {TIMES} trade(s) made.")
-    free = free_on_venue()
-    if free is None:
-        bevo.status("unreadable")
-        continue
-    if move_in(free):
-        continue
-    arriving = OWN and (not S.get("deposits") or (free <= S["free_before"] + 1
-                                                   and time.time() - S["deposit_at"] < 1800))
-    if free < NEED and arriving:
-        if S.get("deposits") or time.time() - S.setdefault("born", time.time()) < 1800:
-            bevo.status("setting_up", free=round(free), allocation=round(ALLOCATION), venue=WHERE)
-            continue
-        if not S.get("unfunded"):  # funding card declined or never answered
-            S["unfunded"] = True
-            bevo.notify(f"{NAME}: its wallet is still empty, so it has not started. Approve "
-                        f"its funding card, or ask Butler to fund it.",
-                        push=f"{NAME} is not funded")
-        bevo.status("unfunded")
-        continue
-    if not S.get("ready") and free >= NEED:
-        S["ready"] = True
-        bevo.notify(f"{NAME}: ${free:,.0f} ready on {WHERE}. Watching now.",
-                    push=f"{NAME} is ready")
-    met, seen = trigger()
-    if free < NEED:
-        short(free, met, seen)
-        continue
-    S.pop("low_at", None)
-    S.pop("missed", None)
-    if not met:
-        S.pop("said", None)
-        S.pop("noquote", None)
-        bevo.status("watching", seen=seen, free=round(free), venue=WHERE)
-        continue
-    if time.time() < S.get("retry_at", 0):  # five minutes between tries
-        bevo.status("retrying", seen=seen)
-        continue
-    argv, line = order()
-    if not argv:
-        S["noquote"], S["retry_at"] = S.get("noquote", 0) + 1, time.time() + 300
-        if S["noquote"] >= 3:  # a blip is logged; a quote still failing is told once
-            say("noquote", f"{NAME}: {seen}, but {line}; nothing traded. It keeps trying.",
-                f"{NAME} cannot quote")
-        else:
-            bevo.log(f"{seen}, but {line}")
-        bevo.status("retrying", seen=seen)
-        continue
-    S.pop("noquote", None)
-    key = bevo.key("trade", bevo.SERVICE_ID, S.get("done", 0), S.get("tries", 0))
-    say("fired", f"{NAME}: {seen}. Placing: {line}.", f"{NAME} fired")
-    S["refused"] = acp(key, *argv)
-    S["key"], S["placing"] = key, line
-    follow_up()
+    q = quote("quote", "--product", "cash_secured_put", "--underlying", "ETH",
+              "--collateral", f"{STRIKE * SIZE:g}", "--strike", f"{STRIKE:g}")
+    if q.get("error"):
+        return None, f"the quote failed ({q['error']})"
+    if not q.get("tradeable") or q.get("waivable"):
+        return None, "the quote is not tradeable now"
+    return (["open", "--instrument", q["instrument"], "--size", f"{q['size']:g}",
+             "--min-premium", f"{q['min_premium_usd']:g}",
+             "--max-collateral", f"{q['collateral']['amount']:g}"],
+            f"sell a {q['size']:g} ETH ${STRIKE:,.0f} put for at least ${q['min_premium_usd']}")
 ```
 
-What each part keeps:
+## What the program does
+
+The same for every duty, and why none of it is yours to write:
 
 - **Set up** (its own wallet): whatever USDC lands in its wallet (the funding card, a
   top-up) it deposits on the venue, and trades nothing in that run. Once it is there it
-  says `ready`, and only then reads the trigger. A wallet still empty after 30 minutes
-  (a funding card declined or left waiting) is said once, with a push. A main-wallet
-  duty's money was deposited in chat.
+  says it is ready, and only then reads the trigger. A wallet still empty after 30
+  minutes (a funding card declined or left waiting) is said once, with a push. A
+  main-wallet duty's money was deposited in chat.
 - **Short** is checked on every run once it is ready, before the trigger matters: the
   owner hears it while there is still time to top up, and again if it fires while short.
   It never deposits on its own past setting up.
-- **One key per order**, from `bevo.key` with the trade's count, never a timestamp: a
-  re-fire reuses it and the server never runs it twice. `bevo.settled` reads how it
-  ended; never send it again under a new key.
+- **One key per order**, from the trade's count, never a timestamp: a re-fire reuses it
+  and the server never runs it twice. An order whose end is unclear is counted and never
+  sent again.
 - **One note per trouble.** While its trigger holds it tries again every five minutes,
   and says each kind of trouble once: an order nobody took, a trade the server held back
   (a Start card or an earlier card still waiting, a limit used up, each named as such),
   a quote that failed three times running. Repeats go to its log and its status line; a
   fill, or the trigger passing, clears them.
-- **Its limit:** `TIMES` trades, then `bevo.done`.
+- **Its limit:** `--times` trades, then it stops itself.
 
 ## By RFQ
 
