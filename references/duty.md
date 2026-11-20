@@ -121,6 +121,7 @@ the first time:
     "watching": "{seen} · ${free} free on {venue}",
     "short": "${gap} short on {venue} · top it up to trade",
     "placed": "Placed: {order} · waiting on {venue}",
+    "retrying": "{seen} · not placed yet, trying again",
     "unreadable": "Couldn't read the options account · retrying"
   },
   "params": {"NAME": "...", "VENUE": "derive", "OWN_WALLET": true, "ALLOCATION_USD": 0,
@@ -171,13 +172,25 @@ WHERE = VENUE.title()
 S = bevo.state
 
 
+HELD = {"pocket_pending": "is waiting for you to hold its Start card",
+        "pocket_empty": "has used up its limit; raise it and it carries on",
+        "OPTIONS_DUTY_CARD_PENDING": "is waiting for you to answer its last card"}
+
+
 def acp(key, *args):
-    out = subprocess.run(["acp", "options", *args, "--idempotency-key", key],
-                         capture_output=True, text=True, timeout=170, check=False).stdout
-    try:
-        return json.loads(out or "{}")
-    except ValueError:
-        return {}
+    """Runs it; returns which of HELD refused it, or ""."""
+    run = subprocess.run(["acp", "options", *args, "--idempotency-key", key],
+                         capture_output=True, text=True, timeout=170, check=False)
+    return next((code for code in HELD if code in run.stdout + run.stderr), "")
+
+
+def say(kind, text, push):
+    """One note per kind of trouble until it clears; a repeat goes to the log only."""
+    if kind in S.get("said", []):
+        bevo.log(text)
+        return
+    S["said"] = S.get("said", []) + [kind]
+    bevo.notify(text, push=push)
 
 
 def quote(*args):
@@ -258,11 +271,17 @@ def follow_up():
         return True
     line = S.pop("placing", "the order")
     del S["key"]
-    if fate == "dropped":
-        S["tries"] = S.get("tries", 0) + 1
-        bevo.notify(f"{NAME}: {line} did not fill at its floor; nothing traded. It tries "
-                    f"again on the next trigger.", push=f"{NAME}: not filled")
+    held = HELD.get(S.pop("refused", ""))
+    if fate == "dropped" or held:  # a held-back trade never ran, whatever the ledger says
+        S["tries"], S["retry_at"] = S.get("tries", 0) + 1, time.time() + 300
+        if held:
+            say("held", f"{NAME}: {line} was not placed: it {held}. Nothing traded.",
+                f"{NAME} needs you")
+        else:
+            say("missed", f"{NAME}: {line} did not fill at its bound; nothing traded. It "
+                f"keeps trying while its trigger holds.", f"{NAME}: not filled")
         return False
+    S.pop("said", None)
     S["done"] = S.get("done", 0) + 1
     if fate == "executed":
         bevo.notify(f"{NAME}: done, {line}. Trade {S['done']} of {TIMES}.", push=f"{NAME}: filled")
@@ -307,15 +326,27 @@ for tick in bevo.ticks():
     S.pop("low_at", None)
     S.pop("missed", None)
     if not met:
+        S.pop("said", None)
+        S.pop("noquote", None)
         bevo.status("watching", seen=seen, free=round(free), venue=WHERE)
+        continue
+    if time.time() < S.get("retry_at", 0):  # five minutes between tries
+        bevo.status("retrying", seen=seen)
         continue
     argv, line = order()
     if not argv:
-        bevo.notify(f"{NAME}: {seen}, but {line}; nothing traded this time.", quiet=True)
+        S["noquote"], S["retry_at"] = S.get("noquote", 0) + 1, time.time() + 300
+        if S["noquote"] >= 3:  # a blip is logged; a quote still failing is told once
+            say("noquote", f"{NAME}: {seen}, but {line}; nothing traded. It keeps trying.",
+                f"{NAME} cannot quote")
+        else:
+            bevo.log(f"{seen}, but {line}")
+        bevo.status("retrying", seen=seen)
         continue
+    S.pop("noquote", None)
     key = bevo.key("trade", bevo.SERVICE_ID, S.get("done", 0), S.get("tries", 0))
-    bevo.notify(f"{NAME}: {seen}. Placing: {line}.", push=f"{NAME} fired")
-    acp(key, *argv)
+    say("fired", f"{NAME}: {seen}. Placing: {line}.", f"{NAME} fired")
+    S["refused"] = acp(key, *argv)
     S["key"], S["placing"] = key, line
     follow_up()
 ```
@@ -333,6 +364,11 @@ What each part keeps:
 - **One key per order**, from `bevo.key` with the trade's count, never a timestamp: a
   re-fire reuses it and the server never runs it twice. `bevo.settled` reads how it
   ended; never send it again under a new key.
+- **One note per trouble.** While its trigger holds it tries again every five minutes,
+  and says each kind of trouble once: an order nobody took, a trade the server held back
+  (a Start card or an earlier card still waiting, a limit used up, each named as such),
+  a quote that failed three times running. Repeats go to its log and its status line; a
+  fill, or the trigger passing, clears them.
 - **Its limit:** `TIMES` trades, then `bevo.done`.
 
 ## By RFQ

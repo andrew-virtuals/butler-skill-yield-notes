@@ -62,6 +62,13 @@
   - **A wallet still empty after 30 minutes is said once**, with a push ("its wallet is
     still empty, so it has not started"), and its status reads "Waiting for its funding
     card": a funding card declined or left waiting no longer shows "Setting up" for good.
+  - **One note per trouble, with its real reason.** While its trigger holds the duty
+    tries again every five minutes and says each kind of trouble once: an order nobody
+    took; a trade the server held back, named as such (a Start card or an earlier card
+    still waiting, a limit used up), where it used to say "did not fill at its floor"; a
+    quote that failed three times running (a blip is only logged). Repeats go to its log
+    and its "retrying" status; a fill, or the trigger passing, clears them. Before, each
+    run could push the same note again.
   - **By RFQ**, only when the owner asked for it, on Derive or Paradex, from either
     wallet: `order()` adds `--order rfq` with the same bound. `rfq.md` now says makers
     may not quote a small order at all, and to offer the order book for one.
