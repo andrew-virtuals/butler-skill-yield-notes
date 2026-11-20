@@ -17,8 +17,10 @@
   - **Its own wallet:** `bevo-wallet create`, then `duty_create` with `walletId` and
     `fundUsdc` (one funding card). Hands-free, kept apart from the owner's account, and
     copyable.
-  - **The main wallet:** Butler deposits now, as step 4 does, then files the duty with a
-    pocket proposal and `spendBasis`. Each trade is a card unless the pocket covers it; not
+  - **The main wallet:** Butler deposits the gap now, as step 4 does (none when free USDC
+    already covers the amount set aside), then files the duty with `pocketUsdc` set to that
+    amount and `spendBasis`, so its one Start card proposes the owner's own figure and is
+    never asked about in chat. Once held, each trade it covers runs with no card; not
     copyable.
   - **Its code starts from a program in `duty.md`**; Butler writes only `trigger()` and
     `order()`. The rest is fixed: whatever USDC lands in its own wallet (the funding

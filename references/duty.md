@@ -55,7 +55,7 @@ answer already gives a figure or a wallet, confirm it in place of asking.
 
 | | Its own wallet | The main wallet |
 | --- | --- | --- |
-| Trades | Hands-free, no card | Without a card only while its pocket covers the trade; else a card each time |
+| Trades | Hands-free, no card | Hands-free once the owner holds its Start card, up to the limit on it |
 | Deposits | The duty makes them, hands-free | A card now, in chat; each top-up a card |
 | Its money | Its own account and Platforms row, apart from the owner's | The owner's main account |
 | Copyable | Yes | No: its trades are never copied |
@@ -80,12 +80,16 @@ trade, or to trade free USDC already in their main options account
 
 ### The main wallet
 
-1. Deposit now, as SKILL.md step 4 does (`--venue` for Paradex), what brings its free
-   USDC there up to the amount set aside. Ask the owner to approve the deposit card, and
-   file nothing more in that turn.
-2. In a later turn, once `acp options account` shows it free, `duty_create` with no `walletId`, `"requestedDailyLimitUsdc"` at least one trade's
-   collateral or cost, and `"spendBasis": {"perTrade": "<its size setting>", "times": <N>}`.
-   The owner answers the pocket card; until then each trade is a card.
+1. When free USDC there (`acp options account`) is short of the amount set aside,
+   deposit the gap now, as SKILL.md step 4 does (`--venue` for Paradex): ask the owner to
+   approve the deposit card, and file nothing more in that turn. When it already covers
+   it, go on to 2 in this turn.
+2. Once it shows free, `duty_create` with no `walletId`, `"pocketUsdc"`: **the amount they
+   set aside**, and `"spendBasis": {"perTrade": "<its size setting>", "times": <N>}`.
+   That files one Start card proposing that limit; the owner's hold is the approval.
+   Never ask them for a limit in chat: they named it. Say that once they hold it, each
+   trade it covers runs with no card; until then a trade it covers is skipped, and a
+   bigger one asks with its own card.
 
 Either way, its code is the program below, filled in; `"movesFunds": true`, a timer input (every 5 minutes for a price; the day and
 time for a schedule), and `params` with at least `NAME`, `VENUE`, `OWN_WALLET`,
