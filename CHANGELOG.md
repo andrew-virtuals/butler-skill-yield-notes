@@ -38,6 +38,14 @@
     with only its launchers on its path, so `python3 ~/skills/options-trading/scripts/quote.py`
     finds neither the skill nor `python3` there; `quote()` runs the helper with the duty's
     own interpreter and returns `{"error": why}` when it fails.
+  - **It files the first time.** `duty.md` gives the exact `duty_create` fields for both
+    wallets: `title` `{NAME}` (a name of at most 38 characters), `spendBasis`
+    (`NEED_USD` x `TIMES`, which the agent requires of every duty that spends), the timer,
+    the params, and a `statusTemplate` whose states the program's `bevo.status()` calls
+    name, as the agent requires; the program's `acp()` puts `--idempotency-key` in its
+    argv. Checked against virtuals-agent's own `prepare()`: both wallets file with no
+    refusal and no warning. Before, each duty cost Butler several refused `duty_create`
+    calls and a read of the platform's duty guide.
   - **Its timer runs from the moment it is filed**, every minute until done, never a
     `startsAt` or an `at`: the time, day or price is in `trigger()`, so the runs before it
     move the money onto the venue. A 14:55 duty that only started at 14:55 deposited then.

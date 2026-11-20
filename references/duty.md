@@ -93,22 +93,54 @@ stands; never argue it twice.
    deposit the gap now, as SKILL.md step 4 does (`--venue` for Paradex): ask the owner to
    approve the deposit card, and file nothing more in that turn. When it already covers
    it, go on to 2 in this turn.
-2. Once it shows free, `duty_create` with no `walletId`, `"pocketUsdc"`: **the amount they
-   set aside**, and `"spendBasis": {"perTrade": "<its size setting>", "times": <N>}`.
-   That files one Start card proposing that limit; the owner's hold is the approval.
-   Never ask them for a limit in chat: they named it. Say that once they hold it, each
-   trade it covers runs with no card; until then a trade it covers is skipped, and a
-   bigger one asks with its own card.
+2. Once it shows free, `duty_create` with no `walletId` and `"pocketUsdc"`: **the amount
+   they set aside**. That files one Start card proposing that limit; the owner's hold is
+   the approval. Never ask them for a limit in chat: they named it. Say that once they
+   hold it, each trade it covers runs with no card; until then a trade it covers is
+   skipped, and a bigger one asks with its own card.
 
-Either way, its code is the program below, filled in; `"movesFunds": true`, and one timer
-input, `{"kind": "timer", "intervalSeconds": 60, "untilDone": true}` (300 for a price or a
-schedule), running from the moment it is filed: never a `startsAt` or an `at`, even for a
-set time. The time, the day or the price is in `trigger()`; the runs before it are when
-its money reaches the venue. Then `params` with at least `NAME`, `VENUE`, `OWN_WALLET`,
-`ALLOCATION_USD`, `NEED_USD` (one trade's need, as in the first reply), `TIMES` and
-`QUOTE_PY`, plus the rule's figures. `QUOTE_PY` is the helper's full path, read in chat
-with `realpath ~/skills/options-trading/scripts/quote.py`: a duty runs in its own folder,
-where `~/skills` is not this skill and `python3` is not on its path. It gets no `options-lifecycle` duty: it follows its own trades.
+### What `duty_create` gets, either way
+
+Besides `walletId` and `fundUsdc`, or `pocketUsdc`, these fields, as written, so it files
+the first time:
+
+```json
+{
+  "name": "<a slug>",
+  "spec": "<the owner's ask, in their words>",
+  "title": "{NAME}",
+  "movesFunds": true,
+  "triggers": [{"kind": "timer", "intervalSeconds": 60, "untilDone": true}],
+  "spendBasis": {"perTrade": "NEED_USD", "times": "TIMES"},
+  "statusTemplate": {
+    "moving": "Moving ${amount} to {venue}",
+    "setting_up": "Setting up: ${free} of ${allocation} on {venue}",
+    "watching": "{seen} · ${free} free on {venue}",
+    "short": "${gap} short on {venue} · top it up to trade",
+    "placed": "Placed: {order} · waiting on {venue}",
+    "unreadable": "Couldn't read the options account · retrying"
+  },
+  "params": {"NAME": "...", "VENUE": "derive", "OWN_WALLET": true, "ALLOCATION_USD": 0,
+             "NEED_USD": 0, "TIMES": 1, "QUOTE_PY": "...", "...": "the rule's figures"},
+  "code": "<the program below, filled in>"
+}
+```
+
+- `NAME`: what it does and when, at most 38 characters, no chain, size or count: "ETH
+  calls every 30 min", "Sell ETH puts below $1,500". The title is `{NAME}` alone.
+- `intervalSeconds`: 60 for a set time, 300 for a price or a schedule. It runs from the
+  moment it is filed, never a `startsAt` or an `at`, even for a set time: the time, day
+  or price is in `trigger()`, and the runs before it are when its money reaches the venue.
+- `OWN_WALLET`: true for its own wallet, false for the main one. `ALLOCATION_USD`: the
+  amount set aside. `NEED_USD`: one trade's need, as in the first reply. `TIMES`: how
+  many trades.
+- `QUOTE_PY`: the helper's full path, read in chat with
+  `realpath ~/skills/options-trading/scripts/quote.py`: a duty runs in its own folder,
+  where `~/skills` is not this skill and `python3` is not on its path.
+- The rule's own figures go in `params` too, each read from `P` in `trigger()` or
+  `order()`, never written into the code.
+
+It gets no `options-lifecycle` duty: it follows its own trades.
 
 ## Its code
 
@@ -136,9 +168,9 @@ WHERE = VENUE.title()
 S = bevo.state
 
 
-def acp(*args):
-    out = subprocess.run(["acp", "options", *args], capture_output=True, text=True,
-                         timeout=170, check=False).stdout
+def acp(key, *args):
+    out = subprocess.run(["acp", "options", *args, "--idempotency-key", key],
+                         capture_output=True, text=True, timeout=170, check=False).stdout
     try:
         return json.loads(out or "{}")
     except ValueError:
@@ -190,10 +222,9 @@ def move_in(free):
     if cash is None or cash < 10:
         return False
     n = S.get("deposits", 0)
-    acp("deposit", "--amount", str(int(cash)), *FROM,
-        "--idempotency-key", bevo.key("deposit", bevo.SERVICE_ID, n))
+    acp(bevo.key("deposit", bevo.SERVICE_ID, n), "deposit", "--amount", str(int(cash)), *FROM)
     S["deposits"], S["deposit_at"], S["free_before"] = n + 1, time.time(), free
-    bevo.status(f"Moving ${int(cash):,} to {WHERE}")
+    bevo.status("moving", amount=int(cash), venue=WHERE)
     return True
 
 
@@ -209,7 +240,7 @@ def short(free, met, seen):
         S["missed"] = True
         bevo.notify(f"{NAME}: {seen}, but it is ${gap:,} short on {WHERE}, so nothing traded. "
                     f"Top it up and it trades the next time.", push=f"{NAME} fired, short ${gap:,}")
-    bevo.status(f"${gap:,} short on {WHERE} · top it up to trade")
+    bevo.status("short", gap=gap, venue=WHERE)
 
 
 def follow_up():
@@ -219,7 +250,7 @@ def follow_up():
         return False
     fate = bevo.settled(key, route="options", wait=60)
     if fate in ("waiting", "approval"):
-        bevo.status(f"Placed: {S.get('placing')} · waiting on {WHERE}")
+        bevo.status("placed", order=S.get("placing") or "the order", venue=WHERE)
         return True
     line = S.pop("placing", "the order")
     del S["key"]
@@ -244,14 +275,14 @@ for tick in bevo.ticks():
         bevo.done(f"{NAME}: all {TIMES} trade(s) made.")
     free = free_on_venue()
     if free is None:
-        bevo.status("Couldn't read the options account · retrying")
+        bevo.status("unreadable")
         continue
     if move_in(free):
         continue
     arriving = OWN and (not S.get("deposits") or (free <= S["free_before"] + 1
                                                    and time.time() - S["deposit_at"] < 1800))
     if free < NEED and arriving:
-        bevo.status(f"Setting up: ${free:,.0f} of ${ALLOCATION:,.0f} on {WHERE}, more on its way")
+        bevo.status("setting_up", free=round(free), allocation=round(ALLOCATION), venue=WHERE)
         continue
     if not S.get("ready") and free >= NEED:
         S["ready"] = True
@@ -263,7 +294,7 @@ for tick in bevo.ticks():
     S.pop("low_at", None)
     S.pop("missed", None)
     if not met:
-        bevo.status(f"{seen} · ${free:,.0f} free on {WHERE}")
+        bevo.status("watching", seen=seen, free=round(free), venue=WHERE)
         continue
     argv, line = order()
     if not argv:
@@ -271,7 +302,7 @@ for tick in bevo.ticks():
         continue
     key = bevo.key("trade", bevo.SERVICE_ID, S.get("done", 0), S.get("tries", 0))
     bevo.notify(f"{NAME}: {seen}. Placing: {line}.", push=f"{NAME} fired")
-    acp(*argv, "--idempotency-key", key)
+    acp(key, *argv)
     S["key"], S["placing"] = key, line
     follow_up()
 ```
