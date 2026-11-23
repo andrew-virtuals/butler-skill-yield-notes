@@ -103,7 +103,7 @@ Step 4's deposit with `--venue rysk`:
   amount or nothing; if what was gathered lands short, it stays in their wallet on the
   chain the reason names. Nothing is set aside for Rysk until a sale locks it.
 - Before it, say how much is already in that wallet (`account.usdc`) and deposit only
-  the shortfall, sized as step 4 says but **never under $2** in place of its $6: the
+  the shortfall, sized as step 4 says but **never under $2** in place of its $11: the
   bridge to HyperEVM refuses less.
 - After the card, re-read the account until `account.usdc` covers `collateral.amount`;
   only then step 5.

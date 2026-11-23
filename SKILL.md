@@ -115,16 +115,15 @@ this chat. One missing: ask, and file nothing this turn.
 
 4. [FIXED] With all four met, fund a sell or a buy only when `freeForNewPutsUsd` is below
    `collateral.amount` (sell) or `max_cost_usd` (buy). Deposit the shortfall plus 2% for
-   the bridge fee and its 1% slippage bound, rounded up, and **never under $6**. Say
-   the bridge fee comes out of the amount:
+   the bridge, rounded up, and **never under $11**. Refused: file the `at least $N` it
+   names, once. Say what arrives from the card alone:
 
    ```sh
    acp options deposit --amount <DEPOSIT_USDC> --idempotency-key <KEY>:deposit
    ```
 
-   The bot gathers stablecoins from **every chain**, any venue.
-   `--from 1` only when `ethereum.usdc` covers it alone. Never ask about gas or an
-   address. Re-read the account until free USDC covers it, and do step 9; if
+   It gathers stablecoins from **every chain**. `--from 1` only when `ethereum.usdc`
+   covers it alone. Never ask about gas or an address. Re-read the account until free USDC covers it, and do step 9; if
    short, re-quote smaller and re-offer. Free USDC spans their Derive accounts
    (`account.md`).
 

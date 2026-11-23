@@ -77,7 +77,7 @@ Derive's: free USDC on one never pays for a trade on the other.
   goes into Paradex from their wallet **on Arbitrum**, through Layerswap. When Arbitrum
   is short, the server first bridges the rest there from Base (the bot gathers onto Base
   from their other chains). Never judge it by Base's or Arbitrum's balance, and never
-  bridge first. Size it as in step 4, $6 at least.
+  bridge first. Size it as in step 4, $11 at least.
 - The bridge to Arbitrum takes its fee on the way, so the deposit may send a little less
   than asked: the outcome says what was sent. If the bridge fails, nothing is deposited
   and whatever moved is in the owner's wallet on Arbitrum. Say so as the reason gives it.

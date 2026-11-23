@@ -11,6 +11,10 @@
   position's `costUsd` from `acp options account`, no longer a duty's `PREMIUM_USD`.
 - **`options-put-delivery` is filed beside it**, no longer instead of it, with its
   instrument in the lifecycle duty's `EXCEPT` so only one duty reports on that put.
+- **A deposit starts at $11, not $6.** Derive and Paradex refuse a deposit under $10, and
+  one whose bridge could deliver less, so Butler tried $6, then $10, then $11, and guessed
+  what would arrive. Step 4 now starts at $11, files the `deposit at least $N` a refusal
+  names once, and says what arrives only from the card.
 - **A Derive order can be worked for a better price.** New `options-order-manager@1` duty
   and `references/order-manager.md`, used only when the owner asks ("get me a better price",
   "work the order"). The duty trades one put sale, buy or close from a wallet of its own,
