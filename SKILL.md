@@ -173,7 +173,7 @@ this chat. One missing: ask, and file nothing this turn.
    `recipe` alone, never a title. The owner needs exactly one of each:
 
    ```json
-   {"recipe": "options-account@6", "title": "Options accounts", "triggers": [{"kind": "timer", "intervalSeconds": 600}]}
+   {"recipe": "options-account@7", "title": "Options accounts", "triggers": [{"kind": "timer", "intervalSeconds": 600}]}
    {"recipe": "options-lifecycle@12", "movesFunds": false, "title": "Options to expiry", "triggers": [{"kind": "timer", "intervalSeconds": 900}]}
    ```
 

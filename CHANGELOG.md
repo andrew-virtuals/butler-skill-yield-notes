@@ -28,6 +28,11 @@
 - **A worked order is stopped with `STOP`, never by turning its duty off.** Only the running
   duty can cancel an order resting from its wallet: the server refuses a chat cancel with
   `--wallet`.
+- **A resting order the market has passed is said.** Files `options-account@7`: the account
+  duty's check now compares every order still resting in the owner's accounts with its
+  option's mark, and says once per order when a sale sits more than 2% under the mark, or a
+  buy more than 2% over it, and would give away $1 or more. It cancels nothing: the note
+  asks the owner. Step 9 updates an `@6` duty in place.
 - **Butler offers RFQ in three cases.** An owner who has never heard of RFQ cannot ask for
   it. On Derive or Paradex, Butler now offers it beside the order book, in one line and
   once per trade, when the order is bigger than the book's best price holds (the "is only

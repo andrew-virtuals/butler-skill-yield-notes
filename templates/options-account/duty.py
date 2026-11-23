@@ -22,10 +22,17 @@ A venue that fails to read, or reads with no worth, writes nothing, so its row
 keeps its last good value; the other venues are written regardless. Zero is
 written only for an account that read fine and holds nothing.
 
-The one note it sends is a deposit landing, and only on a venue whose deposits
+It sends two notes. One is a deposit landing, and only on a venue whose deposits
 are credited after their card has closed (`depositsLandLater`: Derive's
 bridge). bevo-server's own note covers every deposit card, open, buy, close and
 withdrawal, and the options-lifecycle duty reports expiries and settlements.
+
+The other is the order guard. A resting order sits at the price its owner chose
+and nothing moves it, so once the venue's own mark has passed that price the
+order hands the difference to whoever takes it: a sale under the mark, a buy
+over it. Each order still resting is compared with its option's mark, and one
+past it by GIFT_SHARE and GIFT_MIN_USD is said once, with what it gives away.
+The owner decides: this duty cancels and re-prices nothing.
 """
 
 import bevo
@@ -41,6 +48,15 @@ DEPOSIT_MIN_USD = 1.0
 QUIET_AFTER_POSITION_CHANGE = 3600
 # A resting order's line on its row (the server's `RESTING_STATUS`): how the lines are found again.
 RESTING = "Resting"
+
+#: The order guard speaks when the mark is this share past the order's price, and the
+#: order would give away at least this much. Under either, it is the mark's own noise.
+GIFT_SHARE = 0.02
+GIFT_MIN_USD = 1.0
+#: A mark older than this says nothing about now.
+MARK_MAX_AGE = 120
+#: The most orders priced in one check, so an owner with many costs a bounded number of reads.
+GUARD_MAX_ORDERS = 10
 
 
 def say(text):
@@ -117,6 +133,70 @@ def resting(account, shown):
         return list(shown or [])
     return [o["platformLine"] for o in account.get("openOrders") or []
             if isinstance(o, dict) and isinstance(o.get("platformLine"), dict)]
+
+
+def open_orders(account):
+    """Every order still resting in the account, each subaccount's included."""
+    holders = [account] + [sub for sub in account.get("accounts") or [] if isinstance(sub, dict)]
+    orders = {}
+    for holder in holders:
+        for order in holder.get("openOrders") or []:
+            if isinstance(order, dict) and order.get("orderId") and order.get("status", "open") == "open":
+                orders[str(order["orderId"])] = order
+    return orders
+
+
+def gift(order, venue):
+    """What the order gives away at the venue's mark now, as (mark, dollars), or None when
+    it gives nothing worth saying or the mark cannot be read."""
+    try:
+        left = float(order.get("size") or 0) - float(order.get("filledSize") or 0)
+        limit = float(order.get("limitPricePerUnitUsd") or 0)
+        if left <= 0 or limit <= 0 or order.get("side") not in ("buy", "sell"):
+            return None
+        body = bevo.read("/options/ticker", {"instrument": order["instrument"], "venue": venue}) or {}
+        mark = float(body.get("mark") or 0)
+        age = time.time() - float(body.get("asOf") or 0) / 1000.0
+    except (bevo.BevoError, KeyError, TypeError, ValueError) as exc:
+        say("could not price the resting order on %s: %s" % (order.get("instrument"), exc))
+        return None
+    if mark <= 0 or age > MARK_MAX_AGE:
+        return None
+    past = mark - limit if order["side"] == "sell" else limit - mark
+    if past <= GIFT_SHARE * mark or past * left < GIFT_MIN_USD:
+        return None
+    return mark, past * left
+
+
+def guard(entry, account):
+    """Say once, for each resting order, that the market has passed its price."""
+    if account.get("ordersUnread"):
+        return  # this read saw no orders: nothing is known, and nothing is forgotten
+    venue, name = str(entry.get("venue") or ""), entry.get("name")
+    orders = open_orders(account)
+    prefix = "gift:%s:" % venue
+    for key in [k for k in list(bevo.state) if str(k).startswith(prefix)]:
+        if key[len(prefix):] not in orders:
+            bevo.state.pop(key)
+    for order_id, order in list(orders.items())[:GUARD_MAX_ORDERS]:
+        key = prefix + order_id
+        if bevo.state.get(key):
+            continue
+        found = gift(order, venue)
+        if found is None:
+            continue
+        mark, given = found
+        selling = order["side"] == "sell"
+        left = float(order["size"]) - float(order.get("filledSize") or 0)
+        bevo.notify(
+            "Your resting %s order on %s, %s %s at $%s each, is now %s %s's own price for it, $%s: "
+            "filled there it gives away about $%s. It is still on the book. Tell me to cancel it "
+            "or to set a new price."
+            % (name, order["instrument"], "to sell" if selling else "to buy", "%g" % left,
+               usd(order["limitPricePerUnitUsd"]), "under" if selling else "over", name, usd(mark),
+               usd(given)),
+            push="A resting %s order is priced %s the market" % (name, "under" if selling else "over"))
+        bevo.state[key] = True
 
 
 def shown_resting(site):
@@ -264,6 +344,11 @@ def write(entry, wallet):
         cash = [cash_line(account.get("usdc"), orders)] if entry.get("cashLine") is True else []
         bevo.platform_balance(site, name, value, account=row_account,
                               positions=(cash + positions + orders)[:20])
+    try:
+        guard(entry, account)
+    except Exception as exc:
+        # The rows are written; a guard that could not run says so and waits for the next check.
+        say("the order guard skipped %s this run: %s" % (name, exc))
     credit = landed(venue, float(account.get("usdc") or 0), holdings(account)) if late else 0.0
     if credit:
         bevo.notify("Your %s deposit landed: $%s USDC credited. The account is worth $%s now."

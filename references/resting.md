@@ -78,6 +78,14 @@ Nothing is filed for a resting order. SKILL.md step 9's lifecycle duty watches w
 account holds, so it picks the option up from its first fill, at what it cost, and an
 order that ends with nothing filled leaves it nothing to watch.
 
+## When the market passes their price
+
+The `options-account` duty tells the owner, once per order, when Derive's or Paradex's own
+price has moved past a resting order's: a sale now under it, a buy now over it, with what
+that gives away. It cancels nothing. "Cancel it": the cancel below. "Set a new price": the
+cancel, and once it is approved a fresh quote and a new resting order as above; never both
+on the book at once. "Leave it": nothing to file.
+
 ## Cancelling
 
 Only when they ask, and only the order they name, by the id `acp options account` lists

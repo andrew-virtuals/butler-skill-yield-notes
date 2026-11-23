@@ -469,3 +469,86 @@ class RestingOrders(unittest.TestCase):
         line = dict(BID_LINE, title="Selling 1 ETH 3,000 call", valueUsd=None)
         fake = run([0], {"/options/account": accounts(prime_with([bid(line)]))})
         self.assertEqual(fake.rows[0]["positions"][0]["valueUsd"], 22.69)
+
+
+def ask(price, size=2, filled=0, order_id="9c41d7e2", instrument="ETH-20261127-2600-C"):
+    """A resting sale, as the account read lists it."""
+    return {"orderId": order_id, "instrument": instrument, "side": "sell", "size": size,
+            "filledSize": filled, "limitPricePerUnitUsd": price, "status": "open", "platformLine": BID_LINE}
+
+
+def ticker(mark, age=0):
+    """`/options/ticker`, read `age` seconds after the venue priced it."""
+    return lambda _params: {"instrument": "ETH-20261127-2600-C", "index": "1750", "mark": mark,
+                            "bid": None, "ask": None, "asOf": (time.time() - age) * 1000}
+
+
+class OrderGuard(unittest.TestCase):
+    def guarded(self, orders, mark, times=(0,), state=None, unread=False, age=0):
+        reads = {"/options/account": accounts(prime_with(orders, unread)), "/options/ticker": ticker(mark, age)}
+        return run([START + t for t in times], reads, state)
+
+    def test_a_sale_the_mark_has_passed_is_said_once(self):
+        fake = self.guarded([ask(50)], "56", times=(0, 600, 1200))
+        self.assertEqual(fake.notes, [
+            "Your resting Derive order on ETH-20261127-2600-C, to sell 2 at $50.00 each, is now under "
+            "Derive's own price for it, $56.00: filled there it gives away about $12.00. It is still "
+            "on the book. Tell me to cancel it or to set a new price."])
+        self.assertEqual(fake.pushes, ["A resting Derive order is priced under the market"])
+        self.assertIs(fake.state["gift:derive:9c41d7e2"], True)
+        # The row is written all the same, with the order on it.
+        self.assertEqual(fake.rows[0]["positions"][-1], BID_LINE)
+
+    def test_a_buy_over_the_mark_is_said_the_other_way(self):
+        fake = self.guarded([bid()], "7")  # 0.95 bid at $10 against a $7 mark
+        self.assertEqual(len(fake.notes), 1)
+        self.assertIn("to buy 0.95 at $10.00 each, is now over Derive's own price for it, $7.00", fake.notes[0])
+        self.assertIn("gives away about $2.85", fake.notes[0])
+
+    def test_only_what_is_left_of_a_part_filled_order_counts(self):
+        fake = self.guarded([ask(50, size=2, filled=1.5)], "56")
+        self.assertIn("to sell 0.5 at $50.00", fake.notes[0])
+        self.assertIn("gives away about $3.00", fake.notes[0])
+
+    def test_a_price_on_the_right_side_or_inside_the_noise_says_nothing(self):
+        for orders, mark in (([ask(50)], "50.9"),      # 1.8% under: inside 2%
+                             ([ask(50)], "44"),        # a sale over the mark gives nothing away
+                             ([bid()], "12"),          # a buy under the mark neither
+                             ([ask(0.5, size=1)], "0.9")):  # 44% under, but $0.40 in all
+            fake = self.guarded(orders, mark)
+            self.assertEqual(fake.notes, [], (orders, mark))
+            self.assertEqual([k for k in fake.state if k.startswith("gift:")], [])
+
+    def test_a_mark_that_is_old_missing_or_unreadable_says_nothing_and_the_rows_still_write(self):
+        self.assertEqual(self.guarded([ask(50)], "56", age=300).notes, [])
+        self.assertEqual(self.guarded([ask(50)], None).notes, [])
+        reads = {"/options/account": accounts(prime_with([ask(50)])), "/options/ticker": BevoError("503")}
+        fake = run([START], reads)
+        self.assertEqual(fake.notes, [])
+        self.assertEqual(len(fake.rows), 1)
+        self.assertTrue(any("could not price the resting order" in line for line in fake.logs))
+        self.assertEqual(fake.statuses[-1][0], "ok")
+
+    def test_a_read_that_cannot_see_orders_asks_nothing_and_forgets_nothing(self):
+        fake = self.guarded([], "56", state={"gift:derive:9c41d7e2": True}, unread=True)
+        self.assertEqual([path for path, _ in fake.read_calls if path == "/options/ticker"], [])
+        self.assertIs(fake.state["gift:derive:9c41d7e2"], True)
+
+    def test_an_order_that_ended_is_forgotten_so_a_new_one_is_said(self):
+        fake = self.guarded([ask(50, order_id="b2")], "56", state={"gift:derive:9c41d7e2": True})
+        self.assertNotIn("gift:derive:9c41d7e2", fake.state)
+        self.assertIs(fake.state["gift:derive:b2"], True)
+        self.assertEqual(len(fake.notes), 1)
+
+    def test_an_order_on_a_single_account_venue_is_priced_with_its_venue(self):
+        entry = paradex("12", 19)
+        entry["account"]["openOrders"] = [ask(50)]
+        fake = run([START], {"/options/account": accounts(entry), "/options/ticker": ticker("56")})
+        self.assertIn("Your resting Paradex order", fake.notes[0])
+        self.assertIn(("/options/ticker", {"instrument": "ETH-20261127-2600-C", "venue": "paradex"}), fake.read_calls)
+
+    def test_no_more_than_ten_orders_are_priced_a_check(self):
+        orders = [ask(50, order_id="o%02d" % i) for i in range(14)]
+        fake = self.guarded(orders, "56")
+        self.assertEqual(len([path for path, _ in fake.read_calls if path == "/options/ticker"]), 10)
+        self.assertEqual(len(fake.notes), 10)
