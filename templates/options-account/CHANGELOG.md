@@ -1,5 +1,17 @@
 # Changelog
 
+## 7
+
+- **The order guard.** A resting order sits at the owner's own price and nothing moves it. Each
+  check now compares every order still resting with its option's mark (`/options/ticker`), and
+  says once per order when the mark has passed its price: a sale more than 2% under the mark,
+  or a buy more than 2% over it, that would give away $1 or more. The note names the order, the
+  venue's price and what it gives away, and leaves the choice to the owner; the duty cancels
+  nothing. Orders a Butler wallet's own duty is working are in that wallet's account, which
+  this duty does not read. A read that cannot see orders (`ordersUnread`), a venue with no mark
+  and a mark over 2 minutes old say nothing. At most 10 orders are priced a check.
+- Supersedes `options-account@6`: SKILL.md step 9 updates an older or forked duty in place.
+
 ## 6
 
 - **A Butler wallet's own Derive row stays.** A duty that trades options from its own wallet has

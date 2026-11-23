@@ -74,12 +74,17 @@ order no longer under `resting orders` has ended.
 
 ## The lifecycle duty
 
-Filed when the order is placed, not on a fill (SKILL.md step 7's `duty_create`, with
-`"ORDER_ID": "<order.orderId>"`): it waits while the order rests, watches what the
-account holds from the first fill, at what it cost, and finishes quietly if the order ends with nothing filled. SIZE is the whole order,
-PREMIUM_USD their price x size, COLLATERAL_USD strike x size for a put (else 0); the
-account's figures replace them as it fills. Never delete it on a cancel: it finishes
-itself.
+Nothing is filed for a resting order. SKILL.md step 9's lifecycle duty watches what the
+account holds, so it picks the option up from its first fill, at what it cost, and an
+order that ends with nothing filled leaves it nothing to watch.
+
+## When the market passes their price
+
+The `options-account` duty tells the owner, once per order, when Derive's or Paradex's own
+price has moved past a resting order's: a sale now under it, a buy now over it, with what
+that gives away. It cancels nothing. "Cancel it": the cancel below. "Set a new price": the
+cancel, and once it is approved a fresh quote and a new resting order as above; never both
+on the book at once. "Leave it": nothing to file.
 
 ## Cancelling
 

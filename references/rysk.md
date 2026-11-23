@@ -24,8 +24,7 @@ wallet**. Nothing else:
 
 ## Every command names it
 
-Add `--venue rysk` to every `acp options` line of `SKILL.md` for that trade, and
-`"VENUE": "rysk"` to its lifecycle duty's `params`.
+Add `--venue rysk` to every `acp options` line of `SKILL.md` for that trade.
 
 A listing ("what can I trade on Rysk") is `references/listing.md` with `--venue rysk`:
 never this helper, which is for quotes only.
@@ -104,7 +103,7 @@ Step 4's deposit with `--venue rysk`:
   amount or nothing; if what was gathered lands short, it stays in their wallet on the
   chain the reason names. Nothing is set aside for Rysk until a sale locks it.
 - Before it, say how much is already in that wallet (`account.usdc`) and deposit only
-  the shortfall, sized as step 4 says but **never under $2** in place of its $6: the
+  the shortfall, sized as step 4 says but **never under $2** in place of its $11: the
   bridge to HyperEVM refuses less.
 - After the card, re-read the account until `account.usdc` covers `collateral.amount`;
   only then step 5.
@@ -123,8 +122,8 @@ balance stays on HyperEVM. It never sells an asset Rysk delivered.
   there.
 - **Near the strike, the maker holding the option chooses whether to exercise it**, so
   the price alone does not say which came back. What came back is `settled[].received`.
-- The lifecycle duty (step 7) says it once Rysk has paid out. On Rysk it is always
-  `options-lifecycle`, never `options-put-delivery`: Rysk delivers the asset itself.
+- The lifecycle duty (step 9) says it once Rysk has paid out. On Rysk there is never an
+  `options-put-delivery` duty: Rysk delivers the asset itself.
 - **Never sell a delivered asset unless the owner asks.** Owning it is what they agreed
   to. When they do ask, it is an ordinary sale with its own card - the `acp-cli`
   skill's "Sell a token" row, with the token's `address` from `received` - never

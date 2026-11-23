@@ -66,6 +66,11 @@ never softened - they are already written for an owner:
   with `waivable: true`. See **Safeguards** below.
 - `warnings`: a poor price that never stops a trade. Say each, then let the owner choose.
 
+A quote may also carry `rfq_offer`: the order book is wide, or holds less than the size,
+so the market makers may do better. It is a line for the owner, like the lists: end the
+reply that offers the trade with it, as written, once per trade. A quote without it gets
+no word about RFQ. File `--order rfq` only when they pick it (`references/rfq.md`).
+
 ## Safeguards
 
 Each safeguard is `id` (`spread` or `fees`; Rysk's `exercise`), `text` with the figure
@@ -73,7 +78,8 @@ and the line it crossed, and `waived`.
 
 1. Offer the trade as step 3 says, with the bad case and the ownership question, and
    say each `text` as written as Butler's safeguard, asking in that same question
-   whether they still want to go ahead. File nothing yet.
+   whether they still want to go ahead. A quote that carries `rfq_offer` still ends
+   with it, after that question. File nothing yet.
 2. Their yes to that waives it. Quote again with `--waive <ids>`, comma-separated; it
    comes back `tradeable: true` with `waive`; file with `--waive <waive>`. The card and
    the record name what was waived. A no files nothing.
@@ -111,6 +117,8 @@ lowest strike, or `null` when the put is that one. Puts only.
 | `bid_depth` | contracts on the best bid; a note bigger than this warns it may fill part-way |
 | `valid_until` | 60 seconds after the read; quote again past it |
 | `waive` | present only when a safeguard was waived; passed to `--waive` |
+| `rfq_offer` | present only when the book is wide or holds less than the size: the last line of the offer, as written |
+| `worked` | Derive only, on a put sale, a buy, a close and a buy-back: the `options-order-manager` duty's settings (`params`), what its wallet starts with (`fund_usdc`) and the most working it could save (`at_mark_saves_usd`). Used only when the owner asks for a better price (`order-manager.md`) |
 
 The spread is the share of the option's value the bid gives up (`1 - bid / mark`):
 over 10% warns, over 20% is the `spread` safeguard, and neither applies when it costs
@@ -135,8 +143,8 @@ it is refused with the strikes it does.
 | `premium_usd` | the ask times the size |
 | `fee_usd` | Derive's taker fee plus the Virtuals platform fee, split as on a sell |
 | `total_cost_usd` | `premium_usd` plus `fee_usd`: what the owner pays at today's ask |
-| `max_loss_usd` | the same number: a bought option can lose all of what it cost, and no more |
-| `max_cost_usd` | about 5% over `total_cost_usd`, rounded up to the cent, never over the budget; passed to `--max-cost`. It is what the owner agrees they can lose |
+| `max_cost_usd` | the ceiling: about 5% over `total_cost_usd`, rounded up to the cent, never over the budget; passed to `--max-cost` unless the owner sets their own. It is what the owner agrees they can lose |
+| `cost_line` | the price as the owner hears it: today's total with its premium and fee, then the ceiling and its room. Said as written |
 | `breakeven` | at expiry: strike plus total cost per contract for a call, minus it for a put |
 | `overpay_vs_fair_vol_pts` | how far the ask sits over Derive's own mark; positive for a buyer |
 | `fair_value_usd` | Derive's mark times the size |
@@ -174,8 +182,8 @@ cutting a loss may accept a wide market; tell them it is wide.
 
 Prices buying back `--size` contracts of `--instrument`, a note the owner **sold** (a
 negative `size` in `acp options account`), on the ask now. `--premium-received` is
-what they got for it: `netPremiumUsd` from the open's outcome, or the lifecycle duty's
-`PREMIUM_USD`, scaled to the size being bought back.
+what they got for it: `netPremiumUsd` from the open's outcome, or the position's
+`costUsd` in `acp options account`, scaled to the size being bought back.
 
 | Field | Means |
 | --- | --- |

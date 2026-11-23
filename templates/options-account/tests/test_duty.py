@@ -1,16 +1,170 @@
 """duty.py run against scripted reads and clocks.
 
     python3 -m unittest discover -s tests -v
+
+The first half is the stand-in for the `bevo` SDK the tests run duty.py against:
+
+A scripted stand-in for the `bevo` SDK, for running duty.py offline.
+
+`run(...)` installs a fresh fake as `bevo`, pins the clock to each check's time
+(the first is the check at start, the rest are ticks), makes the jitter sleep
+free, executes duty.py to the end of its ticks, and returns the fake for
+assertions.
 """
 
 import ast
+import importlib.util
+import json
+import os
+import subprocess
 import sys
+import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from fake_bevo import (DERIVE, PARADEX, WALLET, BevoError, accounts, derive, every,  # noqa: E402
-                       paradex, platform, position, run, subaccount, venue)
+ROOT = Path(__file__).resolve().parent.parent
+
+START = 1792915200  # 2026-10-25T00:00:00Z
+WALLET = "0x00000000000000000000000000000000000000a1"
+
+
+class BevoError(Exception):
+    pass
+
+
+class FakeBevo:
+    BevoError = BevoError
+
+    def __init__(self, times, reads, state, platforms=None, refuse=()):
+        self.times = list(times)
+        self.reads = {path: list(value) if isinstance(value, list) else value
+                      for path, value in reads.items()}
+        self.state = dict(state)
+        self.now = self.times[0]
+        self.platforms = [] if platforms is None else platforms
+        self.refuse = set(refuse)
+        self.logs, self.notes, self.pushes, self.fails = [], [], [], []
+        self.statuses, self.rows, self.read_calls, self.removed = [], [], [], []
+
+    def log(self, message):
+        self.logs.append(str(message))
+
+    def notify(self, text, quiet=False, push=None):
+        self.notes.append(str(text))
+        self.pushes.append(push)
+        return {"ok": True}
+
+    def fail(self, reason):
+        self.fails.append(str(reason))
+
+    def status(self, next, last=None, next_at=None, **values):
+        self.statuses.append((next, values))
+
+    def platform_balance(self, site, name, usd, account="", icon=None, positions=None):
+        self.rows.append({"site": site, "name": name, "usd": usd, "account": account,
+                          "positions": positions})
+        # The SDK answers {} for a write the server refused (logged, never raised).
+        return {} if account in self.refuse else {"id": "row-1"}
+
+    def platform_balances(self):
+        if isinstance(self.platforms, BaseException):
+            raise self.platforms
+        return list(self.platforms)
+
+    def spawned(self, argv, **_kwargs):
+        """`subprocess.run`: records `bevo-platforms remove <id>` instead of running it."""
+        if list(argv[:2]) == ["bevo-platforms", "remove"]:
+            self.removed.append(argv[2])
+        return subprocess.CompletedProcess(argv, 0, "", "")
+
+    def read(self, path, params=None):
+        """A list fixture answers one item per call and repeats its last."""
+        self.read_calls.append((path, dict(params or {})))
+        value = self.reads.get(path)
+        if isinstance(value, list):
+            value = value.pop(0) if len(value) > 1 else value[0]
+        if callable(value):
+            value = value(params or {})
+        if isinstance(value, BaseException):
+            raise value
+        if value is None:
+            raise BevoError("no fixture for %s" % path)
+        return value
+
+    def ticks(self):
+        for at in self.times[1:]:
+            self.now = at
+            yield {"kind": "timer"}
+
+
+def run(times, reads=None, state=None, params=None, platforms=None, refuse=()):
+    fake = FakeBevo(times, reads or {}, state or {}, platforms, refuse)
+    sys.modules["bevo"] = fake
+    spec = importlib.util.spec_from_file_location("duty_under_test", ROOT / "duty.py")
+    module = importlib.util.module_from_spec(spec)
+    env = {"PARAMS": json.dumps(params or {})}
+    with mock.patch("time.time", lambda: fake.now), mock.patch("time.sleep", lambda _s: None), \
+            mock.patch("subprocess.run", fake.spawned), mock.patch.dict(os.environ, env):
+        spec.loader.exec_module(module)
+    return fake
+
+
+def every(minutes, count, start=START):
+    return [start + i * minutes * 60 for i in range(count)]
+
+
+DERIVE = "https://www.derive.xyz"
+PARADEX = "https://www.paradex.trade"
+
+
+def venue(vid, name, site, usdc="0", worth=None, positions=(), exists=True, late=False, cash=False):
+    """One entry of `venues` in bevo-server's bare `/options/account` answer."""
+    return {"venue": vid, "name": name, "site": site, "depositsLandLater": late, "cashLine": cash,
+            "available": True,
+            "wallet": WALLET, "signerReady": True,
+            "account": {"exists": exists, "usdc": usdc, "positions": list(positions),
+                        "worthUsd": worth},
+            "lines": []}
+
+
+def derive(usdc="0", worth=None, positions=(), exists=True, subs=None):
+    entry = venue("derive", "Derive", DERIVE, usdc, worth, positions, exists, late=True)
+    if subs is not None:
+        entry["account"]["accounts"] = list(subs)
+    return entry
+
+
+def subaccount(universe, sub_id, usdc, worth, positions=()):
+    """One entry of Derive's `account.accounts`: a risk universe's own subaccount."""
+    return {"exists": True, "subaccountId": sub_id, "universe": universe, "usdc": usdc,
+            "worthUsd": worth, "positions": list(positions)}
+
+
+def platform(row_id, site, account):
+    """A row as `bevo.platform_balances()` lists it."""
+    host = site.split("://", 1)[1].split("/", 1)[0].lower()
+    return {"id": row_id, "siteHost": host[4:] if host.startswith("www.") else host,
+            "account": account}
+
+
+def paradex(usdc="0", worth=None, positions=(), exists=True):
+    return venue("paradex", "Paradex", PARADEX, usdc, worth, positions, exists, cash=True)
+
+
+def accounts(*venues):
+    """The bare read: Derive's legacy body at the top, every venue in `venues`."""
+    return {"wallet": WALLET, "signerReady": True, "account": None, "venues": list(venues)}
+
+
+def position(instrument, size, value, pnl=None):
+    parts = instrument.split("-")
+    strike = parts[-2]
+    return {"instrument": instrument, "size": size, "underlying": parts[0],
+            "strike": float(strike.replace("_", ".")), "type": parts[-1],
+            "valueUsd": value, "pnlUsd": pnl, "expiresIn": "in 2 days"}
+
+
 
 SOURCE = (Path(__file__).resolve().parent.parent / "duty.py").read_text()
 
@@ -24,7 +178,7 @@ def rows(fake):
 
 
 class EveryVenue(unittest.TestCase):
-    # Mainnet, andrew4 (2026-10-22): Derive worth 4.54, Paradex 13.93, a call open on each.
+    # Mainnet (2026-10-22): Derive worth 4.54, Paradex 13.93, a call open on each.
     def test_one_row_per_venue_at_its_own_worth_with_its_positions(self):
         body = accounts(derive("1.45", 4.541177, [position(DERIVE_CALL, 0.17, 3.1)]),
                         paradex("8.11", 13.932716, [position(CALL, 0.1, 5.82, pnl=0.07), position(PUT, -0.2, 1.2)]))
@@ -254,7 +408,7 @@ if __name__ == "__main__":
     unittest.main()
 
 
-# Staging, andrew5 (2026-11-06): a $10 resting bid for 0.95 ETH-20261127-2600-C on Derive's
+# Staging (2026-11-06): a $10 resting bid for 0.95 ETH-20261127-2600-C on Derive's
 # PRIME, which the Platforms row did not show. The line is the server's own (`platformLine`).
 BID_LINE = {"title": "Buying 0.95 ETH 2,600 call", "subtitle": "ETH-20261127-2600-C", "valueUsd": 9.5,
             "status": "Resting",
@@ -267,7 +421,7 @@ def bid(line=BID_LINE):
 
 
 def prime_with(orders, unread=False):
-    prime = dict(subaccount("PRIME", 120485, "22.69", 30.82, [position(DERIVE_CALL, 0.17, 8.13)]),
+    prime = dict(subaccount("PRIME", 100001, "22.69", 30.82, [position(DERIVE_CALL, 0.17, 8.13)]),
                  openOrders=orders)
     entry = derive("22.69", 30.82, subs=[prime])
     if unread:
@@ -315,3 +469,86 @@ class RestingOrders(unittest.TestCase):
         line = dict(BID_LINE, title="Selling 1 ETH 3,000 call", valueUsd=None)
         fake = run([0], {"/options/account": accounts(prime_with([bid(line)]))})
         self.assertEqual(fake.rows[0]["positions"][0]["valueUsd"], 22.69)
+
+
+def ask(price, size=2, filled=0, order_id="9c41d7e2", instrument="ETH-20261127-2600-C"):
+    """A resting sale, as the account read lists it."""
+    return {"orderId": order_id, "instrument": instrument, "side": "sell", "size": size,
+            "filledSize": filled, "limitPricePerUnitUsd": price, "status": "open", "platformLine": BID_LINE}
+
+
+def ticker(mark, age=0):
+    """`/options/ticker`, read `age` seconds after the venue priced it."""
+    return lambda _params: {"instrument": "ETH-20261127-2600-C", "index": "1750", "mark": mark,
+                            "bid": None, "ask": None, "asOf": (time.time() - age) * 1000}
+
+
+class OrderGuard(unittest.TestCase):
+    def guarded(self, orders, mark, times=(0,), state=None, unread=False, age=0):
+        reads = {"/options/account": accounts(prime_with(orders, unread)), "/options/ticker": ticker(mark, age)}
+        return run([START + t for t in times], reads, state)
+
+    def test_a_sale_the_mark_has_passed_is_said_once(self):
+        fake = self.guarded([ask(50)], "56", times=(0, 600, 1200))
+        self.assertEqual(fake.notes, [
+            "Your resting Derive order on ETH-20261127-2600-C, to sell 2 at $50.00 each, is now under "
+            "Derive's own price for it, $56.00: filled there it gives away about $12.00. It is still "
+            "on the book. Tell me to cancel it or to set a new price."])
+        self.assertEqual(fake.pushes, ["A resting Derive order is priced under the market"])
+        self.assertIs(fake.state["gift:derive:9c41d7e2"], True)
+        # The row is written all the same, with the order on it.
+        self.assertEqual(fake.rows[0]["positions"][-1], BID_LINE)
+
+    def test_a_buy_over_the_mark_is_said_the_other_way(self):
+        fake = self.guarded([bid()], "7")  # 0.95 bid at $10 against a $7 mark
+        self.assertEqual(len(fake.notes), 1)
+        self.assertIn("to buy 0.95 at $10.00 each, is now over Derive's own price for it, $7.00", fake.notes[0])
+        self.assertIn("gives away about $2.85", fake.notes[0])
+
+    def test_only_what_is_left_of_a_part_filled_order_counts(self):
+        fake = self.guarded([ask(50, size=2, filled=1.5)], "56")
+        self.assertIn("to sell 0.5 at $50.00", fake.notes[0])
+        self.assertIn("gives away about $3.00", fake.notes[0])
+
+    def test_a_price_on_the_right_side_or_inside_the_noise_says_nothing(self):
+        for orders, mark in (([ask(50)], "50.9"),      # 1.8% under: inside 2%
+                             ([ask(50)], "44"),        # a sale over the mark gives nothing away
+                             ([bid()], "12"),          # a buy under the mark neither
+                             ([ask(0.5, size=1)], "0.9")):  # 44% under, but $0.40 in all
+            fake = self.guarded(orders, mark)
+            self.assertEqual(fake.notes, [], (orders, mark))
+            self.assertEqual([k for k in fake.state if k.startswith("gift:")], [])
+
+    def test_a_mark_that_is_old_missing_or_unreadable_says_nothing_and_the_rows_still_write(self):
+        self.assertEqual(self.guarded([ask(50)], "56", age=300).notes, [])
+        self.assertEqual(self.guarded([ask(50)], None).notes, [])
+        reads = {"/options/account": accounts(prime_with([ask(50)])), "/options/ticker": BevoError("503")}
+        fake = run([START], reads)
+        self.assertEqual(fake.notes, [])
+        self.assertEqual(len(fake.rows), 1)
+        self.assertTrue(any("could not price the resting order" in line for line in fake.logs))
+        self.assertEqual(fake.statuses[-1][0], "ok")
+
+    def test_a_read_that_cannot_see_orders_asks_nothing_and_forgets_nothing(self):
+        fake = self.guarded([], "56", state={"gift:derive:9c41d7e2": True}, unread=True)
+        self.assertEqual([path for path, _ in fake.read_calls if path == "/options/ticker"], [])
+        self.assertIs(fake.state["gift:derive:9c41d7e2"], True)
+
+    def test_an_order_that_ended_is_forgotten_so_a_new_one_is_said(self):
+        fake = self.guarded([ask(50, order_id="b2")], "56", state={"gift:derive:9c41d7e2": True})
+        self.assertNotIn("gift:derive:9c41d7e2", fake.state)
+        self.assertIs(fake.state["gift:derive:b2"], True)
+        self.assertEqual(len(fake.notes), 1)
+
+    def test_an_order_on_a_single_account_venue_is_priced_with_its_venue(self):
+        entry = paradex("12", 19)
+        entry["account"]["openOrders"] = [ask(50)]
+        fake = run([START], {"/options/account": accounts(entry), "/options/ticker": ticker("56")})
+        self.assertIn("Your resting Paradex order", fake.notes[0])
+        self.assertIn(("/options/ticker", {"instrument": "ETH-20261127-2600-C", "venue": "paradex"}), fake.read_calls)
+
+    def test_no_more_than_ten_orders_are_priced_a_check(self):
+        orders = [ask(50, order_id="o%02d" % i) for i in range(14)]
+        fake = self.guarded(orders, "56")
+        self.assertEqual(len([path for path, _ in fake.read_calls if path == "/options/ticker"]), 10)
+        self.assertEqual(len(fake.notes), 10)

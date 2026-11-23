@@ -50,21 +50,24 @@ Every number is a **field on the buy quote**. Never compute one.
 
 | In the sentence | Field |
 | --- | --- |
-| the most they pay, and the most they can lose | `max_cost_usd` (the card's "You pay at most") |
-| what it costs at today's price | `total_cost_usd` (`premium_usd` + `fee_usd`) |
+| what it costs today, and the most they pay | `cost_line`, as written. The premium and fee add up to `total_cost_usd`, never to the ceiling: never put them after "at most" |
+| the most they can lose | the ceiling: `max_cost_usd` (the card's "You pay at most"), or the one they set (below) |
 | fees | `fee_usd`, always its own line, split when `platform_fee_usd` is above 0: "$0.65 in fees: $0.62 to Derive and $0.03 Virtuals platform fee". At 0: "$0.62 in fees, all Derive's; no Virtuals platform fee". Always the words "Virtuals platform fee", never "platform" alone, and never Butler's. The receipt after the fill says it the same way, at 0 too |
 | where it starts paying at expiry | `breakeven` |
 | the price it turns on | `strike` |
 | the date | `expiry`, its time as given, never one from memory |
 | how much | `size`, in units of the asset |
 | how good the price is | `overpay_vs_fair_vol_pts` |
+| a wide book, or one that holds less than the size | each of `warnings`, then `rfq_offer` when the quote has it, as written, before the closing question |
 
 ## The shape
 
 Four beats, in this order:
 
-1. **It is a bet, and the most it can lose.** "This is not yield. You pay at most
-   $199.54, and you can lose all of it."
+1. **It is a bet: today's price, the ceiling, and the most it can lose.** "This is not
+   yield. About $190.03 at today's price ($189.38 premium plus $0.65 in fees). The order
+   allows 5% for the price moving before it fills, so you pay at most $199.54; you can
+   set a different ceiling. You can lose all of what you pay."
 2. **What it pays.** "If ETH is above $2,600 on 30 October, the call pays $2.95 for
    every dollar above that."
 3. **Breakeven and time, in one sentence.** "It only beats what you paid above about
@@ -74,6 +77,24 @@ Four beats, in this order:
 
 For a put, the same with "below": "If ETH is below $2,350 on 30 October, the put pays
 $3.45 for every dollar below that; it only beats its cost below about $2,295."
+
+## The ceiling
+
+`max_cost_usd` is `total_cost_usd` plus room, so a small move between the quote and
+the fill does not stop it. The order fills at the best ask up to the ceiling; if the
+price holds, they pay about `total_cost_usd`. `cost_line` says the room and that they
+can set a different ceiling: say both, once, and do not ask about it. A yes to the
+amount is a yes to `max_cost_usd`.
+
+If they name their own ceiling ("no more than $195", "no room"), it replaces
+`max_cost_usd` everywhere: in the yes, in funding, and in `--max-cost`. Naming it is
+not the yes: ask again with it, "You can lose the whole $195 - yes?", and file only
+after that yes. Never pick a different ceiling for them.
+
+- Under `total_cost_usd`: it would not fill at today's price. Say that and ask again.
+- With a budget, never over `budget_usd`; for more, quote again with the new budget.
+- Less room means more no-fills. A buy that does not fill moved past their ceiling:
+  re-quote and re-ask, never re-file the same ceiling.
 
 ## Words
 
@@ -92,6 +113,9 @@ The ask over Derive's own mark is what the buyer gives away crossing the spread.
 - over 10% of the option's value: a `warning`. Say it as written; the choice is theirs.
 - over 20%: the `spread` safeguard holds the buy back until they waive it
   (`references/helper.md` § Safeguards).
+
+Either one, or a best ask that holds less than the size, puts `rfq_offer` on the quote:
+end the offer with it, as written (`references/helper.md`).
 
 ## A hedge
 
@@ -113,7 +137,7 @@ more than the position ("sell 5 of my ETH calls" with 0.16 held), say so and ask
 and never pick between two positions for them.
 
 Quote the close with `quote --side close --instrument <name> --size <size>`. Say
-`net_proceeds_usd` against what they paid (the lifecycle duty's `PREMIUM_USD`), plainly
+`net_proceeds_usd` against what they paid (the position's `costUsd`), plainly
 when it is less: "Selling back now gets about $178.73 after fees, against $190.03 you
 paid." Give any `warnings` as written ("fees take 16% of what the bid pays").
 
@@ -124,12 +148,11 @@ needs a quote under 60 seconds old.
 
 If it does not fill, nobody bought at that floor; the price moved. Say exactly that,
 never "no liquidity", and re-quote before offering again, never re-filing the same
-floor. With `no live bid`, nobody is bidding for this option right now: holding it to
+floor. On Derive or Paradex, offer RFQ with that re-quote (`references/rfq.md`). With `no live bid`, nobody is bidding for this option right now: holding it to
 expiry costs nothing, and the lifecycle duty reports the outcome.
 
-A close sells only what they hold (`reduce_only` on the venue). After a confirmed
-close, the lifecycle duty for that instrument is deleted; if part is still held, it is
-filed again for what remains.
+A close sells only what they hold (`reduce_only` on the venue). Nothing is filed or
+deleted after it: the lifecycle duty watches whatever the account still holds.
 
 ## At expiry
 
@@ -138,23 +161,22 @@ the money pays automatically into the Derive account: (settle - strike) x size f
 call, (strike - settle) x size for a put. Nothing has to be done to collect it. It
 stays in the account until withdrawn. One that ends out of the money pays nothing.
 
-The `options-lifecycle@11` duty, filed after a confirmed buy (or when a resting buy is placed, `references/resting.md`), tells the owner the day
-before and again with the outcome. It is filed with:
-
-| Param | From |
-| --- | --- |
-| `INSTRUMENT` | `approvalOutcome.instrument` |
-| `PRODUCT` | `long_call` or `long_put` |
-| `UNDERLYING` | the instrument's prefix |
-| `STRIKE` | `approvalOutcome.strike` |
-| `SIZE` | `approvalOutcome.filledSize` (a fill can be partial) |
-| `PREMIUM_USD` | `approvalOutcome.totalCostUsd` |
-| `COLLATERAL_USD` | 0 |
+The lifecycle duty (SKILL.md step 9) tells the owner the day before and again with the
+outcome, for every option the account holds. Nothing is filed for it per buy.
 
 A bought option pays cash and buys nothing, so it is never `options-put-delivery`.
 
 ## Say to the owner
 
-"This is a bet, not yield. You pay at most **$199.54** for 2.95 ETH calls at $2,600;
-if ETH is not above about $2,664 on 30 October you lose all of it, and it is worth a
-little less each day ETH stands still. You can lose the whole $199.54 - yes?"
+"This is a bet, not yield. 2.95 ETH calls at $2,600: about $190.03 at today's price
+($189.38 premium plus $0.65 in fees). The order allows 5% for the price moving before
+it fills, so you pay at most **$199.54**; you can set a different ceiling. If ETH is not
+above about $2,664 on 30 October you lose all of it, and it is worth a little less each
+day ETH stands still. You can lose the whole $199.54 - yes?"
+
+A quote with a warning and `rfq_offer`, the first-time check included: both are said
+before the questions, never dropped for them. "… The best ask is only 25 contracts and
+this buy is 40, so it may fill part-way. I can also ask the market makers for a price
+instead of taking the order book (RFQ): they get 20 seconds to quote inside your limit,
+and if none does, nothing trades. Order book or RFQ? Either way, you can lose the whole
+$2,034.90 - yes?"

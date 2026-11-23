@@ -10,7 +10,7 @@ another on your own.
 ## Every command names it
 
 Add `--venue paradex` to every helper line and every `acp options` line of `SKILL.md`
-for that trade, and `"VENUE": "paradex"` to its lifecycle duty's `params`. A quote's
+for that trade (and `"VENUE": "paradex"` to an `options-put-delivery` duty's `params`). A quote's
 `venue` says which venue priced it: file the command on that one. A helper quote on
 Paradex, for example:
 
@@ -45,6 +45,14 @@ python3 ~/skills/options-trading/scripts/quote.py quote --venue paradex --side b
   memory.
 - Spreads outside ETH are often wide, so expect more `warnings` and safeguards there
   (`references/helper.md` § Safeguards).
+- **Listed is not priced.** A stock, index or commodity option often has no bid or ask at
+  all, at any strike or expiry: its quote says `no live ask` or `no live bid`. The helper
+  already reads the quotes shown only to retail orders, so the order book is empty for
+  Butler's orders too: say the reason as the quote gives it. Opening: it is the asset
+  that has no price, not the strike, so do not walk the chain. Run one more quote, at
+  another expiry, and no third: when both say it, say the asset has no price on Paradex
+  right now and stop. Never offer RFQ for it (`references/rfq.md`), and never point to
+  another venue for it unless that venue's list (`references/listing.md`) has the asset.
 
 ## The account
 
@@ -69,7 +77,7 @@ Derive's: free USDC on one never pays for a trade on the other.
   goes into Paradex from their wallet **on Arbitrum**, through Layerswap. When Arbitrum
   is short, the server first bridges the rest there from Base (the bot gathers onto Base
   from their other chains). Never judge it by Base's or Arbitrum's balance, and never
-  bridge first. Size it as in step 4, $6 at least.
+  bridge first. Size it as in step 4, $11 at least.
 - The bridge to Arbitrum takes its fee on the way, so the deposit may send a little less
   than asked: the outcome says what was sent. If the bridge fails, nothing is deposited
   and whatever moved is in the owner's wallet on Arbitrum. Say so as the reason gives it.

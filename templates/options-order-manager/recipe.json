@@ -1,0 +1,134 @@
+{
+  "id": "options-order-manager",
+  "version": 1,
+  "description": "Work one Derive options order from its own wallet for a better price than filling at once: take a maker who saves half the spread, rest at the mark, never past the worst price agreed.",
+  "keywords": [
+    "better price",
+    "derive",
+    "fill",
+    "limit order",
+    "mark price",
+    "options order",
+    "order manager",
+    "post-only",
+    "rfq",
+    "spread",
+    "work the order"
+  ],
+  "triggers": [
+    "timer"
+  ],
+  "keys": [
+    "om:<duty>:<order>:<n>:<op>",
+    "om:<duty>:<order>:deposit:<n>"
+  ],
+  "params": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "INSTRUMENT",
+      "ACTION",
+      "SIZE",
+      "WORST_PRICE",
+      "FEE_USD"
+    ],
+    "properties": {
+      "INSTRUMENT": {
+        "type": "string",
+        "description": "Derive's name for the option, from the quote: ETH-20261128-3000-P.",
+        "minLength": 8,
+        "maxLength": 64
+      },
+      "ACTION": {
+        "type": "string",
+        "enum": [
+          "open",
+          "buy",
+          "close"
+        ],
+        "description": "open sells a cash-secured put (or a call the account covers), buy buys one, close sells back or buys back what the duty's account holds. A close is worked by RFQ and the book only: Derive refuses a resting reduce-only order."
+      },
+      "SIZE": {
+        "type": "number",
+        "minimum": 1e-08,
+        "description": "Contracts to trade, in units of the underlying, on the venue's size step."
+      },
+      "WORST_PRICE": {
+        "type": "number",
+        "minimum": 1e-08,
+        "description": "The worst price per contract, before fees, the owner agreed to: the fill-now price by default. A sale never goes under it, a buy never over it."
+      },
+      "FEE_USD": {
+        "type": "number",
+        "minimum": 0,
+        "description": "The fill-now quote's fee_usd for the whole SIZE (Derive's plus the Virtuals platform fee). Turns a price per contract into the rail's net bound."
+      },
+      "WORK_MINUTES": {
+        "type": "number",
+        "minimum": 5,
+        "maximum": 1440,
+        "default": 240,
+        "description": "How long to work the order, from when its money is on Derive. It always finishes an hour before expiry."
+      },
+      "STEP_MINUTES": {
+        "type": "number",
+        "minimum": 1,
+        "maximum": 240,
+        "description": "How often the target gives ground toward the book, and the makers are asked again. Defaults to an eighth of WORK_MINUTES, between 1 and 30."
+      },
+      "TAKE_SAVING": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1,
+        "default": 0.5,
+        "description": "A maker's quote is taken at once when it saves this share of the gap between the book's price and Derive's mark. 1 takes a maker only at the target; 0 takes any quote that beats the book."
+      },
+      "SIZE_STEP": {
+        "type": "number",
+        "minimum": 1e-08,
+        "default": 0.01,
+        "description": "The venue's size step for this option (the quote's size_step)."
+      },
+      "MIN_SIZE": {
+        "type": "number",
+        "minimum": 1e-08,
+        "description": "The smallest order the venue takes (the quote's min_size). Less than this left over finishes the duty. Defaults to SIZE_STEP."
+      },
+      "TICK_SIZE": {
+        "type": "number",
+        "minimum": 1e-08,
+        "default": 0.1,
+        "description": "Derive's price tick for this option (public/get_instrument tick_size): a resting order rests on it, and moves only by more than 1.5 ticks."
+      },
+      "MAKER_FEE_RATE": {
+        "type": "number",
+        "minimum": 0,
+        "default": 0.0001,
+        "description": "Derive's maker fee for this option, a share of the index per contract (public/get_instrument maker_fee_rate). A resting fill pays it and no base fee; every choice between resting, asking the makers and taking the book is made on what the owner nets after fees."
+      },
+      "FILL_NOW_PRICE": {
+        "type": "number",
+        "minimum": 0,
+        "description": "The book's price per contract when the owner agreed: the receipt compares the average with it. Defaults to WORST_PRICE."
+      },
+      "STOP": {
+        "type": "boolean",
+        "default": false,
+        "description": "true ends the order early: the duty cancels what rests on Derive, sends the receipt for what filled, and finishes. The only way to take a resting order off the book: the chat cannot cancel it, and a paused duty cannot."
+      }
+    }
+  },
+  "status": {
+    "starting": "First check {next}",
+    "setting_up": "${free} of ${need} on Derive \u00b7 check {next}",
+    "moving": "Moving ${amount} to Derive \u00b7 next check {next}",
+    "working": "{filled}/{size} \u00b7 at ${price} \u00b7 check {next}",
+    "busy": "Waiting on its last order \u00b7 check {next}",
+    "paused": "{filled}/{size} \u00b7 market moving \u00b7 check {next}",
+    "sweeping": "Deadline: {filled}/{size} \u00b7 last try {next}",
+    "unreadable": "Couldn't read Derive \u00b7 retrying {next}",
+    "paused_settings": "Paused: the settings need fixing",
+    "stopped": "Stopped: the server refused its orders",
+    "done": "Finished: {filled} of {size} filled"
+  }
+}

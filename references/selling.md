@@ -59,6 +59,7 @@ model. If a sentence needs a number the quote does not carry, the sentence is wr
 | what is locked | `collateral.amount` (`collateral.usd` in dollars) |
 | fees | `fee_usd`, always its own line, split when `platform_fee_usd` is above 0: "$0.65 in fees: $0.62 to Derive and $0.03 Virtuals platform fee". At 0: "$0.62 in fees, all Derive's; no Virtuals platform fee". Always the words "Virtuals platform fee", never "platform" alone, and never Butler's. The receipt after the fill says it the same way, at 0 too |
 | how good the price is | `edge_vs_fair_vol_pts` |
+| a wide book, or one that holds less than the size | each of `warnings`, then `rfq_offer` when the quote has it, as written, after the four beats and before the ownership question |
 
 ## The shape
 
@@ -121,6 +122,9 @@ The bid under Derive's own mark is the spread, and it is what a market maker kee
   (`references/helper.md` § Safeguards). A waived note still gets the bad case and the
   ownership question.
 
+Either one, or a best bid that holds less than the size, puts `rfq_offer` on the quote:
+end the offer with it, as written (`references/helper.md`).
+
 An owner who hears "16% a year" without hearing that the spread took part of the
 premium has been told half of it.
 
@@ -128,12 +132,13 @@ premium has been told half of it.
 
 **Derive and Paradex settle in cash.** An in-the-money put reduces USDC by (strike - settlement
 price) x size; it does not deliver ETH. "You now own ETH at $2,300" is true only after
-a separate spot buy has filled. `options-lifecycle` never buys: it only reports, and
-is filed with `movesFunds: false`, so the owner gets no spending-limit card.
+a separate spot buy has filled. `options-lifecycle` (SKILL.md step 9) never buys: it
+only reports, with `movesFunds: false`, so the owner gets no spending-limit card.
 
 Only when the owner asked before the open to end up owning the asset, file
-`options-put-delivery@1` instead of `options-lifecycle` (never both), in SKILL.md step
-7. It watches the same way and buys the asset if the put is assigned:
+`options-put-delivery@1` in SKILL.md step 7, and add that instrument to the lifecycle
+duty's `EXCEPT` (`duty_update` its params, keeping the names already there) so only one
+duty reports on the put. It watches the same way and buys the asset if the put is assigned:
 
 ```json
 {"recipe": "options-put-delivery@1", "title": "Watch {INSTRUMENT}, buy {UNDERLYING} if assigned",
@@ -144,6 +149,10 @@ Only when the owner asked before the open to end up owning the asset, file
  "PREMIUM_USD": <netPremiumUsd>, "COLLATERAL_USD": <collateral>}}
 ```
 
+Its numbers come from `approvalOutcome`, never the quote. Filed in a chat that already
+filed an options duty, it needs `"alongside": [<this chat's earlier duties>]`.
+`duty_delete` it once that put is closed.
+
 `TOKEN_ID` is the token it buys: ETH is `native:8453`; BTC is the verified, non-stock
 Base row of `bevo-read token-search BTC` as `<address>:8453` (ask if two fit). It
 spends, so a spending-limit card opens on the collateral: tell the owner that holding
@@ -153,7 +162,7 @@ approval then.
 The premium and the freed collateral stay in the Derive account until withdrawn.
 
 **Rysk settles physically**: an assigned put delivers the asset itself, so there is no
-delivery buy there: always `options-lifecycle` (`references/rysk.md`).
+delivery buy there: never `options-put-delivery` (`references/rysk.md`).
 
 ## Buying back early
 
@@ -161,7 +170,7 @@ A sold note shows in `acp options account` positions with a **negative** `size`.
 Buying it back ends it before expiry and frees its collateral. Quote it with
 `quote --side buyback --instrument <name> --size <size as a positive number>
 --premium-received <USD>`, where the premium is the open's `netPremiumUsd` (or the
-duty's `PREMIUM_USD`) scaled to the size being bought back.
+position's `costUsd`) scaled to the size being bought back.
 
 Say `total_cost_usd`, then `result_usd`, plainly when it is negative: "Buying it back
 now costs about $4.46 with fees. You were paid $3.00 for it, so you would take a $1.46

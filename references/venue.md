@@ -45,7 +45,10 @@ bridge's cost below; a spread or a depth moves by the hour.
   Butler's server refuses it. A bridged deposit is priced first: if the bridge's
   guaranteed arrival (bounded at 1% slippage) is under $10, it is refused with nothing
   moved. The direct Base bridge costs about $0.10; a route from another chain costs
-  more. The card gives the bridge's fee and what arrives.
+  more. The card gives the bridge's fee and what arrives. Step 4's $11 floor clears
+  this from Base; when a costlier route is refused, its reason ends `deposit at least $N`:
+  file that amount once, and never try $10 or a figure of your own first. Paradex
+  refuses a deposit under $10 the same way.
 - A withdrawal pays to the owner's wallet on Ethereum once Derive's batch is proven, in
   the window its card gives, less a fee Derive does not state in advance. Bringing it to
   Base (the `:home` leg) is an ordinary `acp trade`, whose quote gives its own minimum

@@ -1,524 +1,437 @@
-"""duty.py run against scripted reads, clocks and acp answers.
+"""duty.py run against scripted accounts, clocks and settlements.
 
     python3 -m unittest discover -s tests -v
+
+The first half is the stand-in for the `bevo` SDK the tests run duty.py against:
+
+A scripted stand-in for the `bevo` SDK, for running duty.py offline.
+
+`run(times, world, ...)` installs a fresh fake as `bevo`, sets PARAMS, and steps the
+clock through `times`, one tick each. `World` is what the reads answer from: the main
+wallet's account on each venue, each Butler wallet's own account with the Platforms row
+the server keeps for it, an index per underlying and the settlements published so far.
+A test changes the world between runs and carries `fake.state` across them.
 """
 
-import ast
-import re
+import importlib.util
+import json
+import os
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from fake_bevo import CALL, EXPIRY, LONG_CALL, LONG_PUT, PUT, BevoError, answer, hours, run  # noqa: E402
+ROOT = Path(__file__).resolve().parent.parent
 
-SOURCE = (Path(__file__).resolve().parent.parent / "duty.py").read_text()
-ASKS = re.compile(r"\?|\bsay the word\b|\bwant me to\b|\bshall i\b|\bshould i\b|\breply\b", re.I)
-
-SETTLED_AT = EXPIRY + hours(1)
-def priced(value):
-    return {"/options/ticker": {"instrument": "ETH-20261030-2450-P", "index": value, "mark": "12.3",
-                                "bid": "11.9", "ask": "12.8", "asOf": 1793260800000}}
+SITES = {"derive": "https://www.derive.xyz", "paradex": "https://app.paradex.trade", "rysk": "https://app.rysk.finance"}
+#: ETH-20261030 at 08:00 UTC.
+EXPIRY = 1793347200
 
 
-PRICE = priced("2705.5")
+class BevoError(Exception):
+    pass
 
 
-def settled(value):
-    return {"/options/settlement": {"price": value}}
+def position(instrument, size, cost=None, **fields):
+    """An account's row for one option held: positive `size` is bought, negative sold."""
+    row = {"instrument": instrument, "size": size, "costUsd": cost}
+    row.update(fields)
+    return row
 
 
-class HeadsUp(unittest.TestCase):
-    def test_nothing_but_the_account_check_while_far_from_expiry(self):
-        fake = run(PUT, [EXPIRY - hours(72)], PRICE)
+def put(size=-0.5, cost=20.5, strike=2450, **fields):
+    return position("ETH-20261030-%d-P" % strike, size, cost, underlying="ETH", strike=strike,
+                    type="P", expirySec=EXPIRY, **fields)
+
+
+def call(size=0.2, cost=4.0, strike=2600, **fields):
+    return position("ETH-20261030-%d-C" % strike, size, cost, underlying="ETH", strike=strike,
+                    type="C", expirySec=EXPIRY, **fields)
+
+
+class World:
+    def __init__(self, derive=(), paradex=None, rysk=None, wallets=(), index=None, settled=None,
+                 unreadable=(), rysk_paid=()):
+        #: venue -> the main wallet's positions there; None for a venue with no account.
+        self.main = {"derive": list(derive), "paradex": paradex, "rysk": rysk}
+        #: [{"id", "label", "address", "venue", "positions", "row": True}]: a Butler wallet's
+        #: own account; `row` False drops its Platforms row, as for a wallet never traded.
+        self.wallets = [dict(w) for w in wallets]
+        self.index = dict({"ETH": 2500.0} if index is None else index)
+        #: (underlying, expiry) or instrument -> the settlement price.
+        self.settled = dict(settled or {})
+        #: Paths, venues ("venue:paradex") or wallet ids ("wallet:<id>") that fail to read.
+        self.unreadable = set(unreadable)
+        self.rysk_paid = list(rysk_paid)
+        self.reads = []
+
+    def account(self, positions, **more):
+        return {"exists": positions is not None, "positions": list(positions or []), **more}
+
+    def main_body(self):
+        venues = []
+        for venue, positions in self.main.items():
+            entry = {"venue": venue, "name": venue.title(), "site": SITES[venue]}
+            if "venue:" + venue in self.unreadable:
+                venues.append(dict(entry, available=False, error="timeout"))
+                continue
+            more = {"settled": self.rysk_paid} if venue == "rysk" else {}
+            venues.append(dict(entry, available=True, account=self.account(positions, **more)))
+        return {"account": venues[0].get("account"), "venues": venues}
+
+    def read(self, path, params):
+        self.reads.append((path, dict(params or {})))
+        if path in self.unreadable:
+            raise BevoError("unreadable")
+        params = params or {}
+        if path == "/options/account":
+            if "walletId" not in params:
+                return self.main_body()
+            if "wallet:" + params["walletId"] in self.unreadable:
+                raise BevoError("unreadable")
+            wallet = next(w for w in self.wallets if w["id"] == params["walletId"] and w["venue"] == params["venue"])
+            return {"venue": wallet["venue"], "account": self.account(wallet["positions"])}
+        if path == "/platform-balances":
+            return {"platforms": [
+                {"name": "%s · %s" % (w["venue"].title(), w["label"]), "siteUrl": SITES[w["venue"]],
+                 "siteHost": SITES[w["venue"]].split("://")[1], "account": w["address"].lower(),
+                 "serverKept": True} for w in self.wallets if w.get("row", True)
+            ] + [{"name": "Derive", "siteHost": "www.derive.xyz", "account": "PRIME", "serverKept": False}]}
+        if path == "/wallets":
+            return {"wallets": [{"walletId": w["id"], "label": w["label"], "address": w["address"],
+                                 "chainType": "ethereum", "status": "active"} for w in self.wallets]}
+        if path == "/options/ticker":
+            name = params["instrument"]
+            value = self.index.get(name.split("-")[0])
+            return {"instrument": name, "index": None if value is None else str(value)}
+        if path == "/options/settlement":
+            key = params.get("instrument") or (params["underlying"], int(params["expiry"]))
+            return {"price": self.settled.get(key)}
+        raise BevoError("no fixture for %s" % path)
+
+
+class FakeBevo:
+    BevoError = BevoError
+
+    def __init__(self, times, world, state):
+        self.times = list(times)
+        self.world = world
+        self.state = dict(state)
+        self.now = self.times[0]
+        self.logs, self.notes, self.statuses = [], [], []
+
+    def log(self, message):
+        self.logs.append(str(message))
+
+    def notify(self, text, quiet=False, push=None):
+        self.notes.append(str(text))
+        return {"ok": True}
+
+    def status(self, next, last=None, next_at=None, **values):
+        self.statuses.append((next, values))
+
+    def read(self, path, params=None):
+        return self.world.read(path, params)
+
+    def platform_balances(self):
+        return self.read("/platform-balances").get("platforms", [])
+
+    def ticks(self):
+        for at in self.times:
+            self.now = at
+            yield {"kind": "timer"}
+
+
+def run(times, world, settings=None, state=None):
+    fake = FakeBevo(times, world, state or {})
+    sys.modules["bevo"] = fake
+    spec = importlib.util.spec_from_file_location("duty_under_test", ROOT / "duty.py")
+    module = importlib.util.module_from_spec(spec)
+    with mock.patch("time.time", lambda: fake.now), \
+            mock.patch.dict(os.environ, {"PARAMS": json.dumps(settings or {})}):
+        spec.loader.exec_module(module)
+    return fake
+
+
+DAY = 86400
+EARLY = EXPIRY - 5 * DAY
+EVE = EXPIRY - 20 * 3600
+AFTER = EXPIRY + 30 * 60
+QUARTER = 900
+
+WALLET = {"id": "w-1", "label": "eth-put-order", "address": "0xAbC0000000000000000000000000000000000001",
+          "venue": "derive", "positions": []}
+
+
+def held(fake):
+    return sorted(fake.state.get("held") or {})
+
+
+class WhatItWatches(unittest.TestCase):
+    def test_nothing_is_set_and_every_position_is_watched(self):
+        fake = run([EARLY], World(derive=[put(), call()]))
+        self.assertEqual(held(fake), ["main|derive|ETH-20261030-2450-P|sold", "main|derive|ETH-20261030-2600-C|bought"])
         self.assertEqual(fake.notes, [])
-        self.assertEqual([path for path, _ in fake.read_calls], ["/options/account"])
+        self.assertEqual(fake.statuses[-1], ("watching", {"count": 2, "when": "30 Oct"}))
 
-    def test_once_inside_the_window_with_the_ticker_read_by_q(self):
-        fake = run(PUT, [EXPIRY - hours(20), EXPIRY - hours(19)], PRICE)
+    def test_no_positions_is_a_quiet_idle_watch(self):
+        fake = run([EARLY], World())
+        self.assertEqual((fake.notes, fake.statuses[-1]), ([], ("none", {})))
+
+    def test_every_venue_of_the_main_wallet(self):
+        world = World(derive=[put()],
+                      paradex=[position("ETH-USD-30OCT26-2450-P", -0.5, 19.0, underlying="ETH", strike=2450,
+                                        type="P", expirySec=EXPIRY)],
+                      rysk=[position("HYPE-30OCT26-56.5-P", -10, 12.0)])
+        fake = run([EARLY], world)
+        self.assertEqual(held(fake), ["main|derive|ETH-20261030-2450-P|sold",
+                                      "main|paradex|ETH-USD-30OCT26-2450-P|sold",
+                                      "main|rysk|HYPE-30OCT26-56.5-P|sold"])
+        rysk = fake.state["held"]["main|rysk|HYPE-30OCT26-56.5-P|sold"]
+        self.assertEqual((rysk["underlying"], rysk["strike"], rysk["kind"], rysk["expiry"]),
+                         ("HYPE", 56.5, "P", EXPIRY))
+
+    def test_a_butler_wallets_own_account_is_found_by_its_platforms_row(self):
+        world = World(wallets=[dict(WALLET, positions=[put(size=0.1, cost=1.12, strike=1300)])])
+        fake = run([EARLY], world)
+        self.assertEqual(held(fake), ["w-1|derive|ETH-20261030-1300-P|bought"])
+        self.assertIn(("/options/account", {"walletId": "w-1", "venue": "derive"}), world.reads)
+
+    def test_a_wallet_with_no_platforms_row_is_never_read(self):
+        world = World(wallets=[dict(WALLET, positions=[put()], row=False)])
+        fake = run([EARLY], world)
+        self.assertEqual(held(fake), [])
+        self.assertNotIn("walletId", str(world.reads))
+
+    def test_with_no_wallet_rows_the_wallet_list_is_not_read(self):
+        world = World(derive=[put()])
+        run([EARLY], world)
+        self.assertNotIn("/wallets", [path for path, _ in world.reads])
+
+    def test_a_put_another_duty_delivers_is_left_alone(self):
+        fake = run([EVE], World(derive=[put(), call()]), {"EXCEPT": ["eth-20261030-2450-p"]})
+        self.assertEqual(held(fake), ["main|derive|ETH-20261030-2600-C|bought"])
         self.assertEqual(len(fake.notes), 1)
-        self.assertIn("looks set to pay out in full", fake.notes[0])
-        self.assertIn(("/options/ticker", {"instrument": "ETH-20261030-2450-P"}), fake.read_calls)
-        self.assertTrue(fake.state["heads_up_sent"])
 
-    def test_put_under_the_strike_warns_of_buying(self):
-        fake = run(PUT, [EXPIRY - hours(5)], priced("2300"))
-        self.assertIn("you may end up buying ETH at $2,450", fake.notes[0])
+    def test_a_row_that_does_not_say_what_it_is_is_skipped(self):
+        fake = run([EARLY], World(derive=[position("ETH-PERP", 1.0, 10.0)]))
+        self.assertEqual(held(fake), [])
+        self.assertIn("not watched", fake.logs[-1])
 
-    def test_call_over_the_strike_warns_of_selling(self):
-        fake = run(CALL, [EXPIRY - hours(5)], priced("3100"))
-        self.assertIn("your ETH may be sold at $3,000", fake.notes[0])
 
-    def test_an_empty_price_read_is_a_gap_not_a_zero_and_never_a_failure(self):
-        fake = run(PUT, [EXPIRY - hours(5), EXPIRY - hours(4)], {"/options/ticker": {"index": None}})
+class TheDayBefore(unittest.TestCase):
+    def test_a_sold_put_above_its_strike(self):
+        fake = run([EVE, EVE + QUARTER], World(derive=[put()]))
+        self.assertEqual(fake.notes, ["ETH $2,450 put, 30 Oct: ETH is at $2,500. Your note looks set to pay out "
+                                      "in full. It settles in about 20 hours."])
+
+    def test_a_sold_put_under_its_strike(self):
+        fake = run([EVE], World(derive=[put()], index={"ETH": 2400.0}))
+        self.assertIn("Your note is under your price, so you may end up buying ETH at $2,450.", fake.notes[0])
+
+    def test_a_bought_call_out_of_the_money(self):
+        fake = run([EVE], World(derive=[call()]))
+        self.assertIn("Your call is out of the money: it pays nothing unless ETH ends above $2,600.", fake.notes[0])
+
+    def test_a_bought_call_in_the_money(self):
+        fake = run([EVE], World(derive=[call()], index={"ETH": 2700.0}))
+        self.assertIn("Your call is in the money: if it ends here it pays about $20.00, against the $4.00 it cost.",
+                      fake.notes[0])
+
+    def test_no_index_waits_and_tells_on_the_next_run(self):
+        world = World(derive=[put()], index={})
+        fake = run([EVE], world)
         self.assertEqual(fake.notes, [])
-        self.assertEqual(fake.fails, [])
-        self.assertNotIn("heads_up_sent", fake.state)
+        world.index = {"ETH": 2500.0}
+        fake = run([EVE + QUARTER], world, state=fake.state)
+        self.assertEqual(len(fake.notes), 1)
 
-    def test_an_unreadable_price_skips_quietly_and_retries(self):
-        fake = run(PUT, [EXPIRY - hours(5)], {"/options/ticker": BevoError("down")})
-        self.assertEqual(fake.notes, [])
-        self.assertNotIn("heads_up_sent", fake.state)
+    def test_heads_up_hours_moves_it(self):
+        fake = run([EXPIRY - 40 * 3600], World(derive=[put()]), {"HEADS_UP_HOURS": 48})
+        self.assertEqual(len(fake.notes), 1)
 
 
 class Settlement(unittest.TestCase):
-    def test_waits_through_the_grace_period_without_reading(self):
-        fake = run(PUT, [EXPIRY + 600], settled("2600"))
-        self.assertEqual(fake.read_calls, [])
-        self.assertEqual(fake.dones, [])
+    def after(self, first, settled, world_now=None, times=(AFTER,)):
+        world = first.world if world_now is None else world_now
+        world.main["derive"] = []  # the venue takes an expired position out of the account
+        for wallet in world.wallets:
+            wallet["positions"] = []
+        world.settled = settled
+        return run(list(times), world, state=first.state)
 
-    def test_asks_for_exactly_this_expiry(self):
-        fake = run(PUT, [SETTLED_AT], settled("2600"))
-        self.assertEqual(fake.read_calls[0], ("/options/settlement", {"underlying": "ETH", "expiry": EXPIRY}))
+    def test_a_sold_put_that_expires_worthless(self):
+        first = run([EARLY], World(derive=[put()]))
+        fake = self.after(first, {("ETH", EXPIRY): 2500.0})
+        self.assertEqual(fake.notes, ["ETH $2,450 put, 30 Oct: ETH settled at $2,500, above your $2,450. You kept "
+                                      "your $1,225.00 and the $20.50 premium. What is left of your collateral is "
+                                      "free cash in your Derive account."])
+        self.assertEqual(held(fake), [])
+        self.assertEqual(fake.statuses[-1], ("none", {}))
 
-    def test_put_out_of_the_money_keeps_everything_and_finishes(self):
-        fake = run(PUT, [SETTLED_AT, SETTLED_AT + 900], settled("2600"))
-        self.assertEqual(len(fake.dones), 1)
-        self.assertIn("You kept your $4,998.00 and the $55.17 premium", fake.dones[0])
-        self.assertEqual(fake.acp_calls, [])
+    def test_a_sold_put_assigned_is_a_loss_in_cash(self):
+        first = run([EARLY], World(derive=[put()]))
+        fake = self.after(first, {("ETH", EXPIRY): 2350.0})
+        self.assertIn("Your note was assigned: you agreed to buy 0.5 ETH at $2,450, which is $50.00 more than they "
+                      "are worth today. After the $20.50 premium you are down $29.50. Derive settles in cash, so "
+                      "you are holding the loss in cash, not the ETH.", fake.notes[0])
 
-    def test_put_assigned_without_delivery_holds_the_loss_in_cash(self):
-        fake = run(PUT, [SETTLED_AT], settled("2200"))
-        text = fake.dones[0]
-        self.assertIn("you agreed to buy 2.04 ETH at $2,450", text)
-        self.assertIn("$510.00 more than they are worth", text)  # (2450-2200) x 2.04
-        self.assertIn("you are down $454.83", text)               # 510 - 55.17
-        self.assertIn("holding the loss in cash", text)
-        self.assertNotIn("you now own", text)
-        self.assertEqual(fake.acp_calls, [])
+    def test_a_bought_call_that_pays(self):
+        first = run([EARLY], World(derive=[call()]))
+        fake = self.after(first, {("ETH", EXPIRY): 2700.0})
+        self.assertIn("ETH settled at $2,700, above your $2,600: your call paid $20.00 into your Derive account. "
+                      "After the $4.00 it cost, you are up $16.00.", fake.notes[0])
 
-    def test_call_out_of_the_money_keeps_the_asset(self):
-        fake = run(CALL, [SETTLED_AT], settled("2900"))
-        self.assertIn("You kept your ETH and the $40.25 premium", fake.dones[0])
+    def test_a_bought_call_that_expires_worthless(self):
+        first = run([EARLY], World(derive=[call()]))
+        fake = self.after(first, {("ETH", EXPIRY): 2500.0})
+        self.assertIn("at or under your $2,600: the call expired worthless, so the $4.00 you paid is lost.",
+                      fake.notes[0])
 
-    def test_call_assigned_reports_the_upside_given_up(self):
-        fake = run(CALL, [SETTLED_AT], settled("3200"))
-        self.assertIn("Your 1.5 ETH was sold at $3,000", fake.dones[0])
-        self.assertIn("gave up $300.00", fake.dones[0])
+    def test_a_sold_call(self):
+        first = run([EARLY], World(derive=[call(size=-1.0, cost=30.0)]))
+        fake = self.after(first, {("ETH", EXPIRY): 2700.0})
+        self.assertIn("Your 1 ETH was sold at $2,600. You gave up $100.00 of further upside, and kept the $30.00 "
+                      "premium.", fake.notes[0])
 
-    def test_unpublished_waits_then_says_so_once_after_six_hours(self):
-        late = [SETTLED_AT, EXPIRY + hours(7), EXPIRY + hours(8)]
-        fake = run(PUT, late, settled(None))
-        self.assertEqual(len(fake.notes), 1)
-        self.assertIn("has not published a settlement price", fake.notes[0])
-        self.assertEqual(fake.dones, [])
+    def test_a_butler_wallets_position_names_its_account(self):
+        world = World(wallets=[dict(WALLET, positions=[put(size=0.1, cost=1.12, strike=1300)])])
+        first = run([EARLY], world)
+        fake = self.after(first, {("ETH", EXPIRY): 1200.0})
+        self.assertIn("your put paid $10.00 into your “eth-put-order” wallet's Derive account. After the "
+                      "$1.12 it cost, you are up $8.88.", fake.notes[0])
 
-    def test_a_broken_read_never_becomes_an_outcome(self):
-        late = [SETTLED_AT, EXPIRY + hours(7), EXPIRY + hours(8)]
-        fake = run(PUT, late, {"/options/settlement": BevoError("503")})
-        self.assertEqual(fake.dones, [])
-        self.assertEqual(len(fake.fails), 3)
-        self.assertEqual(len(fake.notes), 1)
-        self.assertIn("will not guess", fake.notes[0])
-
-    def test_a_zero_price_is_not_a_settlement(self):
-        fake = run(PUT, [SETTLED_AT], settled("0"))
-        self.assertEqual(fake.dones, [])
-
-
-def held(*rows):
-    return {"/options/account": {"network": "mainnet", "account": {"exists": True, "positions": list(rows)}}}
-
-
-class BoughtOptions(unittest.TestCase):
-    def test_a_call_in_the_money_says_what_it_would_pay(self):
-        reads = dict(priced("2900"), **held({"instrument": "ETH-20261030-2800-C", "size": 0.5}))
-        fake = run(LONG_CALL, [EXPIRY - hours(5)], reads)
-        self.assertIn("Your call is in the money: if it ends here it pays about $50.00, against the $40.90", fake.notes[0])
-
-    def test_a_put_out_of_the_money_says_what_it_needs(self):
-        reads = dict(priced("2400"), **held({"instrument": "ETH-20261030-2200-P", "size": 1}))
-        fake = run(LONG_PUT, [EXPIRY - hours(5)], reads)
-        self.assertIn("it pays nothing unless ETH ends below $2,200", fake.notes[0])
-
-    def test_a_call_that_pays_reports_the_payout_and_the_net(self):
-        fake = run(LONG_CALL, [SETTLED_AT], settled("3000"))
-        self.assertIn("your call paid $100.00 into your Derive account", fake.dones[0])  # (3000-2800) x 0.5
-        self.assertIn("After the $40.90 it cost, you are up $59.10", fake.dones[0])
-        self.assertIn("The payout is free cash", fake.dones[0])
-        self.assertEqual(fake.acp_calls, [])
-
-    def test_a_call_that_pays_less_than_it_cost_is_down(self):
-        fake = run(LONG_CALL, [SETTLED_AT], settled("2850"))
-        self.assertIn("you are down $15.90", fake.dones[0])  # 25 - 40.90
-
-    def test_a_worthless_put_says_the_premium_is_lost(self):
-        fake = run(LONG_PUT, [SETTLED_AT], settled("2200"))
-        self.assertIn("at or above your $2,200: the put expired worthless, so the $30.00 you paid is lost",
-                      fake.dones[0])
-
-    def test_a_note_still_sold_gets_its_heads_up(self):
-        reads = dict(priced("2900"), **held({"instrument": PUT["INSTRUMENT"], "size": -1}))
-        fake = run(PUT, [EXPIRY - hours(5)], reads)
-        self.assertEqual(fake.dones, [])
+    def test_it_is_told_from_what_was_last_seen_even_if_the_wallet_row_is_gone(self):
+        world = World(wallets=[dict(WALLET, positions=[put(size=0.1, cost=1.12, strike=1300)])])
+        first = run([EARLY], world)
+        world.wallets = []
+        fake = self.after(first, {("ETH", EXPIRY): 1200.0})
         self.assertEqual(len(fake.notes), 1)
 
-    def test_an_unreadable_account_still_sends_the_heads_up(self):
-        reads = dict(priced("2900"))
-        reads["/options/account"] = BevoError("503")
-        fake = run(LONG_CALL, [EXPIRY - hours(5)], reads)
-        self.assertEqual(len(fake.notes), 1)
-
-
-def reads_in_turn(*answers):
-    """An /options/account fixture that answers each read with the next row set."""
-    queue = list(answers)
-    return lambda _params: queue.pop(0) if len(queue) > 1 else queue[0]
-
-
-def account(*rows):
-    return {"network": "mainnet", "account": {"exists": True, "positions": list(rows)}}
-
-
-class ClosedEarly(unittest.TestCase):
-    TICK = 900
-
-    def ticks(self, start, n=2):
-        return [start + self.TICK * i for i in range(n)]
-
-    def test_an_option_sold_back_early_finishes_quietly(self):
-        fake = run(LONG_CALL, self.ticks(EXPIRY - hours(5)), dict(priced("2900"), **held()))
-        self.assertEqual(len(fake.dones), 1)
-        self.assertIn("was sold back before expiry", fake.dones[0])
+    def test_inside_the_grace_it_waits_quietly(self):
+        first = run([EARLY], World(derive=[put()]))
+        fake = self.after(first, {("ETH", EXPIRY): 2500.0}, times=[EXPIRY + 300])
         self.assertEqual(fake.notes, [])
+        self.assertEqual(fake.statuses[-1], ("settling", {"count": 1}))
 
-    def test_a_note_bought_back_early_finishes_quietly(self):
-        reads = dict(priced("2900"), **held({"instrument": PUT["INSTRUMENT"], "size": 0.5}))
-        fake = run(PUT, self.ticks(EXPIRY - hours(5)), reads)
-        self.assertEqual(len(fake.dones), 1)
-        self.assertIn("was bought back before expiry", fake.dones[0])
-        self.assertEqual(fake.notes, [])
-
-    def test_a_close_days_before_the_heads_up_ends_the_duty_then(self):
-        fake = run(LONG_CALL, self.ticks(EXPIRY - hours(240)), held())
-        self.assertEqual(len(fake.dones), 1)
-        self.assertIn("was sold back before expiry", fake.dones[0])
-        self.assertNotIn("/options/ticker", [path for path, _ in fake.read_calls])
-
-    def test_a_close_after_the_heads_up_ends_the_duty_before_any_outcome(self):
-        fake = run(LONG_CALL, self.ticks(EXPIRY - hours(5), 3) + [SETTLED_AT],
-                   dict(priced("2900"), **settled("3000"), **held()), state={"heads_up_sent": True})
-        self.assertEqual(len(fake.dones), 1)
-        self.assertIn("was sold back before expiry", fake.dones[0])
-        self.assertNotIn("/options/settlement", [path for path, _ in fake.read_calls])
-
-    def test_one_empty_read_waits_and_sends_no_heads_up_that_tick(self):
-        fake = run(LONG_CALL, [EXPIRY - hours(5)], dict(priced("2900"), **held()))
-        self.assertEqual(fake.dones, [])
-        self.assertEqual(fake.notes, [])
-        self.assertEqual(fake.state["not_held_reads"], 1)
-
-    def test_a_blip_then_held_sends_the_heads_up_and_resets(self):
-        reads = dict(priced("2900"))
-        reads["/options/account"] = reads_in_turn(account(), account({"instrument": LONG_CALL["INSTRUMENT"], "size": 0.5}))
-        fake = run(LONG_CALL, self.ticks(EXPIRY - hours(5)), reads)
-        self.assertEqual(fake.dones, [])
+    def test_no_price_yet_waits_and_says_so_once_after_six_hours(self):
+        first = run([EARLY], World(derive=[put()]))
+        fake = self.after(first, {}, times=[AFTER, EXPIRY + 7 * 3600, EXPIRY + 8 * 3600])
         self.assertEqual(len(fake.notes), 1)
-        self.assertEqual(fake.state["not_held_reads"], 0)
-
-    def test_an_unreadable_account_never_ends_the_duty(self):
-        reads = dict(priced("2900"), **settled("3000"))
-        reads["/options/account"] = BevoError("503")
-        fake = run(LONG_CALL, self.ticks(EXPIRY - hours(30), 8) + [SETTLED_AT], reads)
-        self.assertEqual(len(fake.dones), 1)
-        self.assertIn("your call paid $100.00", fake.dones[0])
-
-    def test_after_expiry_the_account_is_never_read(self):
-        fake = run(LONG_CALL, [SETTLED_AT], dict(settled("3000"), **held()))
-        self.assertNotIn("/options/account", [path for path, _ in fake.read_calls])
-        self.assertIn("your call paid", fake.dones[0])
-
-
-def resting_account(rows=(), orders=()):
-    return {"network": "mainnet", "account": {"exists": True, "positions": list(rows), "openOrders": list(orders)}}
-
-
-RESTING_PUT = dict(PUT, SIZE=2, PREMIUM_USD=60, COLLATERAL_USD=4900, ORDER_ID="r1")
-OPEN_ORDER = {"orderId": "r1", "instrument": PUT["INSTRUMENT"], "side": "sell", "size": 2, "filledSize": 0, "status": "open"}
-
-
-class RestingOrder(unittest.TestCase):
-    """bevo-server docs/options-venues.md § Resting orders: filed when the order is placed."""
-
-    TICK = 900
-
-    def ticks(self, start, n=2):
-        return [start + self.TICK * i for i in range(n)]
-
-    def test_waits_quietly_while_the_order_rests_with_nothing_filled(self):
-        reads = dict(PRICE, **{"/options/account": resting_account(orders=[OPEN_ORDER])})
-        fake = run(RESTING_PUT, self.ticks(EXPIRY - hours(5), 3), reads)
-        self.assertEqual(fake.notes, [])
-        self.assertEqual(fake.dones, [])
-        self.assertEqual(fake.lines[-1][0], "waiting")
-        self.assertNotIn("/options/ticker", [path for path, _ in fake.read_calls])
-
-    def test_from_the_first_fill_watches_what_is_held_at_what_it_cost(self):
-        part = {"instrument": PUT["INSTRUMENT"], "size": -0.5, "costUsd": 14.5}
-        reads = dict(priced("2300"), **settled("2400"), **{
-            "/options/account": resting_account([part], [dict(OPEN_ORDER, filledSize=0.5)])})
-        fake = run(RESTING_PUT, [EXPIRY - hours(5), SETTLED_AT], reads)
-        self.assertEqual(fake.state["held_size"], 0.5)
-        self.assertIn("buying ETH at $2,450", fake.notes[0])
-        # Settled on the 0.5 held and its $14.50, never the 2 ordered.
-        self.assertIn("you agreed to buy 0.5 ETH at $2,450, which is $25.00 more", fake.dones[0])
-        self.assertIn("After the $14.50 premium you are down $10.50", fake.dones[0])
-
-    def test_an_order_that_ends_with_nothing_filled_finishes_quietly(self):
-        reads = dict(PRICE, **{"/options/account": reads_in_turn(
-            resting_account(orders=[OPEN_ORDER]), resting_account(), resting_account())})
-        fake = run(RESTING_PUT, self.ticks(EXPIRY - hours(72), 3), reads)
-        self.assertEqual(len(fake.dones), 1)
-        self.assertIn("ended with nothing filled", fake.dones[0])
-        self.assertEqual(fake.notes, [])
-
-    def test_one_read_with_neither_order_nor_position_waits_a_tick(self):
-        fake = run(RESTING_PUT, [EXPIRY - hours(72)], {"/options/account": resting_account()})
-        self.assertEqual(fake.dones, [])
-        self.assertEqual(fake.state["not_held_reads"], 1)
-
-    def test_still_unfilled_at_expiry_reports_no_settlement(self):
-        reads = dict(settled("2400"), **{"/options/account": resting_account(orders=[OPEN_ORDER])})
-        fake = run(RESTING_PUT, [EXPIRY - hours(1), SETTLED_AT], reads)
-        self.assertEqual(len(fake.dones), 1)
-        self.assertIn("ended at expiry with nothing filled", fake.dones[0])
-        self.assertNotIn("/options/settlement", [path for path, _ in fake.read_calls])
-
-    def test_a_filled_then_closed_position_ends_as_closed_early(self):
-        held_row = {"instrument": PUT["INSTRUMENT"], "size": -2, "costUsd": 60}
-        reads = dict(priced("2600"), **{"/options/account": reads_in_turn(
-            resting_account([held_row]), resting_account(), resting_account())})
-        fake = run(RESTING_PUT, self.ticks(EXPIRY - hours(72), 3), reads)
-        self.assertIn("was bought back before expiry", fake.dones[0])
-
-    def test_an_unreadable_account_never_ends_a_waiting_order(self):
-        fake = run(RESTING_PUT, self.ticks(EXPIRY - hours(72), 4), {"/options/account": BevoError("503")})
-        self.assertEqual(fake.dones, [])
-
-    def test_rysk_takes_no_order_id(self):
-        fake = run(dict(RESTING_PUT, VENUE="rysk", INSTRUMENT="ETH-30OCT26-2450-P"), [EXPIRY - hours(72)])
-        self.assertIn("Rysk takes no resting orders", fake.notes[0])
-
-
-class Settings(unittest.TestCase):
-    def test_a_bought_call_must_be_a_call(self):
-        fake = run(dict(LONG_CALL, PRODUCT="long_put"), [SETTLED_AT], settled("3000"))
-        self.assertIn("is a call but PRODUCT says long_put", fake.notes[0])
-
-    def test_any_derive_currency_is_watched(self):
-        sol = {"INSTRUMENT": "SOL-20261030-150-C", "PRODUCT": "long_call", "UNDERLYING": "SOL",
-               "STRIKE": 150, "SIZE": 2, "PREMIUM_USD": 18.4}
-        ticker = {"/options/ticker": {"instrument": "SOL-20261030-150-C", "index": "162.4", "mark": "14.1"}}
-        fake = run(sol, [EXPIRY - hours(5)], ticker)
-        self.assertIn(("/options/ticker", {"instrument": "SOL-20261030-150-C"}), fake.read_calls)
-        self.assertIn("SOL is at $162. Your call", fake.notes[0])
-        self.assertIn("is in the money", fake.notes[0])
-        self.assertIn("pays about $24.80", fake.notes[0])
-        fake = run(sol, [SETTLED_AT], {"/options/settlement": {"price": "170"}})
-        self.assertIn("your call paid $40.00", fake.dones[0])
-
-    def test_a_put_filed_as_a_call_does_nothing(self):
-        fake = run(dict(PUT, PRODUCT="covered_call"), [SETTLED_AT], settled("2200"))
-        self.assertIn("does nothing until its settings are fixed", fake.notes[0])
-        self.assertEqual(fake.read_calls, [])
-        self.assertEqual(len(fake.fails), 1)
-
-    def test_the_underlying_must_match_the_instrument(self):
-        fake = run(dict(PUT, UNDERLYING="BTC"), [SETTLED_AT], settled("2200"))
-        self.assertIn("not an option on UNDERLYING BTC", fake.notes[0])
-
-    def test_a_bad_instrument_name_does_nothing(self):
-        fake = run(dict(PUT, INSTRUMENT="ETH-OCT30-2450-P"), [SETTLED_AT], settled("2200"))
-        self.assertIn("is not a Derive option name", fake.notes[0])
-
-
-class Paradex(unittest.TestCase):
-    """VENUE paradex: Paradex's names, and every options read names the venue."""
-
-    PUT = dict(PUT, VENUE="paradex", INSTRUMENT="ETH-USD-30OCT26-2450-P")
-    LONG_CALL = dict(LONG_CALL, VENUE="paradex", INSTRUMENT="ETH-USD-30OCT26-2800-C")
-
-    def test_reads_the_paradex_account_and_ticker(self):
-        fake = run(self.PUT, [EXPIRY - hours(20)], dict(PRICE, **{"/options/account": {
-            "venue": "paradex", "account": {"positions": [
-                {"instrument": "ETH-USD-30OCT26-2450-P", "size": -2.04}]}}}))
-        self.assertIn(("/options/account", {"venue": "paradex"}), fake.read_calls)
-        self.assertIn(("/options/ticker", {"instrument": "ETH-USD-30OCT26-2450-P", "venue": "paradex"}),
-                      fake.read_calls)
+        self.assertIn("it expired 7 hours ago and Derive has not published a settlement price yet", fake.notes[0])
+        self.assertEqual(held(fake), ["main|derive|ETH-20261030-2450-P|sold"])
+        fake = self.after(fake, {("ETH", EXPIRY): 2500.0}, times=[EXPIRY + 9 * 3600])
         self.assertEqual(len(fake.notes), 1)
+        self.assertEqual(held(fake), [])
 
-    def test_reads_settlement_by_the_option_and_names_paradex(self):
-        fake = run(self.LONG_CALL, [SETTLED_AT], settled("3000"))
-        self.assertEqual(fake.read_calls[-1],
-                         ("/options/settlement", {"instrument": "ETH-USD-30OCT26-2800-C", "venue": "paradex"}))
-        self.assertIn("your call paid $100.00 into your Paradex account", fake.dones[0])
-        self.assertIn("free cash in your Paradex account", fake.dones[0])
-        self.assertNotIn("Derive", fake.dones[0])
+    def test_two_positions_settle_in_one_run_each_with_its_own_note(self):
+        first = run([EARLY], World(derive=[put(), call()]))
+        fake = self.after(first, {("ETH", EXPIRY): 2500.0})
+        self.assertEqual(len(fake.notes), 2)
 
-    # META's options expire at the New York close: 2026-10-30T20:00:00Z, 12 hours
-    # after the 08:00 UTC its name implies (EXPIRY is that 08:00).
-    META = dict(LONG_CALL, VENUE="paradex", INSTRUMENT="META-USD-30OCT26-650-C", UNDERLYING="META",
-                STRIKE=650, SIZE=0.1)
-    META_CLOSE = EXPIRY + hours(12)
+    def test_a_paradex_option_settles_by_its_own_name(self):
+        name = "ETH-USD-30OCT26-2450-P"
+        world = World(paradex=[position(name, -0.5, 19.0, underlying="ETH", strike=2450, type="P",
+                                        expirySec=EXPIRY)])
+        first = run([EARLY], world)
+        world.main["paradex"] = []
+        world.settled = {name: 2500.0}
+        fake = run([AFTER], world, state=first.state)
+        self.assertIn("free cash in your Paradex account.", fake.notes[0])
+        self.assertIn(("/options/settlement", {"instrument": name, "venue": "paradex"}), world.reads)
 
-    def meta_ticker(self, expiry):
-        return {"/options/ticker": {"instrument": "META-USD-30OCT26-650-C", "index": "641.6", "mark": "9.9",
-                                    "expirySec": expiry},
-                "/options/account": {"venue": "paradex", "account": {"positions": [
-                    {"instrument": "META-USD-30OCT26-650-C", "size": 0.1}]}}}
-
-    def test_a_stock_option_expires_when_paradex_says_not_at_the_names_08_utc(self):
-        fake = run(self.META, [EXPIRY + hours(1)], self.meta_ticker(self.META_CLOSE))
-        self.assertEqual(fake.state["expiry_sec"], self.META_CLOSE)
-        self.assertNotIn("/options/settlement", [path for path, _ in fake.read_calls])
-        self.assertEqual(fake.lines[-1][0], "hours")
-        self.assertEqual(fake.dones, [])
-
-    def test_the_stated_expiry_is_kept_once_read(self):
-        reads = dict(self.meta_ticker(None), **{"/options/ticker": BevoError("market gone")})
-        fake = run(self.META, [EXPIRY + hours(1)], reads, state={"expiry_sec": self.META_CLOSE})
-        self.assertEqual(fake.lines[-1][0], "hours")
-        self.assertNotIn("/options/settlement", [path for path, _ in fake.read_calls])
-
-    def test_without_a_stated_expiry_the_names_08_utc_stands(self):
-        for stated in (None, EXPIRY + hours(30), EXPIRY - hours(1)):
-            fake = run(self.META, [EXPIRY + hours(1)], self.meta_ticker(stated))
-            self.assertNotIn("expiry_sec", fake.state)
-            self.assertEqual(fake.lines[-1][0], "settling")
-
-    def test_a_derive_name_on_paradex_does_nothing(self):
-        fake = run(dict(self.PUT, INSTRUMENT="ETH-20261030-2450-P"), [EXPIRY - hours(20)], PRICE)
-        self.assertEqual(fake.read_calls, [])
-        self.assertTrue(any("Paradex option name" in f for f in fake.fails + fake.logs))
+    def test_the_cost_missing_from_the_account_is_left_out_not_guessed(self):
+        first = run([EARLY], World(derive=[call(cost=None)]))
+        fake = self.after(first, {("ETH", EXPIRY): 2500.0})
+        self.assertTrue(fake.notes[0].endswith("the call expired worthless."))
 
 
 class Rysk(unittest.TestCase):
-    """VENUE rysk: Rysk's names, physical settlement, and the outcome from what Rysk paid out."""
+    NAME = "HYPE-30OCT26-56.5-P"
 
-    PUT = dict(PUT, VENUE="rysk", INSTRUMENT="ETH-30OCT26-2450-P")
+    def world(self):
+        return World(rysk=[position(self.NAME, -10, 12.0)], index={"HYPE": 60.0})
 
-    @staticmethod
-    def paid(*rows, price="2600"):
-        return {"/options/settlement": {"price": price},
-                "/options/account": {"venue": "rysk", "account": {"positions": [], "settled": list(rows)}}}
+    def test_it_waits_for_the_payout_not_the_price(self):
+        world = self.world()
+        first = run([EARLY], world)
+        world.main["rysk"] = []
+        world.settled = {self.NAME: 60.0}
+        fake = run([AFTER], world, state=first.state)
+        self.assertEqual(fake.notes, [])
+        world.rysk_paid = [{"instrument": "HYPE-30OCT26-56.50-P", "size": 10, "assigned": False,
+                            "received": [{"amount": 565, "symbol": "USDT0"}]}]
+        fake = run([AFTER + QUARTER], world, state=fake.state)
+        self.assertEqual(fake.notes, ["HYPE $56.50 put, 30 Oct: HYPE settled at $60.00, at or above your $56.50. "
+                                      "Your put expired worthless: Rysk returned 565 USDT0 to your HyperEVM "
+                                      "wallet, and you keep the $12.00 premium."])
 
-    @staticmethod
-    def row(assigned, *legs, size=2.04, instrument="ETH-30OCT26-2450-P"):
-        return {"instrument": instrument, "expirySec": EXPIRY, "size": size, "assigned": assigned,
-                "received": [{"amount": a, "symbol": s, "address": "0x" + s} for a, s in legs]}
-
-    def test_reads_rysk_and_never_checks_for_an_early_close(self):
-        fake = run(self.PUT, [EXPIRY - hours(20)], dict(PRICE))
-        self.assertEqual(fake.read_calls, [("/options/ticker", {"instrument": "ETH-30OCT26-2450-P", "venue": "rysk"})])
-        self.assertIn("looks set to pay out in full", fake.notes[0])
-
-    def test_waits_for_rysk_to_pay_out_even_with_a_price(self):
-        fake = run(self.PUT, [SETTLED_AT], self.paid())
-        self.assertEqual(fake.dones, [])
-        self.assertIn(("/options/settlement", {"instrument": "ETH-30OCT26-2450-P", "venue": "rysk"}), fake.read_calls)
-        self.assertIn(("/options/account", {"venue": "rysk"}), fake.read_calls)
-        self.assertEqual(fake.lines[-1], ("settling", {}))
-
-    def test_expired_worthless_says_the_usdc_came_back(self):
-        fake = run(self.PUT, [SETTLED_AT], self.paid(self.row(False, (4998, "USDC"))))
-        text = fake.dones[0]
-        self.assertIn("ETH settled at $2,600, at or above your $2,450", text)
-        self.assertIn("expired worthless: Rysk returned 4998 USDC to your HyperEVM wallet", text)
-        self.assertIn("keep the $55.17 premium", text)
-        self.assertEqual(fake.lines[-1], ("done", {"price": 2600.0}))
-
-    def test_assigned_says_the_asset_was_delivered_never_a_cash_loss(self):
-        fake = run(self.PUT, [SETTLED_AT], self.paid(self.row(True, (2.04, "UETH")), price="2200"))
-        text = fake.dones[0]
-        self.assertIn("Your put was assigned: Rysk delivered 2.04 UETH to your HyperEVM wallet, bought at $2,450 each", text)
-        self.assertIn("$510.00 more than they were worth", text)
-        self.assertIn("you are down $454.83", text)
-        self.assertIn("yours to keep", text)
-        self.assertNotIn("in cash", text)
-        self.assertEqual(fake.acp_calls, [])
-
-    def test_under_the_strike_but_not_exercised_reads_what_came_back(self):
-        fake = run(self.PUT, [SETTLED_AT], self.paid(self.row(False, (4998, "USDC")), price="2440"))
-        self.assertIn("under your $2,450. Your put was not exercised: Rysk returned 4998 USDC", fake.dones[0])
-
-    def test_finds_its_own_sale_of_the_same_put(self):
-        rows = [self.row(False, (2450, "USDC"), size=1, instrument="ETH-30OCT26-2450.0-P"),
-                self.row(False, (4998, "USDC"))]
-        fake = run(self.PUT, [SETTLED_AT], self.paid(*rows))
-        self.assertIn("returned 4998 USDC", fake.dones[0])
-
-    def test_a_payout_with_no_price_yet_still_finishes(self):
-        fake = run(self.PUT, [SETTLED_AT], self.paid(self.row(False, (4998, "USDC")), price=None))
-        self.assertIn("ETH settled. Your put expired worthless", fake.dones[0])
-        self.assertEqual(fake.lines[-1], ("paid", {}))
-
-    def test_says_once_when_rysk_has_not_paid_out_for_hours(self):
-        fake = run(self.PUT, [SETTLED_AT, EXPIRY + hours(7), EXPIRY + hours(8)], self.paid())
-        self.assertEqual(len(fake.notes), 1)
-        self.assertIn("Rysk has not paid it out yet", fake.notes[0])
-        self.assertEqual(fake.dones, [])
-
-    def test_only_a_sold_put(self):
-        for params, why in [(dict(LONG_CALL, VENUE="rysk", INSTRUMENT="ETH-30OCT26-2800-C"), "only a sold put"),
-                            (dict(self.PUT, INSTRUMENT="ETH-20261030-2450-P"), "not a Rysk option name")]:
-            fake = run(params, [SETTLED_AT], self.paid())
-            self.assertIn(why, fake.notes[0])
-            self.assertEqual(fake.read_calls, [])
-
-    def test_no_note_asks_the_owner_anything(self):
-        worlds = [run(self.PUT, [SETTLED_AT], self.paid(self.row(True, (2.04, "UETH")), price="2200")),
-                  run(self.PUT, [SETTLED_AT], self.paid(self.row(False, (4998, "USDC")))),
-                  run(self.PUT, [SETTLED_AT, EXPIRY + hours(7)], self.paid())]
-        for fake in worlds:
-            for text in fake.notes + [d for d in fake.dones if d]:
-                self.assertIsNone(ASKS.search(text), text)
+    def test_an_assigned_put_delivers_the_asset(self):
+        world = self.world()
+        first = run([EARLY], world)
+        world.main["rysk"] = []
+        world.settled = {self.NAME: 50.0}
+        world.rysk_paid = [{"instrument": self.NAME, "size": 10, "assigned": True,
+                            "received": [{"amount": 10, "symbol": "HYPE"}]}]
+        fake = run([AFTER], world, state=first.state)
+        self.assertIn("Your put was assigned: Rysk delivered 10 HYPE to your HyperEVM wallet, bought at $56.50 "
+                      "each. That is $65.00 more than they were worth at settlement; after the $12.00 premium "
+                      "you are down $53.00. The HYPE is yours to keep", fake.notes[0])
 
 
-class StatusLine(unittest.TestCase):
-    def test_counts_down_in_days_then_hours(self):
-        fake = run(PUT, [EXPIRY - hours(72), EXPIRY - hours(30), EXPIRY - hours(1)], PRICE)
-        self.assertEqual(fake.lines, [("days", {"days": 3}), ("hours", {"hours": 30}), ("soon", {})])
+class ClosedOrUnreadable(unittest.TestCase):
+    def test_a_position_gone_twice_running_is_dropped_without_a_note(self):
+        world = World(derive=[put()])
+        first = run([EARLY], world)
+        world.main["derive"] = []
+        once = run([EARLY + QUARTER], world, state=first.state)
+        self.assertEqual(held(once), ["main|derive|ETH-20261030-2450-P|sold"])
+        twice = run([EARLY + 2 * QUARTER], world, state=once.state)
+        self.assertEqual((held(twice), twice.notes), ([], []))
 
-    def test_waits_then_reports_the_settlement(self):
-        fake = run(PUT, [EXPIRY + 600, SETTLED_AT], settled("2600"))
-        self.assertEqual(fake.lines, [("settling", {}), ("done", {"price": 2600.0})])
+    def test_one_empty_read_then_back_is_still_watched(self):
+        world = World(derive=[put()])
+        first = run([EARLY], world)
+        world.main["derive"] = []
+        once = run([EARLY + QUARTER], world, state=first.state)
+        world.main["derive"] = [put()]
+        back = run([EARLY + 2 * QUARTER, EARLY + 3 * QUARTER], world, state=once.state)
+        self.assertEqual(back.state["held"]["main|derive|ETH-20261030-2450-P|sold"]["gone"], 0)
 
-    def test_bad_settings_pause_it(self):
-        fake = run(dict(PUT, PRODUCT="covered_call"), [EXPIRY - hours(72)])
-        self.assertEqual([state for state, _ in fake.lines], ["paused", "paused"])
+    def test_an_unreadable_venue_keeps_what_it_held(self):
+        world = World(derive=[put()])
+        first = run([EARLY], world)
+        world.unreadable = {"venue:derive"}
+        fake = run([EARLY + i * QUARTER for i in range(1, 5)], world, state=first.state)
+        self.assertEqual(held(fake), ["main|derive|ETH-20261030-2450-P|sold"])
 
+    def test_an_unreadable_wallet_keeps_what_it_held(self):
+        world = World(wallets=[dict(WALLET, positions=[put(size=0.1, cost=1.12)])])
+        first = run([EARLY], world)
+        world.unreadable = {"wallet:w-1"}
+        fake = run([EARLY + i * QUARTER for i in range(1, 5)], world, state=first.state)
+        self.assertEqual(len(held(fake)), 1)
 
-class Boundary(unittest.TestCase):
-    def test_runs_no_command_so_it_files_as_moving_no_money(self):
-        # Butler's lint marks a duty as spending from any `acp` it runs, and a
-        # spending duty is filed with a pocket card. This one only reports.
-        tree = ast.parse(SOURCE)
-        imported = {alias.name for node in ast.walk(tree) if isinstance(node, (ast.Import, ast.ImportFrom))
-                    for alias in node.names} | {node.module for node in ast.walk(tree)
-                                                if isinstance(node, ast.ImportFrom)}
-        self.assertFalse(imported & {"subprocess", "shlex"})
-        self.assertNotIn('"acp"', SOURCE)
-        self.assertNotIn("os.system", SOURCE)
-        self.assertNotIn("os.popen", SOURCE)
+    def test_no_account_read_at_all_changes_nothing(self):
+        world = World(derive=[put()])
+        first = run([EARLY], world)
+        world.unreadable = {"/options/account"}
+        fake = run([EARLY + QUARTER], world, state=first.state)
+        self.assertEqual(fake.statuses[-1], ("unreadable", {}))
+        self.assertEqual(len(held(fake)), 1)
 
-    def test_an_assigned_put_never_buys(self):
-        fake = run(dict(PUT, DELIVER_ASSET=True, TOKEN_ID="native:8453"), [SETTLED_AT], settled("2200"),
-                   acp=[answer(executed=True)])
-        self.assertEqual(fake.acp_calls, [])
-        self.assertIn("holding the loss in cash, not the ETH", fake.dones[0])
+    def test_a_part_close_is_watched_at_what_is_left(self):
+        world = World(derive=[put()])
+        first = run([EARLY], world)
+        world.main["derive"] = [put(size=-0.2, cost=8.2)]
+        fake = run([EARLY + QUARTER], world, state=first.state)
+        rec = fake.state["held"]["main|derive|ETH-20261030-2450-P|sold"]
+        self.assertEqual((rec["size"], rec["usd"]), (-0.2, 8.2))
 
-    def test_no_note_asks_the_owner_anything(self):
-        worlds = [
-            run(PUT, [EXPIRY - hours(5)], priced("2300")),
-            run(PUT, [SETTLED_AT], settled("2200")),
-            run(PUT, [SETTLED_AT], settled("2600")),
-            run(CALL, [SETTLED_AT], settled("3200")),
-            run(PUT, [SETTLED_AT, EXPIRY + hours(7)], settled(None)),
-            run(PUT, [SETTLED_AT, EXPIRY + hours(7)], {"/options/settlement": BevoError("x")}),
-        ]
-        for fake in worlds:
-            for text in fake.notes + [d for d in fake.dones if d]:
-                self.assertIsNone(ASKS.search(text), text)
+    def test_a_crash_in_one_run_does_not_end_the_watch(self):
+        world = World(derive=[{"instrument": "ETH-20261030-2450-P", "size": "x"}, put()])
+        fake = run([EARLY, EARLY + QUARTER], world)
+        self.assertEqual(len(held(fake)), 1)
 
 
 if __name__ == "__main__":

@@ -464,6 +464,32 @@ def check_fees(q, drag):
                              "keeps more of it" % pct(drag))
 
 
+#: The least an order manager's wallet is funded with: under $10 Derive takes no deposit,
+#: and the bridge's fee comes out of what is sent.
+WORKED_MIN_FUND_USD = 12
+
+
+def worked(action, name, inst, size, price, fee, mark, need_usd=0.0):
+    """Derive only: what the options-order-manager duty takes to work this trade for a
+    better price than `price`, the book's now. `params` are its settings as they are,
+    `fund_usdc` what its own wallet starts with (0: it trades what that wallet's account
+    already holds), `at_mark_saves_usd` the most it could save, a fill at Derive's mark."""
+    if V["id"] != "derive" or price <= 0:
+        return {}
+    selling = action == "open" or (action == "close" and need_usd < 0)
+    saves = (mark - price if selling else price - mark) * size if mark > 0 else 0.0
+    fund = max(int(math.ceil(need_usd * 1.02)), WORKED_MIN_FUND_USD) if need_usd > 0 else 0
+    return {"worked": {
+        "params": {"INSTRUMENT": name, "ACTION": action, "SIZE": size, "WORST_PRICE": price,
+                   "FEE_USD": rnd(fee, 2), "SIZE_STEP": num(inst.get("amount_step")),
+                   "MIN_SIZE": num(inst.get("minimum_amount")),
+                   "TICK_SIZE": num(inst.get("tick_size")) or 0.1,
+                   "MAKER_FEE_RATE": num(inst.get("maker_fee_rate")) or 0.0001},
+        "fund_usdc": fund,
+        "at_mark_saves_usd": rnd(max(saves, 0.0), 2),
+    }}
+
+
 def settle(q, waived):
     """Tradeable once nothing the venue refuses is left and every safeguard is
     waived. `waive` is what the open or buy passes on to `--waive`."""
@@ -475,6 +501,24 @@ def settle(q, waived):
     passed = [sg["id"] for sg in q["safeguards"] if sg["waived"]]
     if passed and q["tradeable"]:
         q["waive"] = ",".join(passed)
+    return q
+
+
+RFQ_OFFER = ("I can also ask the market makers for a price instead of taking the order book "
+             "(RFQ): they get 20 seconds to quote inside your limit, and if none does, nothing "
+             "trades. Order book or RFQ?")
+
+
+def offer_rfq(q):
+    """Makers may beat a book that is wide or holds less than the size. They may not
+    quote the smallest order at all, and a quote the venue refuses has no bound to
+    quote inside, so neither gets the offer."""
+    size = q.get("size") or 0
+    if q.get("reasons") or size <= 0 or size == q.get("min_size"):
+        return q
+    said = q.get("warnings", []) + [sg["text"] for sg in q.get("safeguards", [])]
+    if any(" wide" in s or "is only" in s and "contracts" in s for s in said):
+        q["rfq_offer"] = RFQ_OFFER
     return q
 
 
@@ -567,6 +611,8 @@ def build_quote(product, underlying, collateral_usd, tenor="monthly",
         "breakeven": rnd(strike - bid if opt_type == "P" else strike + bid, 2),
         "valid_until": iso(now + QUOTE_TTL_SEC),
     })
+    if opt_type == "P":
+        q.update(worked("open", inst["instrument_name"], inst, size, bid, fee, mark, strike * size))
     if dte > 0 and locked_usd > 0:
         q["apr_pct"] = rnd(net / locked_usd * (365 / dte) * 100, 2)
     if opt_type == "P":
@@ -634,6 +680,18 @@ def strike_for(chain, tickers, opt_type, spot, otm_pct, target_delta, strike=Non
     sign = -1 if opt_type == "P" else 1
     want = spot * (1 + sign * otm_pct / 100.0)
     return min(chain, key=lambda i: abs(num(i["option_details"]["strike"]) - want))
+
+
+def cost_line(premium, fee, total, ceiling):
+    """The buy's price as the owner hears it. The premium and fee add up to today's
+    total, never to the ceiling, which carries the room for the price to move."""
+    room = max(1, int(round((ceiling / total - 1) * 100))) if total > 0 else 0
+    today = ("About $%.2f at today's price ($%.2f premium plus $%.2f in fees). "
+             % (total, premium, fee))
+    if ceiling <= total:
+        return today + "The order allows nothing for the price moving, so it fills only at that or less."
+    return today + ("The order allows %d%% for the price moving before it fills, so you pay "
+                    "at most $%.2f; you can set a different ceiling." % (room, ceiling))
 
 
 def build_buy_quote(product, underlying, budget_usd=None, tenor="monthly",
@@ -733,8 +791,8 @@ def build_buy_quote(product, underlying, budget_usd=None, tenor="monthly",
         "premium_usd": rnd(gross, 2),
         **fee_fields(venue_fee, ours),
         "total_cost_usd": total_r,
-        "max_loss_usd": total_r,
         "max_cost_usd": max_cost,
+        "cost_line": cost_line(rnd(gross, 2), rnd(fee, 2), total_r, max_cost),
         "breakeven": rnd(strike + per if opt_type == "C" else strike - per, 2),
         "fair_value_usd": rnd(mark * size, 2),
         "overpay_vs_fair_vol_pts": rnd(gap, 2),
@@ -743,6 +801,7 @@ def build_buy_quote(product, underlying, budget_usd=None, tenor="monthly",
         "mark_iv_pct": rnd(mark_iv * 100, 2),
         "valid_until": iso(now + QUOTE_TTL_SEC),
     })
+    q.update(worked("buy", inst["instrument_name"], inst, size, ask, fee, mark, gross + fee))
 
     if ask_sz < size:
         q["warnings"].append(
@@ -848,6 +907,7 @@ def build_close_quote(instrument, size):
         "edge_vs_fair_vol_pts": rnd(-gap, 2),
         "valid_until": iso(now + QUOTE_TTL_SEC),
     })
+    q.update(worked("close", name, inst, size, bid, fee, mark, -1.0))
     if bid_sz < size:
         q["warnings"].append(
             "the best bid is only %s contracts and this close is %s - it may fill "
@@ -915,6 +975,7 @@ def build_buyback_quote(instrument, size, premium_received=None):
         "overpay_vs_fair_vol_pts": rnd(gap, 2),
         "valid_until": iso(now + QUOTE_TTL_SEC),
     })
+    q.update(worked("close", name, inst, size, ask, fee, mark))
     if premium_received is not None:
         q["premium_received_usd"] = rnd(premium_received, 2)
         q["result_usd"] = rnd(premium_received - total, 2)
@@ -1000,6 +1061,10 @@ def safeguard_list(text):
 
 
 def run_quote(p, a):
+    return offer_rfq(build_asked_quote(p, a))
+
+
+def build_asked_quote(p, a):
     def need(*flags):
         missing = [f for f in flags if getattr(a, f) is None]
         if missing:

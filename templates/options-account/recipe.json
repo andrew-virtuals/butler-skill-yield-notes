@@ -1,14 +1,15 @@
 {
   "id": "options-account",
-  "version": 6,
-  "description": "Keep every options venue's account on the wallet's Platforms tab.",
+  "version": 7,
+  "description": "Keep every options venue's account on the wallet's Platforms tab, and say when a resting order's price has fallen behind the market.",
   "supersedes": [
     "derive-account@1",
     "options-account@1",
     "options-account@2",
     "options-account@3",
     "options-account@4",
-    "options-account@5"
+    "options-account@5",
+    "options-account@6"
   ],
   "keywords": [
     "derive",
@@ -18,7 +19,9 @@
     "options account",
     "options balance",
     "platforms",
-    "wallet"
+    "wallet",
+    "resting order",
+    "stale order"
   ],
   "triggers": [
     "timer"
@@ -30,15 +33,15 @@
   },
   "status": {
     "starting": "First check {next}",
-    "ok": "${value} · {positions} open · next check {next}",
+    "ok": "${value} \u00b7 {positions} open \u00b7 next check {next}",
     "credited": {
       "last": "Deposit credited ${credit}",
       "next": "next check {next}"
     },
-    "partial": "${value} · {skipped} not read · retry {next}",
-    "no_account": "No deposit credited yet · next check {next}",
-    "signer_off": "Butler's signer is off · next check {next}",
-    "unreadable": "Couldn't read it · retry {next}",
-    "unpriced": "No worth from the venue · retry {next}"
+    "partial": "${value} \u00b7 {skipped} not read \u00b7 retry {next}",
+    "no_account": "No deposit credited yet \u00b7 next check {next}",
+    "signer_off": "Butler's signer is off \u00b7 next check {next}",
+    "unreadable": "Couldn't read it \u00b7 retry {next}",
+    "unpriced": "No worth from the venue \u00b7 retry {next}"
   }
 }

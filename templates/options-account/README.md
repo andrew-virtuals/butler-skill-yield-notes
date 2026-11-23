@@ -4,7 +4,7 @@ Keeps the owner's account on every options venue on the wallet's Platforms tab: 
 
 ## How it is filed
 
-`{"recipe": "options-account@6", "title": "Options accounts", "triggers": [{"kind": "timer", "intervalSeconds": 600}]}`. No settings. One per owner: a second writes the same rows. An owner still running `derive-account` has it removed when this one is filed, so each row has one writer. An older or forked one is updated in place with `duty_update {"recipe": "options-account@6"}`.
+`{"recipe": "options-account@7", "title": "Options accounts", "triggers": [{"kind": "timer", "intervalSeconds": 600}]}`. No settings. One per owner: a second writes the same rows. An owner still running `derive-account` has it removed when this one is filed, so each row has one writer. An older or forked one is updated in place with `duty_update {"recipe": "options-account@7"}`.
 
 ## What it does
 
@@ -28,6 +28,10 @@ A venue that splits the account (`account.accounts`, Derive's risk universes) ge
 ## The one note
 
 On a venue with `depositsLandLater` (Derive, whose deposit is bridged after its card has closed), a rise in USDC of $1 or more, with positions unchanged for an hour, is a deposit landing: "Your Derive deposit landed: $50.00 USDC credited. The account is worth $55.00 now." The first check never notes one; before the account exists its baseline is $0, so the first deposit is a rise from zero. Paradex's deposit card reports the credit itself, so it gets no note.
+
+## The order guard
+
+Nothing re-prices a resting order. Each check compares every order still resting with its option's mark (`/options/ticker`) and says, once per order, when a sale sits more than 2% under the mark or a buy more than 2% over it and what is left would give away $1 or more: "Your resting Derive order on ETH-20261127-2600-C, to sell 2 at $50.00 each, is now under Derive's own price for it, $56.00: filled there it gives away about $12.00. …" Cancelling is the owner's. Silent for a read that saw no orders, no mark, or a mark over 2 minutes old; 10 orders a check at most. An `options-order-manager` order rests in its own wallet's account, not read here.
 
 ## What it will not do
 

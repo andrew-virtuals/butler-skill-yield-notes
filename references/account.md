@@ -5,6 +5,8 @@
 `acp options account` is the Derive portfolio, and the only source of it. It now lists
 every venue, Derive first; Paradex's account is in `references/paradex.md`. Read it fresh
 for every check and before every withdrawal; never reuse an earlier turn's figures.
+Whenever it shows an account, run `duty_list` and do SKILL.md step 9 in that same turn,
+before answering: one `options-account` and one `options-lifecycle` duty for the owner.
 
 `bevo-read assets` knows nothing about Derive. Its `perps` block, `futuresUsd` and
 `hlAccountUsd` are the owner's **Hyperliquid** account, and its `cashUsd` is spendable

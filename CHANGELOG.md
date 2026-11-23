@@ -1,5 +1,95 @@
 # Changelog
 
+## 2.17.0
+
+- **A buy offer gives today's price and the ceiling as two numbers, and the owner can set
+  the ceiling.** Seen in QA (F6): "You pay at most $2.60 ($1.92 premium + $0.55 fee)",
+  but those add up to $2.47. $2.60 was `max_cost_usd`, today's total plus 5% room for the
+  price moving before the fill. The buy quote now prints `cost_line`: "About $2.47 at
+  today's price ($1.92 premium plus $0.55 in fees). The order allows 5% for the price
+  moving before it fills, so you pay at most $2.60; you can set a different ceiling."
+  `max_loss_usd`, which repeated `total_cost_usd` under a name that read as a second
+  maximum, is gone. `buying.md` § The ceiling: a ceiling the owner names replaces
+  `max_cost_usd` in the yes, funding and `--max-cost`. It gets its own yes before
+  filing, and it is never under `total_cost_usd` or over the budget. `SKILL.md`'s buy
+  command files `<AGREED_CEILING>`. Live-model eval (virtuals-agent `options-ceiling`,
+  0.1 ETH 1800 call on Derive, v4-1-flash, 10 trials a cell, old = this PR's head before
+  the change): the room was said in 2/10 offers before and 10/10 after; "you can set a
+  different ceiling" in 0/10 before and 7/10 after. When the owner named a ceiling, a yes
+  to it came before filing in 8/10 before and 10/10 after. Every trial filed the right
+  `--max-cost`. The false breakdown did not reproduce on the order book in either arm
+  (0/40).
+- **One duty watches every option to expiry.** Files `options-lifecycle@12`, once per owner
+  beside `options-account` (step 9), with nothing to set. It was one duty per option, filed
+  after each fill and deleted after each close; step 7 now files nothing per trade, and a
+  resting order and a part close need no duty work either. It reads what every account
+  holds, a Butler wallet's own included, so a worked order's position is watched like any
+  other. Step 9 deletes the per-option `@11` duties. What a close compares against is the
+  position's `costUsd` from `acp options account`, no longer a duty's `PREMIUM_USD`.
+- **`options-put-delivery` is filed beside it**, no longer instead of it, with its
+  instrument in the lifecycle duty's `EXCEPT` so only one duty reports on that put.
+- **A deposit starts at $11, not $6.** Derive and Paradex refuse a deposit under $10, and
+  one whose bridge could deliver less, so Butler tried $6, then $10, then $11, and guessed
+  what would arrive. Step 4 now starts at $11, files the `deposit at least $N` a refusal
+  names once, and says what arrives only from the card.
+- **A Derive order can be worked for a better price.** New `options-order-manager@1` duty
+  and `references/order-manager.md`, used only when the owner asks ("get me a better price",
+  "work the order"). The duty trades one put sale, buy or close from a wallet of its own,
+  funded by one card: it takes a market maker's quote that saves half the gap between the
+  book and Derive's mark, rests post-only at the mark, gives ground toward the book step by
+  step, and never passes the worst price the owner agreed. It ends with a receipt: the
+  average, the saving against the book, and where each fill came from. Needs
+  `DUTY_WALLET_OPTIONS_ENABLED` on the server.
+- **A worked order chooses on what the owner nets after fees.** A resting fill pays Derive's
+  maker fee and no $0.50 base fee, so on a small order the duty rests rather than take a
+  maker's quote or the book, unless it beats resting by more than the taker fee.
+- **A Derive quote carries the duty's settings.** `worked.params`, `worked.fund_usdc` and
+  `worked.at_mark_saves_usd` on a put sale, a buy, a close and a buy-back, so nothing is
+  worked out in the chat.
+- **A worked order is stopped with `STOP`, never by turning its duty off.** Only the running
+  duty can cancel an order resting from its wallet: the server refuses a chat cancel with
+  `--wallet`.
+- **A resting order the market has passed is said.** Files `options-account@7`: the account
+  duty's check now compares every order still resting in the owner's accounts with its
+  option's mark, and says once per order when a sale sits more than 2% under the mark, or a
+  buy more than 2% over it, and would give away $1 or more. It cancels nothing: the note
+  asks the owner. Step 9 updates an `@6` duty in place.
+- **Butler offers RFQ in three cases.** An owner who has never heard of RFQ cannot ask for
+  it. On Derive or Paradex, Butler now offers it beside the order book, in one line and
+  once per trade, when the order is bigger than the book's best price holds (the "is only
+  N contracts" warning), when the book's price is poor (a `spread` safeguard or a
+  wide-market warning), and when a book order did not fill. The owner still picks:
+  `--order rfq` is filed only on their word. A safeguard still needs its yes and
+  `--waive`. No offer for an order at the quote's `min_size`, and never for an empty book.
+  - `scripts/quote.py` decides the first two: such a quote carries `rfq_offer`, the line
+    for the owner, said as written at the end of the offer. Prose alone did not work: in
+    the live-model eval Butler built its offer from the quote's fields and left the line
+    out. New tests in `tests/test_quote_warnings.py`. The buy and sell reply shapes
+    (`references/buying.md`, `references/selling.md`) give the warnings and `rfq_offer`
+    a place before the closing question, with a worked sentence: a first-time buyer's
+    three questions were crowding the line out.
+  - New section "When Butler brings it up" in `references/rfq.md`; `rfq_offer` in
+    `references/helper.md`, `references/buying.md` and `references/selling.md`; SKILL.md's
+    "No fill" row offers RFQ with the re-quote.
+
+- **Listed is not priced, and an empty book is not a reason for RFQ.** References only.
+  Paradex's stock, index and commodity options often have no bid or ask at any strike or
+  expiry, so their quote says `no live ask` or `no live bid`. Measured on mainnet on
+  2026-11-20, before the US cash open: the helper's source already carries the quotes
+  shown only to retail orders, those options had none either, and a small RFQ on them
+  drew no maker quote while one on ETH drew many. So the quote's reason was true, and
+  nothing in the helper changes.
+  - `references/paradex.md`: a new point under The market says this, has Butler run
+    one more quote, at another expiry, and no third when opening, before saying the
+    asset has no price on Paradex right now, never offer RFQ for it, and never point to
+    another venue that does not list the asset.
+  - `references/listing.md`: a list with stocks, indices or commodities is said with one
+    line that listed is not always priced.
+  - `references/rfq.md`: "Never offered for an empty book". A `no live ask` or
+    `no live bid` quote never brings up RFQ, on either venue. On Paradex, an owner who
+    asks for RFQ on a stock, index or commodity option with no price hears that there is
+    no quote to take the bound from, so nothing can be filed. Derive's RFQ is as it was.
+
 ## 2.16.0
 
 - **A duty that trades options has its money in place before it can trade.** New
