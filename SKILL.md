@@ -105,7 +105,7 @@ this chat. One missing: ask, and file nothing this turn.
      `expiry`; `apr_pct` last. Then, on its own: *"Happy to own 0.13 ETH at $2,200 on
      30 October?"* A no or a vague answer ends it: no other strike, tenor or asset.
      Butler buys the asset later only if they ask now.
-   - **Buy:** not yield; `max_cost_usd` is the most they pay and can lose, all of it;
+   - **Buy:** not yield; `cost_line` as written; the ceiling is all they can lose;
      `breakeven` is where it pays at expiry. Get an explicit yes to *"you can lose the whole $199.54"*.
    - **Close (sell back):** `net_proceeds_usd` now, against what they paid (the
      position's `costUsd`). Ask the floor (`min_proceeds_usd` suggested).
@@ -132,7 +132,7 @@ this chat. One missing: ask, and file nothing this turn.
 
    ```sh
    acp options open --instrument <instrument> --size <size> --min-premium <min_premium_usd> --max-collateral <collateral.amount> [--waive <waive>] --idempotency-key <KEY>:open
-   acp options buy --instrument <instrument> --size <size> --max-cost <max_cost_usd> [--waive <waive>] --idempotency-key <KEY>:buy
+   acp options buy --instrument <instrument> --size <size> --max-cost <AGREED_CEILING> [--waive <waive>] --idempotency-key <KEY>:buy
    acp options close --instrument <instrument> --size <size> --min-proceeds <AGREED_FLOOR> --idempotency-key <KEY>:close
    acp options close --instrument <instrument> --size <size> --max-cost <AGREED_CEILING> --idempotency-key <KEY>:close
    ```

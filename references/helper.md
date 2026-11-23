@@ -143,8 +143,8 @@ it is refused with the strikes it does.
 | `premium_usd` | the ask times the size |
 | `fee_usd` | Derive's taker fee plus the Virtuals platform fee, split as on a sell |
 | `total_cost_usd` | `premium_usd` plus `fee_usd`: what the owner pays at today's ask |
-| `max_loss_usd` | the same number: a bought option can lose all of what it cost, and no more |
-| `max_cost_usd` | about 5% over `total_cost_usd`, rounded up to the cent, never over the budget; passed to `--max-cost`. It is what the owner agrees they can lose |
+| `max_cost_usd` | the ceiling: about 5% over `total_cost_usd`, rounded up to the cent, never over the budget; passed to `--max-cost` unless the owner sets their own. It is what the owner agrees they can lose |
+| `cost_line` | the price as the owner hears it: today's total with its premium and fee, then the ceiling and its room. Said as written |
 | `breakeven` | at expiry: strike plus total cost per contract for a call, minus it for a put |
 | `overpay_vs_fair_vol_pts` | how far the ask sits over Derive's own mark; positive for a buyer |
 | `fair_value_usd` | Derive's mark times the size |

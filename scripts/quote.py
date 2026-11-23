@@ -682,6 +682,18 @@ def strike_for(chain, tickers, opt_type, spot, otm_pct, target_delta, strike=Non
     return min(chain, key=lambda i: abs(num(i["option_details"]["strike"]) - want))
 
 
+def cost_line(premium, fee, total, ceiling):
+    """The buy's price as the owner hears it. The premium and fee add up to today's
+    total, never to the ceiling, which carries the room for the price to move."""
+    room = max(1, int(round((ceiling / total - 1) * 100))) if total > 0 else 0
+    today = ("About $%.2f at today's price ($%.2f premium plus $%.2f in fees). "
+             % (total, premium, fee))
+    if ceiling <= total:
+        return today + "The order allows nothing for the price moving, so it fills only at that or less."
+    return today + ("The order allows %d%% for the price moving before it fills, so you pay "
+                    "at most $%.2f; you can set a different ceiling." % (room, ceiling))
+
+
 def build_buy_quote(product, underlying, budget_usd=None, tenor="monthly",
                     otm_pct=5.0, target_delta=None, want_size=None, on=None, strike=None,
                     waived=()):
@@ -779,8 +791,8 @@ def build_buy_quote(product, underlying, budget_usd=None, tenor="monthly",
         "premium_usd": rnd(gross, 2),
         **fee_fields(venue_fee, ours),
         "total_cost_usd": total_r,
-        "max_loss_usd": total_r,
         "max_cost_usd": max_cost,
+        "cost_line": cost_line(rnd(gross, 2), rnd(fee, 2), total_r, max_cost),
         "breakeven": rnd(strike + per if opt_type == "C" else strike - per, 2),
         "fair_value_usd": rnd(mark * size, 2),
         "overpay_vs_fair_vol_pts": rnd(gap, 2),

@@ -2,6 +2,23 @@
 
 ## 2.17.0
 
+- **A buy offer gives today's price and the ceiling as two numbers, and the owner can set
+  the ceiling.** Seen in QA (F6): "You pay at most $2.60 ($1.92 premium + $0.55 fee)",
+  but those add up to $2.47. $2.60 was `max_cost_usd`, today's total plus 5% room for the
+  price moving before the fill. The buy quote now prints `cost_line`: "About $2.47 at
+  today's price ($1.92 premium plus $0.55 in fees). The order allows 5% for the price
+  moving before it fills, so you pay at most $2.60; you can set a different ceiling."
+  `max_loss_usd`, which repeated `total_cost_usd` under a name that read as a second
+  maximum, is gone. `buying.md` § The ceiling: a ceiling the owner names replaces
+  `max_cost_usd` in the yes, funding and `--max-cost`. It gets its own yes before
+  filing, and it is never under `total_cost_usd` or over the budget. `SKILL.md`'s buy
+  command files `<AGREED_CEILING>`. Live-model eval (virtuals-agent `options-ceiling`,
+  0.1 ETH 1800 call on Derive, v4-1-flash, 10 trials a cell, old = this PR's head before
+  the change): the room was said in 2/10 offers before and 10/10 after; "you can set a
+  different ceiling" in 0/10 before and 7/10 after. When the owner named a ceiling, a yes
+  to it came before filing in 8/10 before and 10/10 after. Every trial filed the right
+  `--max-cost`. The false breakdown did not reproduce on the order book in either arm
+  (0/40).
 - **One duty watches every option to expiry.** Files `options-lifecycle@12`, once per owner
   beside `options-account` (step 9), with nothing to set. It was one duty per option, filed
   after each fill and deleted after each close; step 7 now files nothing per trade, and a
