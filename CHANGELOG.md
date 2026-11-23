@@ -1,5 +1,31 @@
 # Changelog
 
+## 2.17.0
+
+- **One duty watches every option to expiry.** Files `options-lifecycle@12`, once per owner
+  beside `options-account` (step 9), with nothing to set. It was one duty per option, filed
+  after each fill and deleted after each close; step 7 now files nothing per trade, and a
+  resting order and a part close need no duty work either. It reads what every account
+  holds, a Butler wallet's own included, so a worked order's position is watched like any
+  other. Step 9 deletes the per-option `@11` duties. What a close compares against is the
+  position's `costUsd` from `acp options account`, no longer a duty's `PREMIUM_USD`.
+- **`options-put-delivery` is filed beside it**, no longer instead of it, with its
+  instrument in the lifecycle duty's `EXCEPT` so only one duty reports on that put.
+- **A Derive order can be worked for a better price.** New `options-order-manager@1` duty
+  and `references/order-manager.md`, used only when the owner asks ("get me a better price",
+  "work the order"). The duty trades one put sale, buy or close from a wallet of its own,
+  funded by one card: it takes a market maker's quote that saves half the gap between the
+  book and Derive's mark, rests post-only at the mark, gives ground toward the book step by
+  step, and never passes the worst price the owner agreed. It ends with a receipt: the
+  average, the saving against the book, and where each fill came from. Needs
+  `DUTY_WALLET_OPTIONS_ENABLED` on the server.
+- **A Derive quote carries the duty's settings.** `worked.params`, `worked.fund_usdc` and
+  `worked.at_mark_saves_usd` on a put sale, a buy, a close and a buy-back, so nothing is
+  worked out in the chat.
+- **A worked order is stopped with `STOP`, never by turning its duty off.** Only the running
+  duty can cancel an order resting from its wallet: the server refuses a chat cancel with
+  `--wallet`.
+
 ## 2.16.0
 
 - **A duty that trades options has its money in place before it can trade.** New

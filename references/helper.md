@@ -111,6 +111,7 @@ lowest strike, or `null` when the put is that one. Puts only.
 | `bid_depth` | contracts on the best bid; a note bigger than this warns it may fill part-way |
 | `valid_until` | 60 seconds after the read; quote again past it |
 | `waive` | present only when a safeguard was waived; passed to `--waive` |
+| `worked` | Derive only, on a put sale, a buy, a close and a buy-back: the `options-order-manager` duty's settings (`params`), what its wallet starts with (`fund_usdc`) and the most working it could save (`at_mark_saves_usd`). Used only when the owner asks for a better price (`order-manager.md`) |
 
 The spread is the share of the option's value the bid gives up (`1 - bid / mark`):
 over 10% warns, over 20% is the `spread` safeguard, and neither applies when it costs
@@ -174,8 +175,8 @@ cutting a loss may accept a wide market; tell them it is wide.
 
 Prices buying back `--size` contracts of `--instrument`, a note the owner **sold** (a
 negative `size` in `acp options account`), on the ask now. `--premium-received` is
-what they got for it: `netPremiumUsd` from the open's outcome, or the lifecycle duty's
-`PREMIUM_USD`, scaled to the size being bought back.
+what they got for it: `netPremiumUsd` from the open's outcome, or the position's
+`costUsd` in `acp options account`, scaled to the size being bought back.
 
 | Field | Means |
 | --- | --- |

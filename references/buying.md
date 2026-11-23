@@ -113,7 +113,7 @@ more than the position ("sell 5 of my ETH calls" with 0.16 held), say so and ask
 and never pick between two positions for them.
 
 Quote the close with `quote --side close --instrument <name> --size <size>`. Say
-`net_proceeds_usd` against what they paid (the lifecycle duty's `PREMIUM_USD`), plainly
+`net_proceeds_usd` against what they paid (the position's `costUsd`), plainly
 when it is less: "Selling back now gets about $178.73 after fees, against $190.03 you
 paid." Give any `warnings` as written ("fees take 16% of what the bid pays").
 
@@ -127,9 +127,8 @@ never "no liquidity", and re-quote before offering again, never re-filing the sa
 floor. With `no live bid`, nobody is bidding for this option right now: holding it to
 expiry costs nothing, and the lifecycle duty reports the outcome.
 
-A close sells only what they hold (`reduce_only` on the venue). After a confirmed
-close, the lifecycle duty for that instrument is deleted; if part is still held, it is
-filed again for what remains.
+A close sells only what they hold (`reduce_only` on the venue). Nothing is filed or
+deleted after it: the lifecycle duty watches whatever the account still holds.
 
 ## At expiry
 
@@ -138,18 +137,8 @@ the money pays automatically into the Derive account: (settle - strike) x size f
 call, (strike - settle) x size for a put. Nothing has to be done to collect it. It
 stays in the account until withdrawn. One that ends out of the money pays nothing.
 
-The `options-lifecycle@11` duty, filed after a confirmed buy (or when a resting buy is placed, `references/resting.md`), tells the owner the day
-before and again with the outcome. It is filed with:
-
-| Param | From |
-| --- | --- |
-| `INSTRUMENT` | `approvalOutcome.instrument` |
-| `PRODUCT` | `long_call` or `long_put` |
-| `UNDERLYING` | the instrument's prefix |
-| `STRIKE` | `approvalOutcome.strike` |
-| `SIZE` | `approvalOutcome.filledSize` (a fill can be partial) |
-| `PREMIUM_USD` | `approvalOutcome.totalCostUsd` |
-| `COLLATERAL_USD` | 0 |
+The lifecycle duty (SKILL.md step 9) tells the owner the day before and again with the
+outcome, for every option the account holds. Nothing is filed for it per buy.
 
 A bought option pays cash and buys nothing, so it is never `options-put-delivery`.
 

@@ -1,5 +1,27 @@
 # Changelog
 
+## 12
+
+- **One duty watches every option.** It was one duty per option, filed by the skill after
+  each fill with that fill's numbers and deleted after each close. It now takes nothing
+  per option: every run it reads what the accounts hold and watches each position to its
+  heads-up and its outcome, at the size and cost the account shows (`costUsd`). A part
+  close, a resting order's fill and a second option need no refiling, and a close needs
+  no delete: a position gone on two reads in a row is dropped quietly. It never finishes.
+  `VENUE`, `INSTRUMENT`, `PRODUCT`, `UNDERLYING`, `STRIKE`, `SIZE`, `PREMIUM_USD`,
+  `COLLATERAL_USD` and `ORDER_ID` are gone. Supersedes `options-lifecycle@11`: file one
+  `@12` and delete the per-option duties.
+- **Butler wallets' own accounts are watched too.** A duty trading options from its own
+  wallet (`options-order-manager`) holds its positions in that wallet's Derive or Paradex
+  account, which `@11` could not see. Each is found by the Platforms row Butler's server
+  keeps for it and read with `walletId`; its notes name the wallet.
+- **`EXCEPT`** names the options another duty reports on: a put filed as
+  `options-put-delivery`.
+- **Notes name the option, not the duty.** "ETH $2,450 put, 30 Oct: ETH settled at…",
+  since one duty now speaks for many.
+- **Not reported any more:** that a position was closed before expiry (the close's own
+  note says so), and an order that ended unfilled (the server's order watch says so).
+
 ## 11
 
 - **A resting order is watched from the moment it is placed.** bevo-server now takes

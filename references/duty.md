@@ -121,7 +121,8 @@ write only the rule, then run it.
    - `error: …`: nothing was built; fix what it names. Under $10 set aside, its own
      wallet cannot deposit: recommend the main wallet.
 
-It gets no `options-lifecycle` duty: it follows its own trades.
+Nothing is filed to watch what it trades: SKILL.md step 9's `options-lifecycle` duty
+watches every option held, in a duty's own wallet too.
 
 ## The rule
 

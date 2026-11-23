@@ -1,8 +1,8 @@
 ---
 name: options-trading
 description: Trade options on Derive, Paradex or Rysk - earn on idle USDC by selling cash-secured puts, buy a call or a put, close before expiry, and check or withdraw USDC and positions.
-version: 2.16.0
-metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","withdraw","withdraw my usdc","derive","my options","options account","options positions","free usdc","derive positions","my option positions","withdraw from derive","withdraw my free usdc","paradex","paradex options","paradex positions","rysk","rysk options","rysk positions","physically settled","hyperevm","limit order","resting order","at my price","or better","leave it on the book","cancel my order","options duty","automate options","options strategy"],"requires":{"bins":["python3","bevo-read","acp"]}}}
+version: 2.17.0
+metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","withdraw","withdraw my usdc","derive","my options","options account","options positions","free usdc","derive positions","my option positions","withdraw from derive","withdraw my free usdc","paradex","paradex options","paradex positions","rysk","rysk options","rysk positions","physically settled","hyperevm","limit order","resting order","at my price","or better","leave it on the book","cancel my order","options duty","automate options","options strategy","better price","work the order"],"requires":{"bins":["python3","bevo-read","acp","bevo-wallet"]}}}
 ---
 
 ## When to use
@@ -19,8 +19,9 @@ Your owner wants, on Derive, Paradex or Rysk options:
   **sold**.
 - **At their price** - "or better", "cancel my order": `resting.md`.
 - **Later** - on a condition, time or schedule: a duty.
+- **A better price, given time** - "work the order": `order-manager.md`.
 - **Look or withdraw** - "my free USDC in Derive" (`freeForNewPutsUsd`, not wallet
-  cash), "my positions": step 1, then stop. "Withdraw my free USDC": step 8, never an
+  cash), "my positions": steps 1 and 9, then stop. "Withdraw my free USDC": step 8, never an
   `acp trade` (`account.md`). Listing: `listing.md`.
 
 Not this skill: covered calls, spreads or leverage.
@@ -69,8 +70,11 @@ this chat. One missing: ask, and file nothing this turn.
    ```
 
    `signerReady: false` - stop: the owner must enable Butler's signer first. Fields:
-   `account.md`. An unreadable account is not an empty one. On
-   `exists: true` on any venue, step 9.
+   `account.md`. An unreadable account is not an empty one.
+
+   **Then, every time a venue shows `exists: true`, call the `duty_list` tool and do
+   step 9 before you answer, whatever was asked.** Without it nobody tells the owner
+   when an option expires.
 
 2. [FIXED] Run the helper in place; never write, copy or edit a script, or trim its
    output. Missing: say so, and stop. Quote with the line for the intent
@@ -89,7 +93,7 @@ this chat. One missing: ask, and file nothing this turn.
    screen or chain till then. Buying: `<PRODUCT>` is `call` or `put`,
    `--budget` the most they will spend. Closing: instrument and size from `positions`;
    positive is `--side close`; negative, `--side buyback` with the size positive and
-   `--premium-received` the note's `netPremiumUsd` (or its duty's PREMIUM_USD) scaled
+   `--premium-received` the position's `costUsd` scaled
    to it. `reasons`: a venue limit, give them as written. `waivable: true`: a
    safeguard (`helper.md` § Safeguards). A strike or
    day they named: `buying.md`.
@@ -103,8 +107,8 @@ this chat. One missing: ask, and file nothing this turn.
      Butler buys the asset later only if they ask now.
    - **Buy:** not yield; `max_cost_usd` is the most they pay and can lose, all of it;
      `breakeven` is where it pays at expiry. Get an explicit yes to *"you can lose the whole $199.54"*.
-   - **Close (sell back):** `net_proceeds_usd` now, against what they paid (the duty's
-     PREMIUM_USD). Ask the floor (`min_proceeds_usd` suggested).
+   - **Close (sell back):** `net_proceeds_usd` now, against what they paid (the
+     position's `costUsd`). Ask the floor (`min_proceeds_usd` suggested).
    - **Close (buy back):** `total_cost_usd` now, then `result_usd` (what the note made
      or lost); it frees `frees`. Ask the ceiling (`max_cost_usd`
      suggested). Waiting costs nothing: say so when `result_usd` is negative.
@@ -150,22 +154,9 @@ this chat. One missing: ask, and file nothing this turn.
    `failed` or `rejected` - nothing traded; give `approvalFailureReason` as written.
    `pending` or `signed` - still waiting.
 
-7. [FIXED] Only on `confirmed`, keep the lifecycle duty in step, numbers from
-   `approvalOutcome`, never the quote. After an open or a buy, `duty_create`:
-
-   ```json
-   {"recipe": "options-lifecycle@11", "movesFunds": false, "title": "Watch {INSTRUMENT} to expiry",
-    "triggers": [{"kind": "timer", "intervalSeconds": 900}],
-    "params": {"VENUE": "<venue>", "INSTRUMENT": "<instrument>", "PRODUCT": "<product>", "UNDERLYING": "<instrument prefix>",
-    "STRIKE": <strike>, "SIZE": <filledSize>, "PREMIUM_USD": <usd>, "COLLATERAL_USD": <usd>}}
-   ```
-
-   Sold put: PRODUCT `cash_secured_put`, PREMIUM_USD `netPremiumUsd`, COLLATERAL_USD
-   `collateral`. Bought: PRODUCT `long_call` or `long_put`, PREMIUM_USD `totalCostUsd`,
-   COLLATERAL_USD 0. Resting: `resting.md`. Asked in step 3 to own the asset: `options-put-delivery@1`
-   (`selling.md`). After a close, `duty_delete` that instrument's duty. Never file for
-   an unknown or failed trade. Part still open, or a second duty in one chat:
-   `lifecycle.md`.
+7. [FIXED] On `confirmed`, do step 9 again: its lifecycle duty is what watches this
+   option, and a close needs no delete. Only if they asked in step 3 to own the asset:
+   `options-put-delivery@1` (`selling.md`). Never file for an unknown or failed trade.
 
 8. [FIXED] Withdraw only when asked, only free USDC: at most this turn's
    `freeForNewPutsUsd`, rounded down to the cent. It lands on Ethereum in its card's
@@ -177,15 +168,23 @@ this chat. One missing: ask, and file nothing this turn.
    acp trade --token-in usdc --chain-in 1 --amount-in <USDC_ARRIVED> --token-out usdc --chain-out 8453 --idempotency-key <KEY>:home
    ```
 
-9. [FIXED] Once any venue has an account, unasked: with no `options-account` duty,
-   file it and delete any `derive-account` one; an older one or a fork,
-   `duty_update` to this recipe.
+9. [FIXED] Whenever step 1 shows an account on any venue, unasked, in that same turn
+   before you answer: `duty_list`, then `duty_show` each for its `recipe`. Go by
+   `recipe` alone, never a title. The owner needs exactly one of each:
 
    ```json
    {"recipe": "options-account@6", "title": "Options accounts", "triggers": [{"kind": "timer", "intervalSeconds": 600}]}
+   {"recipe": "options-lifecycle@12", "movesFunds": false, "title": "Options to expiry", "triggers": [{"kind": "timer", "intervalSeconds": 900}]}
    ```
 
-   It alone writes Platforms rows; never `bevo-platforms set`.
+   - Missing, or the list is empty: file it now. Neither takes `params`; one covers
+     every option.
+   - An older `options-account` or a fork: `duty_update` to this recipe.
+   - `duty_delete` only these: `derive-account`, every `options-lifecycle@11` or older
+     (one per option), and a second `options-lifecycle@12`. Nothing else, and never an
+     `options-put-delivery`.
+
+   `options-account` alone writes Platforms rows; never `bevo-platforms set`.
 
 ## Idempotency and retries
 

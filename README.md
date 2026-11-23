@@ -6,8 +6,8 @@ selling cash-secured puts, buying calls and puts, and closing them on **Derive**
 people maintaining the repo. A butler receives `SKILL.md`, `references/**/*.md` and
 `scripts/**/*.py`; the registry also serves the duty templates under `templates/`.
 
-- **Version:** 2.15.1 (`SKILL.md`), with `options-lifecycle` 11, `options-put-delivery` 1
-  and `options-account` 6.
+- **Version:** 2.17.0 (`SKILL.md`), with `options-lifecycle` 12, `options-put-delivery` 1,
+  `options-account` 6 and `options-order-manager` 1.
   What changed in each release: `CHANGELOG.md`.
 - **Registry name:** `options-trading`, listed in the hub's `skills.json` from this repo.
   The skill was `yield-notes` before 2.0.0, which is why the repository still has that
@@ -46,8 +46,7 @@ An open is quoted on every venue that offers it unless the owner names one, and 
 side by side with what the quotes do not say (cash or physical settlement, getting out
 early, funding), never ranked (`references/which-venue.md`). A close or withdrawal runs
 where the position or USDC is. Every helper and `acp options` line for a trade then
-carries `--venue paradex` or `--venue rysk`, as does its lifecycle duty's `VENUE`
-setting.
+carries `--venue paradex` or `--venue rysk`.
 
 ## How the pieces fit
 
@@ -59,10 +58,11 @@ setting.
 | Trading | `acp options open`, `buy`, `close` | One approval card each. After approval the order is an immediate-or-cancel limit order, inside the bound on the card (`--min-premium`, `--max-cost`, `--min-proceeds`). Rysk's card is good for 5 minutes and is re-quoted against its floor. With `--order gtc` or `post-only` (Derive and Paradex) it is instead a resting order at the owner's price per contract, and `acp options cancel` files a card to take it off the book (`references/resting.md`). With `--order rfq` (Derive and Paradex, when the owner asks) the run asks the market makers for up to 20 seconds and takes the best quote inside the same bound (`references/rfq.md`). |
 | Outcome | `bevo-read request <key> --route options` | `approvalStatus`, then `approvalOutcome` (the fill) or `approvalFailureReason`. |
 | Withdrawing | `acp options withdraw` | One approval card. A Derive withdrawal also takes an `acp trade` home to Base. |
-| Watching to expiry | the `options-lifecycle@11` duty, `templates/options-lifecycle/` | Filed after a confirmed open or buy, from the fill, or when a resting order is placed (`ORDER_ID`), which it waits on until it fills. Sends a heads-up the day before expiry and the outcome once the option settles. Runs no command, so it is filed with `movesFunds: false` and no pocket. Deleted after a confirmed close. |
-| Owning the asset after an assigned put | the `options-put-delivery@1` duty, `templates/options-put-delivery/` | Filed instead of `options-lifecycle`, for a sold Derive or Paradex put, only when the owner asked before the open to end up owning the asset. Watches the same way, then buys the asset with `acp trade` if the put is assigned. The only options duty with a pocket. |
+| Watching to expiry | the `options-lifecycle@12` duty, `templates/options-lifecycle/` | One per owner, filed unasked once any venue account exists, with nothing to set. Watches every option held, sold or bought, in the main wallet's accounts and in every Butler wallet's own: a heads-up the day before expiry and the outcome once it settles, at the size and cost the account shows. Nothing is filed per trade or deleted after a close. Runs no command, so it is filed with `movesFunds: false` and no pocket. |
+| Owning the asset after an assigned put | the `options-put-delivery@1` duty, `templates/options-put-delivery/` | Filed for a sold Derive or Paradex put, only when the owner asked before the open to end up owning the asset; its instrument goes in the lifecycle duty's `EXCEPT` so only one duty reports on it. Watches that put, then buys the asset with `acp trade` if it is assigned. The only options duty with a pocket. |
 | A duty that trades | the owner's own duty code, `references/duty.md` | Butler's first reply recommends the duty's own wallet (hands-free, one funding card, copyable) or the main wallet (one Start card for the amount set aside, then no card per trade it covers) with a reason, asks how much to set aside in total, and which venue. `scripts/make_duty.py` builds it from `scripts/duty_program.py` and Butler's rule (`trigger()`, `order()`), so the program is never retyped: the money is on the venue before the trigger is watched, never deposited when it fires; it tells the owner when it is ready, when it fires and how each order ended, and when its balance is short of the next trade. |
 | Platforms rows | the `options-account@6` duty, `templates/options-account/` | One per owner, filed unasked once any venue account exists. The only writer of the options rows on the wallet's Platforms tab: one row per venue, and one per Derive subaccount, each at the venue's own worth with its positions and resting orders listed. |
+| Working an order for a better price | the `options-order-manager@1` duty, `templates/options-order-manager/` | Filed only when the owner asks for a better price than the book (`references/order-manager.md`), from a Derive quote's `worked` block. Trades one Derive order hands-free from the duty's own wallet, funded by one card: it takes a maker who saves half the gap between the book and Derive's mark, rests post-only at the mark, and gives ground toward the book each step, never past the agreed worst price, then sends a receipt against the fill-now price and finishes; the lifecycle duty watches what it holds. Stopped with its `STOP` setting, never by turning it off: only the running duty can cancel its wallet's resting order. |
 
 ## Safety model
 
@@ -192,8 +192,10 @@ python3 validate.py --standalone .
 python3 validate.py --standalone templates/options-lifecycle
 python3 validate.py --standalone templates/options-put-delivery
 python3 validate.py --standalone templates/options-account
+python3 validate.py --standalone templates/options-order-manager
 python3 -m unittest discover -s templates/options-lifecycle/tests
 python3 -m unittest discover -s templates/options-put-delivery/tests
+python3 -m unittest discover -s templates/options-order-manager/tests
 python3 -m unittest discover -s templates/options-account/tests
 ```
 
@@ -209,11 +211,12 @@ CI runs the same. Two limits to keep in mind:
 `templates/` holds the duties this skill files, each a complete template (`recipe.json`,
 `duty.py`, `README.md`, `CHANGELOG.md`, `tests/`):
 
-- **`options-lifecycle`:** one per option, from the fill to the outcome, on any of the
-  three venues. A Rysk put's outcome is what Rysk paid out. A Paradex option's expiry is
-  the one the venue states, since a stock or index option expires at its market's close.
-  It only reports and runs no command, so it never asks for a pocket. It supersedes
-  `@1`–`@9`.
+- **`options-lifecycle`:** one per owner, watching every option the accounts hold, on
+  any of the three venues and in every Butler wallet's own account (found by the
+  Platforms row Butler's server keeps for it). A Rysk put's outcome is what Rysk paid
+  out. An option's expiry is the one its account row states, since a Paradex stock or
+  index option expires at its market's close. It only reports and runs no command, so
+  it never asks for a pocket. `@12` supersedes the per-option `@1`–`@11`.
 - **`options-put-delivery`:** one per sold Derive or Paradex put whose owner asked to end
   up owning the asset. The lifecycle watch plus the delivery buy, which `options-lifecycle`
   carried as `DELIVER_ASSET` until `@9`. Kept a separate template because Butler marks a
@@ -236,8 +239,8 @@ and `SKILL.md` updated to file the new version.
    whose code changed, as above.
 2. Merge to `main` and tag `vX.Y.Z`. A published `name@version` is immutable.
 3. In `butler-skills`, point `skills.json` (`options-trading`) and `templates.json`
-   (`options-lifecycle`, `options-put-delivery`, `options-account`, each with its
-   `path`) at the new tag.
+   (`options-lifecycle`, `options-put-delivery`, `options-account`,
+   `options-order-manager`, each with its `path`) at the new tag.
 
 When a release depends on a change in Butler's server (a new `acp options` field or
 venue behaviour), ship the server change first, or make the skill and duties fall back
@@ -255,15 +258,16 @@ references/
   selling.md, buying.md     what to say and ask for each kind of trade
   resting.md                a resting order at the owner's price, and cancelling it
   rfq.md                    an RFQ to the market makers, when the owner asks for one
-  lifecycle.md              the lifecycle duty after a partial close, and a second duty in one chat
   duty.md                   a duty whose own code trades: its money first, its notes, topping it up
+  order-manager.md          a Derive order worked for a better price by the order-manager duty
   account.md                the account read, subaccounts, withdrawals
   venue.md                  Derive's facts: fees, sizes, spreads, settlement
   paradex.md, rysk.md       what differs on each of those venues
 scripts/                    the helpers, run in place: quote.py, rysk.py, options_list.py
                             duty_program.py, the program of a duty that trades, and make_duty.py, which builds one
 templates/
-  options-lifecycle/        watch one option to its outcome
-  options-put-delivery/     the same for a sold put, buying the asset if assigned
+  options-lifecycle/        watch every option held to its outcome
+  options-put-delivery/     watch one sold put, buying the asset if assigned
   options-account/          the owner's Platforms rows
+  options-order-manager/    work one Derive order for a better price
 ```

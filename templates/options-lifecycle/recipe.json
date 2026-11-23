@@ -1,24 +1,23 @@
 {
   "id": "options-lifecycle",
-  "version": 11,
-  "description": "Watch one Derive, Paradex or Rysk option to expiry, sold or bought, or a resting order from the moment it is placed: a heads-up the day before and the outcome once it settles. It only reports.",
+  "version": 12,
+  "description": "Watch every option the owner holds, on Derive, Paradex and Rysk and in every wallet, to expiry: a heads-up the day before and the outcome once it settles. One per owner; it only reports.",
   "keywords": [
     "assigned",
     "bought option",
+    "butler wallet",
     "call option",
     "cash secured put",
     "covered call",
     "derive",
     "expiry",
-    "gtc",
-    "limit order",
+    "heads-up",
     "long call",
     "long put",
     "option",
     "paradex",
+    "positions",
     "put option",
-    "resting order",
-    "roll",
     "rysk",
     "settlement",
     "yield note"
@@ -36,100 +35,38 @@
     "options-lifecycle@7",
     "options-lifecycle@8",
     "options-lifecycle@9",
-    "options-lifecycle@10"
+    "options-lifecycle@10",
+    "options-lifecycle@11"
   ],
   "params": {
     "type": "object",
     "additionalProperties": false,
-    "required": [
-      "INSTRUMENT",
-      "PRODUCT",
-      "UNDERLYING",
-      "STRIKE",
-      "SIZE",
-      "PREMIUM_USD"
-    ],
+    "required": [],
     "properties": {
-      "VENUE": {
-        "type": "string",
-        "enum": [
-          "derive",
-          "paradex",
-          "rysk"
-        ],
-        "default": "derive",
-        "description": "The venue the option trades on: derive (the default), paradex or rysk. Every options read the duty makes names it. On rysk only a sold put (cash_secured_put) is watched."
-      },
-      "INSTRUMENT": {
-        "type": "string",
-        "description": "The venue's own name for the option, exactly as it was filled: ETH-20261030-2450-P on Derive, ETH-USD-30OCT26-2450-P on Paradex, ETH-30OCT26-2450-P on Rysk. The expiry and strike are read back out of this, so it must match the fill.",
-        "minLength": 8,
-        "maxLength": 64
-      },
-      "PRODUCT": {
-        "type": "string",
-        "enum": [
-          "cash_secured_put",
-          "covered_call",
-          "long_call",
-          "long_put"
-        ],
-        "description": "cash_secured_put or covered_call for a note the owner SOLD (income); long_call or long_put for an option they BOUGHT. Must match the P/C in INSTRUMENT."
-      },
-      "UNDERLYING": {
-        "type": "string",
-        "description": "The asset ticker, the prefix of INSTRUMENT: ETH, BTC, SOL, HYPE or any other currency the venue lists options on. Used for the settlement read on Derive.",
-        "minLength": 2,
-        "maxLength": 12
-      },
-      "STRIKE": {
-        "type": "number",
-        "description": "The price the owner agreed to buy at (put) or sell at (call).",
-        "minimum": 1e-08
-      },
-      "SIZE": {
-        "type": "number",
-        "description": "Contracts sold or bought, in units of the underlying. For a resting order, the whole order: what is held replaces it from the first fill.",
-        "minimum": 1e-08
-      },
-      "PREMIUM_USD": {
-        "type": "number",
-        "minimum": 0,
-        "description": "For a sold note, what the owner kept at open, net of the venue's fee. For a bought option, the total it cost including the fee (the open's totalCostUsd). Quoted back at expiry."
-      },
-      "COLLATERAL_USD": {
-        "type": "number",
-        "minimum": 0,
-        "default": 0,
-        "description": "USDC locked behind a sold put, as the open reported it. 0 for a covered call and for any bought option."
-      },
       "HEADS_UP_HOURS": {
         "type": "number",
         "minimum": 1,
         "maximum": 168,
         "default": 24,
-        "description": "How long before expiry to send the heads-up. Sent once."
+        "description": "How long before an option's expiry its heads-up is sent. Sent once per option."
       },
-      "ORDER_ID": {
-        "type": "string",
-        "maxLength": 80,
-        "default": "",
-        "description": "Only for a resting order (GTC or post-only), filed the moment it is placed: approvalOutcome.order.orderId. The duty waits while the order rests with nothing filled, then watches the size the account holds at what it cost, and finishes quietly if the order ends with nothing filled. SIZE and PREMIUM_USD are then the whole order at its own price; the account's figures replace them from the first fill. Empty for a fill."
+      "EXCEPT": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 64
+        },
+        "default": [],
+        "description": "The venue's names of options another duty reports on, which this one leaves alone: a sold put filed as options-put-delivery. A name no account holds is ignored."
       }
     }
   },
   "status": {
     "starting": "First check {next}",
-    "days": "Settles in {days} days · next check {next}",
-    "hours": "Settles in {hours} hours · next check {next}",
-    "unseen": "Position not found · next check {next}",
-    "settling": "Waiting for settlement · next check {next}",
-    "closed": "Closed before expiry",
-    "paused": "Paused: the settings need fixing",
-    "done": "Settled at ${price}",
-    "soon": "Settles within 2 hours · next check {next}",
-    "paid": "Settled",
-    "waiting": "Order waiting to fill · next check {next}",
-    "unfilled": "Order ended unfilled"
+    "watching": "{count} open · first {when} · check {next}",
+    "settling": "{count} expired, no price yet · check {next}",
+    "none": "No options held · next check {next}",
+    "unreadable": "Couldn't read the accounts · retry {next}"
   }
 }

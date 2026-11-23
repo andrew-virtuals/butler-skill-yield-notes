@@ -104,6 +104,18 @@ class PlatformFeeTest(unittest.TestCase):
         self.assertEqual(back["total_cost_usd"], 51.35)  # 50 + 1.10 + 0.25
         self.assertEqual(back["result_usd"], 8.65)
 
+    def test_a_derive_quote_carries_the_order_managers_settings(self):
+        buy, _ = self.quote({"platformFeeRate": 0}, "--side", "buy", "--product", "call", "--underlying", "ETH",
+                            "--size", "1", "--strike", "1900")
+        self.assertEqual(buy["worked"], {
+            "params": {"INSTRUMENT": ETH_CALL, "ACTION": "buy", "SIZE": 1.0, "WORST_PRICE": 50.0,
+                       "FEE_USD": 1.1, "SIZE_STEP": 0.01, "MIN_SIZE": 0.01, "TICK_SIZE": 0.1},
+            "fund_usdc": 53, "at_mark_saves_usd": 1.0})
+        back, _ = self.quote({"platformFeeRate": 0}, *CLOSE[1:])
+        self.assertEqual((back["worked"]["params"]["ACTION"], back["worked"]["params"]["WORST_PRICE"],
+                          back["worked"]["fund_usdc"], back["worked"]["at_mark_saves_usd"]),
+                         ("close", 48.0, 0, 1.0))
+
     def test_the_parts_add_up_to_the_fee(self):
         h = helper(account()[0])
         h.PLATFORM["rate"] = 0.005

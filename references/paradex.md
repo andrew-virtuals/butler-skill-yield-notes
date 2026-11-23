@@ -10,7 +10,7 @@ another on your own.
 ## Every command names it
 
 Add `--venue paradex` to every helper line and every `acp options` line of `SKILL.md`
-for that trade, and `"VENUE": "paradex"` to its lifecycle duty's `params`. A quote's
+for that trade (and `"VENUE": "paradex"` to an `options-put-delivery` duty's `params`). A quote's
 `venue` says which venue priced it: file the command on that one. A helper quote on
 Paradex, for example:
 

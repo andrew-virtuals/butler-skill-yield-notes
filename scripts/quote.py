@@ -464,6 +464,31 @@ def check_fees(q, drag):
                              "keeps more of it" % pct(drag))
 
 
+#: The least an order manager's wallet is funded with: under $10 Derive takes no deposit,
+#: and the bridge's fee comes out of what is sent.
+WORKED_MIN_FUND_USD = 12
+
+
+def worked(action, name, inst, size, price, fee, mark, need_usd=0.0):
+    """Derive only: what the options-order-manager duty takes to work this trade for a
+    better price than `price`, the book's now. `params` are its settings as they are,
+    `fund_usdc` what its own wallet starts with (0: it trades what that wallet's account
+    already holds), `at_mark_saves_usd` the most it could save, a fill at Derive's mark."""
+    if V["id"] != "derive" or price <= 0:
+        return {}
+    selling = action == "open" or (action == "close" and need_usd < 0)
+    saves = (mark - price if selling else price - mark) * size if mark > 0 else 0.0
+    fund = max(int(math.ceil(need_usd * 1.02)), WORKED_MIN_FUND_USD) if need_usd > 0 else 0
+    return {"worked": {
+        "params": {"INSTRUMENT": name, "ACTION": action, "SIZE": size, "WORST_PRICE": price,
+                   "FEE_USD": rnd(fee, 2), "SIZE_STEP": num(inst.get("amount_step")),
+                   "MIN_SIZE": num(inst.get("minimum_amount")),
+                   "TICK_SIZE": num(inst.get("tick_size")) or 0.1},
+        "fund_usdc": fund,
+        "at_mark_saves_usd": rnd(max(saves, 0.0), 2),
+    }}
+
+
 def settle(q, waived):
     """Tradeable once nothing the venue refuses is left and every safeguard is
     waived. `waive` is what the open or buy passes on to `--waive`."""
@@ -567,6 +592,8 @@ def build_quote(product, underlying, collateral_usd, tenor="monthly",
         "breakeven": rnd(strike - bid if opt_type == "P" else strike + bid, 2),
         "valid_until": iso(now + QUOTE_TTL_SEC),
     })
+    if opt_type == "P":
+        q.update(worked("open", inst["instrument_name"], inst, size, bid, fee, mark, strike * size))
     if dte > 0 and locked_usd > 0:
         q["apr_pct"] = rnd(net / locked_usd * (365 / dte) * 100, 2)
     if opt_type == "P":
@@ -743,6 +770,7 @@ def build_buy_quote(product, underlying, budget_usd=None, tenor="monthly",
         "mark_iv_pct": rnd(mark_iv * 100, 2),
         "valid_until": iso(now + QUOTE_TTL_SEC),
     })
+    q.update(worked("buy", inst["instrument_name"], inst, size, ask, fee, mark, gross + fee))
 
     if ask_sz < size:
         q["warnings"].append(
@@ -848,6 +876,7 @@ def build_close_quote(instrument, size):
         "edge_vs_fair_vol_pts": rnd(-gap, 2),
         "valid_until": iso(now + QUOTE_TTL_SEC),
     })
+    q.update(worked("close", name, inst, size, bid, fee, mark, -1.0))
     if bid_sz < size:
         q["warnings"].append(
             "the best bid is only %s contracts and this close is %s - it may fill "
@@ -915,6 +944,7 @@ def build_buyback_quote(instrument, size, premium_received=None):
         "overpay_vs_fair_vol_pts": rnd(gap, 2),
         "valid_until": iso(now + QUOTE_TTL_SEC),
     })
+    q.update(worked("close", name, inst, size, ask, fee, mark))
     if premium_received is not None:
         q["premium_received_usd"] = rnd(premium_received, 2)
         q["result_usd"] = rnd(premium_received - total, 2)

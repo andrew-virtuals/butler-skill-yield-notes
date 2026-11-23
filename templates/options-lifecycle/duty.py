@@ -1,41 +1,40 @@
-"""Watch one yield note from open to outcome, and say what happened.
+"""Watch every option the owner holds, on every venue and in every wallet, to its outcome.
 
-A note is one option the owner sold on Derive, Paradex or Rysk (VENUE), fully
-collateralised; a bought option is one they paid a premium for. The options-trading skill opens either
-and files this duty with the fill's own numbers.
-Two moments matter and the owner should never have to ask about either:
+One duty per owner, with nothing to set. It reads what the accounts hold, so it needs no
+filing per trade: an option bought or sold from the chat, a resting order once it fills,
+and a position a duty opened from a wallet of its own are all watched the same way. Two
+moments matter and the owner should never have to ask about either:
 
-    the day before   where the asset is, and which way the note is leaning
-    settlement       what they kept, or what they agreed to buy or sell
+    the day before   where the asset is, and which way the option is leaning
+    settlement       what it paid or cost, or what they agreed to buy or sell
 
-It only watches and reports: it runs no command, so it files as a duty that
-moves no money and gets no pocket. A sold put whose owner asked to end up
-owning the asset is filed as `options-put-delivery` instead, which buys it.
+It only watches and reports: it runs no command, so it is filed as a duty that moves no
+money and gets no pocket.
 
-A duty has no network of its own, so both prices come through the options
-rail: the heads-up reads Derive's own index for this option
-(`bevo.read("/options/ticker")`), the price it will settle against, and the
-settlement comes from `bevo.read("/options/settlement")`. That works for every
-currency Derive lists options on.
+Where it looks, every run:
 
-Derive and Paradex settle options in **cash**. An in-the-money put reduces
-USDC; it does not hand over ETH. So the duty never says "you now own 2.04 ETH":
-it says the owner is holding the loss in cash, because that is what has happened.
+    the main wallet   `bevo.read("/options/account")`: every venue's account at once
+    a Butler wallet   each "<platform> · <duty>" Platforms row Butler's server keeps
+                      (`serverKept`) is one wallet's own Derive or Paradex account; it is
+                      read with that wallet's id (`walletId`) and that venue
 
-Rysk settles **physically**: an assigned put delivers the asset to the owner's
-HyperEVM wallet, so there is no delivery buy. Near the strike the maker holding
-the option chooses whether to exercise it, so the outcome is what Rysk paid out
+What it remembers of a position is what the account said last: its size, and what it cost
+or brought in (`costUsd`, fees included). A position gone before expiry on two reads in a
+row was closed, and is dropped without a word: the close had its own note. At expiry the
+venue takes the position out of the account, so the outcome is told from what was last
+seen. An account that cannot be read changes nothing.
+
+Both prices come through the options rail: the heads-up reads the venue's own index for
+the option (`/options/ticker`), the price it settles against, and the outcome reads
+`/options/settlement`. Derive and Paradex settle in **cash**: an assigned put reduces
+USDC and hands over no asset, and the duty says so. Rysk settles **physically**, and near
+the strike its maker chooses whether to exercise, so a Rysk outcome is what Rysk paid out
 (the account read's `settled`), never inferred from the price.
 
-A resting order (GTC or post-only, bevo-server docs/options-venues.md §
-Resting orders) is filed with ORDER_ID the moment it is placed, before anything
-has filled. Until it fills the duty only waits; from its first fill it watches
-the size the account actually holds, priced at what the account says it cost,
-so a part-fill is watched as what it is. An order that ends with nothing filled
-finishes the duty quietly: there is nothing to watch.
+A sold put filed as `options-put-delivery` is that duty's to report: its name goes in
+EXCEPT, and this duty leaves it alone.
 
-Settings: VENUE, INSTRUMENT, PRODUCT, UNDERLYING, STRIKE, SIZE,
-PREMIUM_USD, COLLATERAL_USD, HEADS_UP_HOURS, ORDER_ID.
+Settings: HEADS_UP_HOURS, EXCEPT.
 """
 
 import bevo
@@ -47,35 +46,26 @@ import time
 
 PARAMS = json.loads(os.environ.get("PARAMS", "{}"))
 
-VENUE = str(PARAMS.get("VENUE") or "derive").strip().lower()
-VENUE_NAME = {"derive": "Derive", "paradex": "Paradex", "rysk": "Rysk"}.get(VENUE, VENUE)
-#: Every options read names the venue, except Derive's: a Derive duty reads exactly
-#: what it read before venues existed.
-VENUE_QUERY = {} if VENUE == "derive" else {"venue": VENUE}
-INSTRUMENT = str(PARAMS.get("INSTRUMENT") or "").strip().upper()
-PRODUCT = str(PARAMS.get("PRODUCT") or "").strip()
-UNDERLYING = str(PARAMS.get("UNDERLYING") or "").strip().upper()
-STRIKE = float(PARAMS.get("STRIKE") or 0)
-SIZE = float(PARAMS.get("SIZE") or 0)
-PREMIUM_USD = float(PARAMS.get("PREMIUM_USD") or 0)
-COLLATERAL_USD = float(PARAMS.get("COLLATERAL_USD") or 0)
-HEADS_UP_HOURS = float(PARAMS.get("HEADS_UP_HOURS") or 24)
-#: A resting order's id, as `approvalOutcome.order.orderId` gave it; empty for a fill.
-ORDER_ID = str(PARAMS.get("ORDER_ID") or "").strip()
-#: What the skill filed for a resting order: the whole order, at its own price.
-ORDER_SIZE, ORDER_PREMIUM_USD = SIZE, PREMIUM_USD
+HEADS_UP_SECONDS = float(PARAMS.get("HEADS_UP_HOURS") or 24) * 3600
+EXCEPT = {str(name).strip().upper() for name in PARAMS.get("EXCEPT") or []}
 
-NAME = os.environ.get("BEVO_SERVICE_NAME") or "your note"
+VENUE_NAMES = {"derive": "Derive", "paradex": "Paradex", "rysk": "Rysk"}
+#: The venues a Butler wallet holds an account of its own on.
+WALLET_VENUES = ("derive", "paradex")
 
-#: Settlement is published shortly after expiry, not at the stroke of it. Below this the duty waits quietly rather than reporting a
-#: missing price as a problem.
+#: Settlement is published shortly after expiry, not at the stroke of it. Below this the
+#: duty waits quietly rather than reporting a missing price as a problem.
 SETTLE_GRACE_SECONDS = 20 * 60
-
-#: Past this with still no price, say so out loud: a settlement that never
-#: lands is an incident, not a delay.
+#: Past this with still no price, say so out loud, once.
 SETTLE_ALARM_SECONDS = 6 * 3600
+#: A position missing on this many reads in a row, before expiry, was closed.
+GONE_READS = 2
 
-PROBLEM = ""
+NAME_FORMS = {
+    "derive": (re.compile(r"^([A-Z0-9]+)-(\d{8})-([0-9_]+)-([PC])$"), "%Y%m%d"),
+    "paradex": (re.compile(r"^([A-Z0-9]+)-USD-(\d{1,2}[A-Z]{3}\d{2})-([0-9_]+)-([PC])$"), "%d%b%y"),
+    "rysk": (re.compile(r"^([A-Z0-9]+)-(\d{1,2}[A-Z]{3}\d{2})-(\d+(?:\.\d+)?)-([PC])$"), "%d%b%y"),
+}
 
 
 def say(text):
@@ -97,517 +87,336 @@ def price(number):
     return "$%s" % format(round(n, 2 if n < 100 else 0), ",.2f" if n < 100 else ",.0f")
 
 
-def parse_instrument(name):
-    """Pull expiry and option type back out of ETH-20261030-2450-P (Derive),
-    ETH-USD-30OCT26-2450-P (Paradex) or ETH-30OCT26-2450-P (Rysk).
+def parse_name(venue, name):
+    """(underlying, expiry, strike, kind) from the venue's own name, or None.
 
-    Derive and Paradex write a decimal strike with an underscore
-    (ADA-...-0_25-P), Rysk with a point (HYPE-6NOV26-56.5-P), so the strike is
-    parsed but never trusted over the STRIKE setting. The name gives the day at
-    08:00 UTC, when every Derive, Rysk and Paradex crypto option expires; a
-    Paradex stock, index or commodity option expires later that day, which
-    `stated_expiry()` reads.
+    Only a fallback: the account's row states each of them. The name gives the day at
+    08:00 UTC, when every Derive, Rysk and Paradex crypto option expires; a Paradex
+    stock, index or commodity option expires later that day, which the row's own
+    `expirySec` says.
     """
-    if VENUE == "rysk":
-        m = re.match(r"^([A-Z0-9]+)-(\d{1,2}[A-Z]{3}\d{2})-(\d+(?:\.\d+)?)-([PC])$", name)
-        day_format = "%d%b%y"
-    elif VENUE == "paradex":
-        m = re.match(r"^([A-Z0-9]+)-USD-(\d{1,2}[A-Z]{3}\d{2})-([0-9_]+)-([PC])$", name)
-        day_format = "%d%b%y"
-    else:
-        m = re.match(r"^([A-Z0-9]+)-(\d{8})-([0-9_]+)-([PC])$", name)
-        day_format = "%Y%m%d"
-    if not m:
+    form = NAME_FORMS.get(venue)
+    found = form[0].match(name) if form else None
+    if not found:
         return None
-    _, day, _strike, kind = m.groups()
+    underlying, day, strike, kind = found.groups()
     try:
-        # Pinned to UTC: read in a DST zone this is an hour out, enough to
-        # call settlement before it has happened.
-        moment = datetime.datetime.strptime(day.title() + " 08:00", day_format + " %H:%M")
-        expiry = int(moment.replace(tzinfo=datetime.timezone.utc).timestamp())
+        # Pinned to UTC: read in a DST zone this is an hour out.
+        moment = datetime.datetime.strptime(day.title() + " 08:00", form[1] + " %H:%M")
     except ValueError:
         return None
-    return {"expiry": expiry, "kind": kind}
+    expiry = int(moment.replace(tzinfo=datetime.timezone.utc).timestamp())
+    return underlying, expiry, float(strike.replace("_", ".")), kind
 
 
-DETAIL = parse_instrument(INSTRUMENT) if INSTRUMENT else None
-
-#: Sold notes (income) and bought options, by the option type each must be.
-PRODUCT_KIND = {"cash_secured_put": "P", "covered_call": "C", "long_call": "C", "long_put": "P"}
-
-EXAMPLE = {"paradex": "ETH-USD-30OCT26-2450-P", "rysk": "ETH-30OCT26-2450-P"}.get(VENUE, "ETH-20261030-2450-P")
-
-if VENUE not in ("derive", "paradex", "rysk"):
-    PROBLEM = "VENUE must be derive, paradex or rysk, not %r" % VENUE
-elif not DETAIL:
-    PROBLEM = "INSTRUMENT %r is not a %s option name like %s" % (INSTRUMENT, VENUE_NAME, EXAMPLE)
-elif VENUE == "rysk" and PRODUCT != "cash_secured_put":
-    PROBLEM = "on Rysk only a sold put (cash_secured_put) is watched, not %r" % PRODUCT
-elif PRODUCT not in PRODUCT_KIND:
-    PROBLEM = "PRODUCT must be one of %s, not %r" % (", ".join(sorted(PRODUCT_KIND)), PRODUCT)
-elif DETAIL["kind"] != PRODUCT_KIND[PRODUCT]:
-    PROBLEM = "%s is a %s but PRODUCT says %s" % (
-        INSTRUMENT, "put" if DETAIL["kind"] == "P" else "call", PRODUCT)
-elif not INSTRUMENT.startswith(UNDERLYING + "-"):
-    PROBLEM = "%s is not an option on UNDERLYING %s" % (INSTRUMENT, UNDERLYING)
-elif SIZE <= 0 or STRIKE <= 0:
-    PROBLEM = "SIZE and STRIKE must both be above zero"
-elif ORDER_ID and VENUE == "rysk":
-    PROBLEM = "Rysk takes no resting orders, so ORDER_ID does not apply"
-
-EXPIRY = DETAIL["expiry"] if DETAIL else 0
-IS_PUT = PRODUCT == "cash_secured_put"
-
-
-def stated_expiry():
-    """Moves EXPIRY to the instant Paradex states, once it has been read.
-
-    A Paradex stock, index or commodity option expires at its market's close
-    (META at 20:00 or 21:00 UTC, CL at 18:30 or 19:30), not at the name's 08:00
-    UTC. The ticker states it (`expirySec`), and it is kept, since an expired
-    market may no longer be listed. Until it is read the name's 08:00 stands,
-    which can only be early: the heads-up comes sooner and the duty waits
-    longer for the settlement price, which it says it is doing.
-    """
-    global EXPIRY
-    if VENUE != "paradex" or not DETAIL:
-        return
-    kept = bevo.state.get("expiry_sec")
-    if kept:
-        EXPIRY = int(kept)
-        return
+def record(venue, wallet, where, row):
+    """What is remembered of one position, or None for a row that is not an option held."""
+    name = str(row.get("instrument") or "").strip().upper()
     try:
-        body = bevo.read("/options/ticker", {"instrument": INSTRUMENT, **VENUE_QUERY}) or {}
-    except bevo.BevoError as exc:
-        if not bevo.state.get("expiry_unread"):
-            bevo.state["expiry_unread"] = True
-            say("could not read when %s expires, so its name's 08:00 UTC stands: %s" % (INSTRUMENT, exc))
-        return
-    try:
-        stated = int(body.get("expirySec") or 0)
+        size = float(row.get("size") or 0)
     except (TypeError, ValueError):
-        stated = 0
-    # The same day as the name, or it is not this option's.
-    if 0 <= stated - DETAIL["expiry"] < 86400:
-        bevo.state["expiry_sec"] = stated
-        EXPIRY = stated
-IS_LONG = PRODUCT in ("long_call", "long_put")
-IS_CALL = PRODUCT_KIND.get(PRODUCT) == "C"
-
-
-def intrinsic(px):
-    """What the option is worth at `px`: what a bought one is paid at expiry."""
-    return max(0.0, (px - STRIKE) if IS_CALL else (STRIKE - px)) * SIZE
-
-
-def account_read():
-    """This option's position row and whether its resting order is still open. None when unreadable."""
+        return None
+    if not name or not size:
+        return None
+    named = parse_name(venue, name) or (None, 0, 0.0, None)
     try:
-        body = (bevo.read("/options/account", VENUE_QUERY) if VENUE_QUERY
-                else bevo.read("/options/account")) or {}
-    except bevo.BevoError as exc:
-        say("could not read the account: %s" % exc)
+        expiry = int(float(row.get("expirySec") or named[1]))
+        strike = float(row.get("strike") or named[2])
+    except (TypeError, ValueError):
         return None
-    account = body.get("account")
-    if not isinstance(account, dict):
+    kind = str(row.get("type") or named[3] or "").upper()[:1]
+    underlying = str(row.get("underlying") or named[0] or "").upper()
+    if expiry <= 0 or strike <= 0 or kind not in ("P", "C") or not underlying:
+        say("%s on %s: the account's row does not say what it is; not watched" % (name, venue))
         return None
-    row = None
-    for r in account.get("positions") or []:
-        size = float(r.get("size") or 0)
-        if r.get("instrument") == INSTRUMENT and (size > 0 if IS_LONG else size < 0):
-            row = r
-            break
-    resting = bool(ORDER_ID) and any(
-        str(o.get("orderId")) == ORDER_ID and o.get("status", "open") == "open"
-        for o in account.get("openOrders") or [])
-    return {"row": row, "resting": resting}
-
-
-def still_held():
-    """Whether the account still holds this option, bought or sold. None when unreadable.
-
-    A bought option can be sold back, and a sold note bought back, before expiry;
-    the skill deletes this duty when it is, and this is the duty's own check in
-    case that was missed.
-    """
-    seen = account_read()
-    return None if seen is None else seen["row"] is not None
-
-
-def hold(row):
-    """Watch what a resting order has filled: the size held and what the account says it cost."""
-    held = abs(float(row.get("size") or 0))
-    if held <= 0:
-        return
     cost = row.get("costUsd")
-    bevo.state["held_size"] = held
-    bevo.state["held_premium_usd"] = (float(cost) if cost not in (None, "")
-                                      else ORDER_PREMIUM_USD * held / ORDER_SIZE)
-    use_held()
+    return {"venue": venue, "wallet": wallet, "where": where, "instrument": name, "size": size,
+            "usd": abs(float(cost)) if cost not in (None, "") else None,
+            "strike": strike, "kind": kind, "expiry": expiry, "underlying": underlying}
 
 
-def use_held():
-    """SIZE, PREMIUM_USD and COLLATERAL_USD as filled so far, once a resting order has filled any."""
-    global SIZE, PREMIUM_USD, COLLATERAL_USD
-    held = bevo.state.get("held_size")
-    if not ORDER_ID or not held:
-        return
-    SIZE = float(held)
-    PREMIUM_USD = float(bevo.state.get("held_premium_usd") or 0)
-    if IS_PUT:
-        COLLATERAL_USD = STRIKE * SIZE
+def key_of(rec):
+    return "|".join((rec["wallet"] or "main", rec["venue"], rec["instrument"],
+                     "bought" if rec["size"] > 0 else "sold"))
 
 
-def order_state():
-    """A resting order's duty before expiry: "held", "waiting", "unfilled", "closed", "unsure".
-
-    Waiting while the order rests with nothing held; held from its first fill;
-    two reads in a row with neither the order nor a position mean it ended
-    unfilled (or, once something had filled, that it was closed early).
-    """
-    seen = account_read()
-    if seen is None:
-        return "held" if bevo.state.get("held_size") else "waiting"
-    if seen["row"] is not None:
-        hold(seen["row"])
-        bevo.state["not_held_reads"] = 0
-        return "held"
-    if seen["resting"]:
-        bevo.state["not_held_reads"] = 0
-        return "waiting"
-    misses = int(bevo.state.get("not_held_reads") or 0) + 1
-    bevo.state["not_held_reads"] = misses
-    if misses < 2:
-        return "unsure"
-    return "closed" if bevo.state.get("held_size") else "unfilled"
+def host(url):
+    text = str(url or "").lower().split("://")[-1].split("/")[0]
+    return text[4:] if text.startswith("www.") else text
 
 
-def closed_early():
-    """"closed", "unsure" or "held", from this tick's account read.
-
-    Two "not held" reads in a row, 15 minutes apart, before it counts: ending
-    early on one empty read would cost an owner who still holds the option its
-    heads-up and its outcome. An unreadable account is held; it never ends a duty.
-    """
-    held = still_held()
-    if held is False:
-        misses = int(bevo.state.get("not_held_reads") or 0) + 1
-        bevo.state["not_held_reads"] = misses
-        return "closed" if misses >= 2 else "unsure"
-    if held is True:
-        bevo.state["not_held_reads"] = 0
-    return "held"
-
-
-def spot_now():
-    """Derive's index for this option's underlying right now, or None for no price this run.
-
-    For the heads-up only; settlement never reads this. It is the venue's own
-    index, the number the option settles against, so it needs no token pin and
-    works for any currency Derive lists. An empty answer is a gap, not a zero.
-    """
-    body = bevo.read("/options/ticker", {"instrument": INSTRUMENT, **VENUE_QUERY}) or {}
-    value = body.get("index")
-    if value in (None, ""):
+def main_accounts():
+    """({venue: account or None}, {site host: venue}, Rysk's paid-out rows), or None when
+    the read failed. An account is None when that venue could not be read."""
+    try:
+        body = bevo.read("/options/account") or {}
+    except bevo.BevoError as exc:
+        say("could not read the options accounts: %s" % exc)
         return None
-    spot = float(value)
-    return spot if spot > 0 else None
+    venues = body.get("venues")
+    if not isinstance(venues, list):
+        # A server from before venues: the body is Derive's own.
+        venues = [dict(body, venue="derive", available=True)]
+    accounts, hosts, paid = {}, {}, []
+    for entry in venues:
+        if not isinstance(entry, dict) or not entry.get("venue"):
+            continue
+        venue = str(entry["venue"])
+        if entry.get("site"):
+            hosts[host(entry["site"])] = venue
+        account = entry.get("account")
+        accounts[venue] = account if entry.get("available") is not False and isinstance(account, dict) else None
+        if venue == "rysk" and accounts[venue]:
+            paid = [r for r in account.get("settled") or [] if isinstance(r, dict)]
+    return accounts, hosts, paid
 
 
-def settlement_price():
-    """The settlement Derive printed for this expiry.
+def wallet_accounts(hosts):
+    """[(walletId, label, venue, account or None)] for every Butler wallet with an options
+    account of its own. A list that cannot be read is no wallets this run."""
+    try:
+        rows = [r for r in bevo.platform_balances() or [] if isinstance(r, dict) and r.get("serverKept")]
+        if not rows:
+            return []
+        wallets = (bevo.read("/wallets") or {}).get("wallets") or []
+    except bevo.BevoError as exc:
+        say("could not list the Butler wallets' accounts: %s" % exc)
+        return []
+    by_address = {str(w.get("address") or "").lower(): w for w in wallets if isinstance(w, dict)}
+    out = []
+    for row in rows:
+        venue = hosts.get(host(row.get("siteHost") or row.get("siteUrl")))
+        wallet = by_address.get(str(row.get("account") or "").lower())
+        if venue not in WALLET_VENUES or not wallet or not wallet.get("walletId"):
+            continue
+        try:
+            body = bevo.read("/options/account", {"walletId": wallet["walletId"], "venue": venue}) or {}
+            account = body.get("account") if isinstance(body.get("account"), dict) else None
+        except bevo.BevoError as exc:
+            say("could not read %s's %s account: %s" % (wallet.get("label"), venue, exc))
+            account = None
+        out.append((str(wallet["walletId"]), str(wallet.get("label") or ""), venue, account))
+    return out
 
-    None means not published yet. A BevoError means the rail cannot answer at
-    all — a different thing, and the owner is told about it rather than being
-    given a guess.
-    """
-    # Paradex keys a settlement by the option itself; Derive by asset and expiry.
-    query = ({"instrument": INSTRUMENT, **VENUE_QUERY} if VENUE_QUERY
-             else {"underlying": UNDERLYING, "expiry": EXPIRY})
-    body = bevo.read("/options/settlement", query) or {}
-    value = body.get("price")
-    if value in (None, ""):
-        return None
-    settled = float(value)
-    return settled if settled > 0 else None
+
+def label(rec):
+    day = datetime.datetime.fromtimestamp(rec["expiry"], datetime.timezone.utc)
+    return "%s %s %s, %d %s" % (rec["underlying"], price(rec["strike"]),
+                                "call" if rec["kind"] == "C" else "put", day.day, day.strftime("%b"))
+
+
+def account_name(rec):
+    venue = VENUE_NAMES.get(rec["venue"], rec["venue"])
+    return "“%s” wallet's %s account" % (rec["where"], venue) if rec["wallet"] else "%s account" % venue
+
+
+def intrinsic(rec, at):
+    worth = at - rec["strike"] if rec["kind"] == "C" else rec["strike"] - at
+    return max(0.0, worth) * abs(rec["size"])
+
+
+def venue_query(rec):
+    return {} if rec["venue"] == "derive" else {"venue": rec["venue"]}
+
+
+def heads_up(rec, now):
+    """Once, the day before: where the asset is and which way this is leaning. True once sent."""
+    try:
+        body = bevo.read("/options/ticker", {"instrument": rec["instrument"], **venue_query(rec)}) or {}
+        spot = float(body.get("index") or 0)
+    except (bevo.BevoError, TypeError, ValueError) as exc:
+        say("could not read the price for %s's heads-up: %s" % (rec["instrument"], exc))
+        return False
+    if spot <= 0:
+        say("no index for %s this run; its heads-up waits" % rec["instrument"])
+        return False
+    asset, strike, call = rec["underlying"], rec["strike"], rec["kind"] == "C"
+    kind = "call" if call else "put"
+    if rec["size"] > 0:
+        worth = intrinsic(rec, spot)
+        if worth > 0:
+            leaning = "Your %s is in the money: if it ends here it pays about %s" % (kind, usd(worth))
+            if rec["usd"] is not None:
+                leaning += ", against the %s it cost" % usd(rec["usd"])
+        else:
+            leaning = "Your %s is out of the money: it pays nothing unless %s ends %s %s" % (
+                kind, asset, "above" if call else "below", price(strike))
+    elif not call:
+        leaning = ("Your note looks set to pay out in full" if spot >= strike else
+                   "Your note is under your price, so you may end up buying %s at %s" % (asset, price(strike)))
+    else:
+        leaning = ("Your note looks set to pay out in full, and you keep your %s" % asset if spot <= strike else
+                   "Your note is above your price, so your %s may be sold at %s" % (asset, price(strike)))
+    hours = round(max(0, rec["expiry"] - now) / 3600.0)
+    bevo.notify("%s: %s is at %s. %s. It settles in about %d hours." % (
+        label(rec), asset, price(spot), leaning, hours))
+    return True
+
+
+def after(rec, text, net):
+    """`text` with what the premium leaves the owner up or down, when the account said it."""
+    if rec["usd"] is None:
+        return ""
+    return text % (usd(rec["usd"]), "down" if net < 0 else "up", usd(abs(net)))
+
+
+def cash_outcome(rec, settled):
+    """What a Derive or Paradex option did at `settled`, in the owner's terms."""
+    asset, strike, size, call = rec["underlying"], rec["strike"], abs(rec["size"]), rec["kind"] == "C"
+    kind, where = "call" if call else "put", account_name(rec)
+    head = "%s settled at %s, " % (asset, price(settled))
+    if rec["size"] > 0:
+        paid = intrinsic(rec, settled)
+        if paid > 0:
+            return (head + "%s your %s: your %s paid %s into your %s.%s" % (
+                "above" if call else "under", price(strike), kind, usd(paid), where,
+                after(rec, " After the %s it cost, you are %s %s.", paid - (rec["usd"] or 0))))
+        lost = ", so the %s you paid is lost" % usd(rec["usd"]) if rec["usd"] is not None else ""
+        return head + "%s your %s: the %s expired worthless%s." % (
+            "at or under" if call else "at or above", price(strike), kind, lost)
+    kept = " and the %s premium" % usd(rec["usd"]) if rec["usd"] is not None else ""
+    if not call:
+        if settled >= strike:
+            return (head + "above your %s. You kept your %s%s. What is left of your collateral is free "
+                    "cash in your %s." % (price(strike), usd(strike * size), kept, where))
+        shortfall = (strike - settled) * size
+        return (head + "under your %s. Your note was assigned: you agreed to buy %s %s at %s, which is "
+                "%s more than they are worth today.%s %s settles in cash, so you are holding the loss "
+                "in cash, not the %s. What is left of your collateral is free cash in your %s." % (
+                    price(strike), fmt(size), asset, price(strike), usd(shortfall),
+                    after(rec, " After the %s premium you are %s %s.", (rec["usd"] or 0) - shortfall),
+                    VENUE_NAMES.get(rec["venue"], rec["venue"]), asset, where))
+    if settled <= strike:
+        return (head + "under your %s. You kept your %s%s. Your %s collateral is free again in your %s." % (
+            price(strike), asset, kept, asset, where))
+    return (head + "above your %s. Your %s %s was sold at %s. You gave up %s of further upside%s. What "
+            "is left of your %s collateral is free again in your %s." % (
+                price(strike), fmt(size), asset, price(strike), usd((settled - strike) * size),
+                (", and kept the %s premium" % usd(rec["usd"])) if rec["usd"] is not None else "",
+                asset, where))
 
 
 def option_key(name):
     """A Rysk name as (underlying, expiry, strike, type), so 95 and 95.0 are one strike."""
-    m = re.match(r"^([A-Z0-9]+)-(\d{1,2}[A-Z]{3}\d{2})-(\d+(?:\.\d+)?)-([PC])$", str(name or ""))
-    return (m.group(1), m.group(2), float(m.group(3)), m.group(4)) if m else None
+    found = NAME_FORMS["rysk"][0].match(str(name or "").upper())
+    return (found.group(1), found.group(2), float(found.group(3)), found.group(4)) if found else None
 
 
-def rysk_payout():
-    """This put's row in the account's `settled` once Rysk has paid it out, else None.
-
-    A BevoError means the account cannot be read, which settle() reports as such.
-    """
-    body = bevo.read("/options/account", VENUE_QUERY) or {}
-    rows = [r for r in ((body.get("account") or {}).get("settled") or [])
-            if option_key(r.get("instrument")) == option_key(INSTRUMENT)]
-    # One owner can sell the same put twice; this duty is the one of this size.
-    sized = [r for r in rows if abs(float(r.get("size") or 0) - SIZE) < 1e-9]
-    return (sized or rows or [None])[0]
-
-
-def rysk_outcome(row, settled):
+def rysk_outcome(rec, row, settled):
     """What Rysk paid out, in the owner's terms. `settled` may still be None."""
+    asset, strike, size = rec["underlying"], rec["strike"], abs(rec["size"])
     back = " + ".join("%s %s" % (fmt(leg["amount"]), leg["symbol"]) for leg in row.get("received") or [])
     at = ""
     if settled:
-        at = " at %s, %s your %s" % (price(settled), "under" if settled < STRIKE else "at or above",
-                                     price(STRIKE))
+        at = " at %s, %s your %s" % (price(settled), "under" if settled < strike else "at or above",
+                                     price(strike))
     if row.get("assigned"):
         text = ("%s settled%s. Your put was assigned: Rysk delivered %s to your HyperEVM wallet, "
-                "bought at %s each." % (UNDERLYING, at, back, price(STRIKE)))
+                "bought at %s each." % (asset, at, back, price(strike)))
         if settled:
-            shortfall = max(0.0, STRIKE - settled) * SIZE
-            net = PREMIUM_USD - shortfall
-            text += (" That is %s more than they were worth at settlement; after the %s premium "
-                     "you are %s %s." % (usd(shortfall), usd(PREMIUM_USD),
-                                         "down" if net < 0 else "up", usd(abs(net))))
-        return text + " The %s is yours to keep; selling it is a separate trade." % UNDERLYING
-    ended = "was not exercised" if settled and settled < STRIKE else "expired worthless"
-    return ("%s settled%s. Your put %s: Rysk returned %s to your HyperEVM wallet, and you keep "
-            "the %s premium." % (UNDERLYING, at, ended, back or "your collateral", usd(PREMIUM_USD)))
+            shortfall = max(0.0, strike - settled) * size
+            net = after(rec, "; after the %s premium you are %s %s", (rec["usd"] or 0) - shortfall)
+            text += " That is %s more than they were worth at settlement%s." % (usd(shortfall), net)
+        return text + " The %s is yours to keep; selling it is a separate trade." % asset
+    ended = "was not exercised" if settled and settled < strike else "expired worthless"
+    kept = ", and you keep the %s premium" % usd(rec["usd"]) if rec["usd"] is not None else ""
+    return "%s settled%s. Your put %s: Rysk returned %s to your HyperEVM wallet%s." % (
+        asset, at, ended, back or "your collateral", kept)
 
 
-def heads_up():
-    """Once, the day before: where the asset is and which way this is leaning."""
+def settle(rec, now, rysk_paid):
+    """Say what an expired option did. True once said; False while the venue has not."""
     try:
-        spot = spot_now()
-    except bevo.BevoError as exc:
-        say("could not read the price for the heads-up: %s" % exc)
-        return
-    if spot is None:
-        say("no index for %s this run; the heads-up waits for the next tick" % INSTRUMENT)
-        return
-
-    hours = max(0, (EXPIRY - time.time()) / 3600.0)
-    if IS_LONG:
-        kind = "call" if IS_CALL else "put"
-        worth = intrinsic(spot)
-        if worth > 0:
-            leaning = ("is in the money: if it ends here it pays about %s, against the %s it cost"
-                       % (usd(worth), usd(PREMIUM_USD)))
-        else:
-            leaning = ("is out of the money: it pays nothing unless %s ends %s %s"
-                       % (UNDERLYING, "above" if IS_CALL else "below", price(STRIKE)))
-        bevo.notify("%s: %s is at %s. Your %s %s. It settles in about %d hours."
-                    % (NAME, UNDERLYING, price(spot), kind, leaning, round(hours)))
-        bevo.state["heads_up_sent"] = True
-        return
-    if IS_PUT:
-        leaning = ("looks set to pay out in full" if spot >= STRIKE else
-                   "is under your price, so you may end up buying %s at %s"
-                   % (UNDERLYING, price(STRIKE)))
-    else:
-        leaning = ("looks set to pay out in full, and you keep your %s" % UNDERLYING
-                   if spot <= STRIKE else
-                   "is above your price, so your %s may be sold at %s"
-                   % (UNDERLYING, price(STRIKE)))
-    bevo.notify("%s: %s is at %s. Your note %s. It settles in about %d hours."
-                % (NAME, UNDERLYING, price(spot), leaning, round(hours)))
-    bevo.state["heads_up_sent"] = True
-
-
-def outcome_sentences(settled):
-    """What actually happened, in the owner's terms. Returns (headline, assigned).
-
-    The assigned-put headline says "agreed to buy", not "have bought": Derive
-    and Paradex settle in cash, so the owner owns no asset.
-    """
-    if IS_LONG:
-        kind = "call" if IS_CALL else "put"
-        side = "above" if settled > STRIKE else "under"
-        paid = intrinsic(settled)
-        if paid > 0:
-            net = paid - PREMIUM_USD
-            return ("%s settled at %s, %s your %s: your %s paid %s into your %s account. After "
-                    "the %s it cost, you are %s %s."
-                    % (UNDERLYING, price(settled), side, price(STRIKE), kind, usd(paid), VENUE_NAME,
-                       usd(PREMIUM_USD), "down" if net < 0 else "up", usd(abs(net))), False)
-        return ("%s settled at %s, %s your %s: the %s expired worthless, so the %s you paid is lost."
-                % (UNDERLYING, price(settled), "at or under" if IS_CALL else "at or above",
-                   price(STRIKE), kind, usd(PREMIUM_USD)), False)
-    if IS_PUT:
-        if settled >= STRIKE:
-            kept = COLLATERAL_USD or (STRIKE * SIZE)
-            return ("%s settled at %s, above your %s. You kept your %s and the %s premium."
-                    % (UNDERLYING, price(settled), price(STRIKE), usd(kept), usd(PREMIUM_USD)), False)
-        shortfall = (STRIKE - settled) * SIZE
-        net = PREMIUM_USD - shortfall
-        return ("%s settled at %s, under your %s. Your note was assigned: you agreed to buy "
-                "%s %s at %s, which is %s more than they are worth today. After the %s premium "
-                "you are %s %s."
-                % (UNDERLYING, price(settled), price(STRIKE), fmt(SIZE), UNDERLYING,
-                   price(STRIKE), usd(shortfall), usd(PREMIUM_USD),
-                   "down" if net < 0 else "up", usd(abs(net))), True)
-    if settled <= STRIKE:
-        return ("%s settled at %s, under your %s. You kept your %s and the %s premium."
-                % (UNDERLYING, price(settled), price(STRIKE), UNDERLYING, usd(PREMIUM_USD)), False)
-    given_up = (settled - STRIKE) * SIZE
-    return ("%s settled at %s, above your %s. Your %s %s was sold at %s. You gave up %s of "
-            "further upside, and kept the %s premium."
-            % (UNDERLYING, price(settled), price(STRIKE), fmt(SIZE), UNDERLYING,
-               price(STRIKE), usd(given_up), usd(PREMIUM_USD)), True)
-
-
-def settle():
-    """Read the settlement, say what happened, and finish."""
-    late = time.time() - EXPIRY
-    try:
-        settled = settlement_price()
-    except bevo.BevoError as exc:
-        say("could not read settlement: %s" % exc)
-        if late > SETTLE_ALARM_SECONDS and not bevo.state.get("settle_alarm"):
-            bevo.state["settle_alarm"] = True
-            bevo.notify("%s: your note has expired and I cannot read what it settled at, so I "
-                        "will not guess. Your money is not at risk from this - it is my read "
-                        "that is broken. I will keep trying." % NAME)
-        bevo.status("settling")
-        bevo.fail("settlement unreadable: %s" % exc)
-        return
-
-    if VENUE == "rysk":
-        settle_rysk(late, settled)
-        return
-
-    if settled is None:
-        if late > SETTLE_ALARM_SECONDS and not bevo.state.get("settle_alarm"):
-            bevo.state["settle_alarm"] = True
-            bevo.notify("%s: your note expired %d hours ago and %s has not published a "
-                        "settlement price yet. Nothing is lost and I am still watching."
-                        % (NAME, round(late / 3600), VENUE_NAME))
-        else:
-            say("settlement not published yet (%d min past expiry)" % round(late / 60))
-        bevo.status("settling")
-        return
-
-    headline, assigned = outcome_sentences(settled)
-    bevo.state["settled_price"] = settled
-
-    tail = ""
-    if assigned and IS_PUT:
-        tail = (" %s settles in cash, so you are holding the loss in cash, not the %s."
-                % (VENUE_NAME, UNDERLYING))
-    if IS_LONG:
-        if intrinsic(settled) > 0:
-            tail += " The payout is free cash in your %s account." % VENUE_NAME
-    elif IS_PUT:
-        tail += " What is left of your collateral is free cash in your %s account." % VENUE_NAME
-    else:
-        tail += " What is left of your %s collateral is free again in your %s account." % (
-            UNDERLYING, VENUE_NAME)
-
-    bevo.status("done", price=settled)
-    bevo.done("%s: %s%s" % (NAME, headline, tail))
-
-
-def settle_rysk(late, settled):
-    """Finish once Rysk has paid out; until then wait, as for a missing price."""
-    try:
-        row = rysk_payout()
-    except bevo.BevoError as exc:
-        say("could not read the Rysk account: %s" % exc)
-        row = None
-    if row is None:
-        if late > SETTLE_ALARM_SECONDS and not bevo.state.get("settle_alarm"):
-            bevo.state["settle_alarm"] = True
-            bevo.notify("%s: your put expired %d hours ago and Rysk has not paid it out yet. "
-                        "Nothing is lost and I am still watching." % (NAME, round(late / 3600)))
-        else:
-            say("Rysk has not paid out %s yet (%d min past expiry)" % (INSTRUMENT, round(late / 60)))
-        bevo.status("settling")
-        return
-    if settled:
-        bevo.state["settled_price"] = settled
-        bevo.status("done", price=settled)
-    else:
-        bevo.status("paid")
-    bevo.done("%s: %s" % (NAME, rysk_outcome(row, settled)))
+        query = ({"underlying": rec["underlying"], "expiry": rec["expiry"]} if rec["venue"] == "derive"
+                 else {"instrument": rec["instrument"], "venue": rec["venue"]})
+        settled = float((bevo.read("/options/settlement", query) or {}).get("price") or 0) or None
+    except (bevo.BevoError, TypeError, ValueError) as exc:
+        say("could not read %s's settlement: %s" % (rec["instrument"], exc))
+        settled = None
+    text = None
+    if rec["venue"] == "rysk":
+        rows = [r for r in rysk_paid or [] if option_key(r.get("instrument")) == option_key(rec["instrument"])]
+        # One owner can sell the same put twice; this is the one of this size.
+        sized = [r for r in rows if abs(abs(float(r.get("size") or 0)) - abs(rec["size"])) < 1e-9]
+        row = (sized or rows or [None])[0]
+        if row is not None:
+            text = rysk_outcome(rec, row, settled)
+    elif settled:
+        text = cash_outcome(rec, settled)
+    if text:
+        bevo.notify("%s: %s" % (label(rec), text))
+        return True
+    late = now - rec["expiry"]
+    if late > SETTLE_ALARM_SECONDS and not rec.get("alarm"):
+        rec["alarm"] = True
+        bevo.notify("%s: it expired %d hours ago and %s has not %s yet, so I will not guess. "
+                    "Nothing is lost and I am still watching." % (
+                        label(rec), round(late / 3600), VENUE_NAMES.get(rec["venue"], rec["venue"]),
+                        "paid it out" if rec["venue"] == "rysk" else "published a settlement price"))
+    return False
 
 
 def fire():
-    stated_expiry()
-    use_held()
-    left = EXPIRY - time.time()
+    now = time.time()
+    main = main_accounts()
+    if main is None:
+        bevo.status("unreadable")
+        return
+    accounts, hosts, rysk_paid = main
+    scopes = {("", venue): account for venue, account in accounts.items()}
+    labels = {}
+    for wallet, where, venue, account in wallet_accounts(hosts):
+        scopes[(wallet, venue)] = account
+        labels[wallet] = where
 
-    if ORDER_ID:
-        if left > 0:
-            seen = order_state()
-            if seen == "waiting":
-                say("%s: the order is resting with nothing filled yet" % INSTRUMENT)
-                bevo.status("waiting")
-                return
-            if seen == "unfilled":
-                bevo.status("unfilled")
-                bevo.done("%s: your order for %s ended with nothing filled, so there is nothing "
-                          "to watch." % (NAME, INSTRUMENT))
-            if seen == "closed":
-                bevo.status("closed")
-                bevo.done("%s: your %s was %s before expiry, so there is nothing left to watch."
-                          % (NAME, INSTRUMENT, "sold back" if IS_LONG else "bought back"))
-            if seen == "unsure":
-                say("%s is neither held nor resting on this read; checking again next tick" % INSTRUMENT)
-                bevo.status("unseen")
-                return
-        elif not bevo.state.get("held_size"):
-            # Nothing ever filled before the option expired: there is no outcome to report.
-            bevo.status("unfilled")
-            bevo.done("%s: your order for %s ended at expiry with nothing filled, so there was "
-                      "nothing to settle." % (NAME, INSTRUMENT))
+    held = dict(bevo.state.get("held") or {})
+    here = set()
+    for (wallet, venue), account in scopes.items():
+        if account is None:
+            continue
+        for row in account.get("positions") or []:
+            rec = record(venue, wallet, labels.get(wallet, ""), row) if isinstance(row, dict) else None
+            if rec is None or rec["instrument"] in EXCEPT:
+                continue
+            key = key_of(rec)
+            here.add(key)
+            old = held.get(key) or {}
+            if rec["usd"] is None:
+                rec["usd"] = old.get("usd")
+            held[key] = dict(rec, told=bool(old.get("told")), alarm=bool(old.get("alarm")), gone=0)
 
-    # Every tick until expiry, so a close the skill forgot to clean up still ends
-    # the duty. After expiry the position is gone either way and says nothing.
-    # A Rysk put cannot be closed early.
-    if left > 0 and VENUE != "rysk" and not ORDER_ID:
-        seen = closed_early()
-        if seen == "closed":
-            bevo.status("closed")
-            bevo.done("%s: your %s was %s before expiry, so there is nothing left to watch."
-                      % (NAME, INSTRUMENT, "sold back" if IS_LONG else "bought back"))
-        if seen == "unsure":
-            say("%s is not in the account on this read; checking again next tick" % INSTRUMENT)
-            bevo.status("unseen")
-            return
-
-    # The owner's Duties row: recipe.json `status` words each state.
-    if left > 0:
-        if left >= 2 * 86400:
-            bevo.status("days", days=int(left // 86400))
-        elif left >= 2 * 3600:
-            bevo.status("hours", hours=int(left // 3600))
+    waiting = 0
+    for key in sorted(held):
+        rec = held[key]
+        left = rec["expiry"] - now
+        if rec["instrument"] in EXCEPT:
+            del held[key]
+        elif left > 0:
+            if key not in here and scopes.get((rec["wallet"], rec["venue"])) is not None:
+                rec["gone"] = int(rec.get("gone") or 0) + 1
+                if rec["gone"] >= GONE_READS:
+                    say("%s is no longer held; it was closed before expiry" % rec["instrument"])
+                    del held[key]
+            elif left <= HEADS_UP_SECONDS and not rec.get("told"):
+                rec["told"] = heads_up(rec, now)
+        elif -left >= SETTLE_GRACE_SECONDS and settle(rec, now, rysk_paid):
+            del held[key]
         else:
-            bevo.status("soon")
+            waiting += 1
+    bevo.state["held"] = held
 
-    if left > HEADS_UP_HOURS * 3600:
-        say("%s: %.1f days to expiry" % (INSTRUMENT, left / 86400.0))
-        return
+    open_ = [rec for rec in held.values() if rec["expiry"] > now]
+    if waiting:
+        bevo.status("settling", count=waiting)
+    elif open_:
+        first = datetime.datetime.fromtimestamp(min(r["expiry"] for r in open_), datetime.timezone.utc)
+        bevo.status("watching", count=len(open_), when="%d %s" % (first.day, first.strftime("%b")))
+    else:
+        bevo.status("none")
 
-    if left > 0:
-        if not bevo.state.get("heads_up_sent"):
-            heads_up()
-        else:
-            say("%s: %.1f hours to expiry, heads-up already sent" % (INSTRUMENT, left / 3600.0))
-        return
-
-    if -left < SETTLE_GRACE_SECONDS:
-        say("%s expired %d min ago; waiting for the settlement price" % (INSTRUMENT, round(-left / 60)))
-        bevo.status("settling")
-        return
-
-    settle()
-
-
-if PROBLEM:
-    bevo.notify("%s does nothing until its settings are fixed: %s." % (NAME, PROBLEM))
-    bevo.status("paused")
 
 for tick in bevo.ticks():
-    if PROBLEM:
-        bevo.status("paused")
-        bevo.fail("settings: %s" % PROBLEM)
-        continue
-    fire()
+    try:
+        fire()
+    except Exception as exc:  # noqa: BLE001 - one bad run must not end the watch
+        say("run skipped: %s" % exc)

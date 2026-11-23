@@ -74,12 +74,9 @@ order no longer under `resting orders` has ended.
 
 ## The lifecycle duty
 
-Filed when the order is placed, not on a fill (SKILL.md step 7's `duty_create`, with
-`"ORDER_ID": "<order.orderId>"`): it waits while the order rests, watches what the
-account holds from the first fill, at what it cost, and finishes quietly if the order ends with nothing filled. SIZE is the whole order,
-PREMIUM_USD their price x size, COLLATERAL_USD strike x size for a put (else 0); the
-account's figures replace them as it fills. Never delete it on a cancel: it finishes
-itself.
+Nothing is filed for a resting order. SKILL.md step 9's lifecycle duty watches what the
+account holds, so it picks the option up from its first fill, at what it cost, and an
+order that ends with nothing filled leaves it nothing to watch.
 
 ## Cancelling
 

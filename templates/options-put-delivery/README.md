@@ -1,6 +1,6 @@
 # options-put-delivery
 
-Watches one cash-secured put the owner **sold** on Derive or Paradex (`acp options open`) to its outcome and, if it is assigned, **buys the asset** the put agreed to buy. Both venues settle in cash, so without the buy an assigned put leaves the owner holding the loss in USDC and none of the asset. The options-trading skill files it instead of `options-lifecycle` only when the owner asked, before the open, to end up owning the asset.
+Watches one cash-secured put the owner **sold** on Derive or Paradex (`acp options open`) to its outcome and, if it is assigned, **buys the asset** the put agreed to buy. Both venues settle in cash, so without the buy an assigned put leaves the owner holding the loss in USDC and none of the asset. The options-trading skill files it only when the owner asked, before the open, to end up owning the asset, and names the put in `options-lifecycle`'s `EXCEPT` so that duty leaves it to this one.
 
 ## How it is filed
 

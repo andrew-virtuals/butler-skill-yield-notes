@@ -12,7 +12,7 @@ jobs:
       - uses: Virtual-Protocol/butler-skills/.github/actions/validate@main
         with:
           path: templates/options-lifecycle
-          params: '{"INSTRUMENT":"ETH-20261030-2450-P","PRODUCT":"cash_secured_put","UNDERLYING":"ETH","STRIKE":2450,"SIZE":2.04,"PREMIUM_USD":55.17,"COLLATERAL_USD":4998}'
+          params: '{}'
       - uses: Virtual-Protocol/butler-skills/.github/actions/validate@main
         with:
           path: templates/options-put-delivery
@@ -20,9 +20,14 @@ jobs:
       - uses: Virtual-Protocol/butler-skills/.github/actions/validate@main
         with:
           path: templates/options-account
+      - uses: Virtual-Protocol/butler-skills/.github/actions/validate@main
+        with:
+          path: templates/options-order-manager
+          params: '{"INSTRUMENT":"ETH-20261204-3000-P","ACTION":"open","SIZE":2,"WORST_PRICE":47,"FEE_USD":1.5}'
       - name: Template unit tests
         run: |
           python3 -m unittest discover -s templates/options-lifecycle/tests -v
           python3 -m unittest discover -s templates/options-put-delivery/tests -v
           python3 -m unittest discover -s templates/options-account/tests -v
+          python3 -m unittest discover -s templates/options-order-manager/tests -v
           python3 -m unittest discover -s tests -v
