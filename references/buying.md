@@ -58,6 +58,7 @@ Every number is a **field on the buy quote**. Never compute one.
 | the date | `expiry`, its time as given, never one from memory |
 | how much | `size`, in units of the asset |
 | how good the price is | `overpay_vs_fair_vol_pts` |
+| a wide book, or one that holds less than the size | each of `warnings`, then `rfq_offer` when the quote has it, as written, before the closing question |
 
 ## The shape
 
@@ -150,3 +151,10 @@ A bought option pays cash and buys nothing, so it is never `options-put-delivery
 "This is a bet, not yield. You pay at most **$199.54** for 2.95 ETH calls at $2,600;
 if ETH is not above about $2,664 on 30 October you lose all of it, and it is worth a
 little less each day ETH stands still. You can lose the whole $199.54 - yes?"
+
+A quote with a warning and `rfq_offer`, the first-time check included: both are said
+before the questions, never dropped for them. "… The best ask is only 25 contracts and
+this buy is 40, so it may fill part-way. I can also ask the market makers for a price
+instead of taking the order book (RFQ): they get 20 seconds to quote inside your limit,
+and if none does, nothing trades. Order book or RFQ? Either way, you can lose the whole
+$2,034.90 - yes?"

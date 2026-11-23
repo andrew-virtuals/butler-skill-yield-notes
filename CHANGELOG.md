@@ -38,7 +38,10 @@
   - `scripts/quote.py` decides the first two: such a quote carries `rfq_offer`, the line
     for the owner, said as written at the end of the offer. Prose alone did not work: in
     the live-model eval Butler built its offer from the quote's fields and left the line
-    out. New tests in `tests/test_quote_warnings.py`.
+    out. New tests in `tests/test_quote_warnings.py`. The buy and sell reply shapes
+    (`references/buying.md`, `references/selling.md`) give the warnings and `rfq_offer`
+    a place before the closing question, with a worked sentence: a first-time buyer's
+    three questions were crowding the line out.
   - New section "When Butler brings it up" in `references/rfq.md`; `rfq_offer` in
     `references/helper.md`, `references/buying.md` and `references/selling.md`; SKILL.md's
     "No fill" row offers RFQ with the re-quote.
