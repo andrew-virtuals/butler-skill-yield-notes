@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.17.1
+
+- **A fee warning the owner already said yes to is not asked again at filing.** Seen in
+  QA: a minimum-size Derive buy offered with fees at about 29% of the premium (a warning), the
+  owner said yes and deposited, and step 5's re-quote came back held by the `fees`
+  safeguard at 32%: the premium had moved and Derive's $0.50 base fee had not. Butler
+  asked a second yes. `helper.md` § Safeguards rule 4: for the same strike, expiry and
+  size, a yes to an offer that gave the fees warning covers the re-quote; it is quoted
+  with `--waive fees`, filed, and the new share is said with the card. A `spread`
+  safeguard or any other change still asks. A dollar floor on the fee was not used: it
+  would also free the NVDA $140 put, a $0.55 fee on a $0.87 premium, which the
+  safeguard is for.
+- **Asked for an RFQ quote, Butler says the figure is the order book's.** Seen in QA:
+  "get me an RFQ quote, just show me the quotes" got the book's prices with no word that
+  they were not the makers'. The makers are asked only once the card is approved, so
+  `rfq.md` § Asked for the RFQ price before filing gives the book's figure as the book's,
+  and says the makers' price comes after approval, never above the limit.
+
 ## 2.17.0
 
 - **A buy offer gives today's price and the ceiling as two numbers, and the owner can set
