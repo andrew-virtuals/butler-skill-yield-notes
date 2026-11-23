@@ -5,6 +5,10 @@ order book now. It is the owner's choice, never Butler's: use it only when they 
 ("RFQ", "request a quote", "ask the market makers", "block price"). Rysk always quotes, so
 it takes no `--order rfq`.
 
+Makers quote a size worth their while, and may not quote a small order at all: say so
+first for one, and offer the order book. A duty's order goes by RFQ the same way
+(`duty.md`).
+
 ## The command
 
 SKILL.md step 5's command, unchanged, with `--order rfq` added. Keep the same total bound

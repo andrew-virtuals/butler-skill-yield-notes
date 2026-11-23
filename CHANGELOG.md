@@ -1,5 +1,109 @@
 # Changelog
 
+## 2.16.0
+
+- **A duty that trades options has its money in place before it can trade.** New
+  `references/duty.md`. `SKILL.md` routes to it twice: "**Later** - on a condition, time
+  or schedule" in When to use, and a new first check in Before you start, "**Now or
+  later.**", which has Butler read `duty.md` before its first reply. Any trade the owner
+  wants to happen later is a duty, never a trade filed now; a condition already met, or
+  a date that may be the expiry, is asked about. The other Before you start checks are
+  renumbered. To fit the body cap, `resting.md`'s pointer is shortened, and step 7's
+  two rarer cases (part of a position still open after a close, a second options duty
+  in one chat) move to a new `references/lifecycle.md`; nothing else is cut.
+  - **The first reply has a fixed shape**, ahead of any quote or question about the
+    rule, even when it also clears up the rule: (1) Butler recommends a wallet (the
+    duty's own, or the main one) with one reason from the chat, and offers the other;
+    (2) how much to set aside for the duty in total, with one trade's need as the
+    floor; (3) which venue. The owner's pick stands.
+  - **Its own wallet:** `bevo-wallet create`, then `duty_create` with `walletId` and
+    `fundUsdc` (one funding card): the amount set aside plus 2%, rounded up to the dollar
+    ($10 is $11), and no other headroom; at least $10 set aside, the venue's minimum
+    deposit, else Butler recommends the main wallet. Hands-free, kept apart from the
+    owner's account, and copyable.
+  - **The main wallet:** Butler deposits the gap now, as step 4 does (none when free USDC
+    already covers the amount set aside), then files the duty with `pocketUsdc` set to that
+    amount and `spendBasis`, so its one Start card proposes the owner's own figure and is
+    never asked about in chat. Once held, each trade it covers runs with no card;
+    `pocketUsdc` 0 only when the owner asked for a card on every trade. Not copyable.
+  - **Its program is a file, never retyped.** `scripts/duty_program.py` is the one program
+    every such duty runs, and `scripts/make_duty.py` builds a duty from it: Butler writes
+    only the rule (`trigger()` and `order()`, in a `rule.py`), and the script saves the
+    whole program in the workspace and prints the complete `duty_create` payload, which
+    names it by `codePath`. The script sets the title (`{NAME}`, at most 38 characters),
+    the timer, `spendBasis`, the status lines, the settings, the helper's full path
+    (`QUOTE_PY`: a duty runs in its own folder, where `~/skills` and `python3` are not
+    found, so `quote()` runs the helper with the duty's own interpreter), and what funds
+    it: `fundUsdc`, the amount set aside plus 2%, for its own wallet; `pocketUsdc`, the
+    amount set aside, for the main one. A main wallet short on the venue gets
+    `deposit_first`, sized to the amount set aside, in place of a payload. It refuses a
+    rule that sends notes, runs the helper by a path or redefines the program's parts;
+    one whose `order()` leaves out the quote's bound (`--min-premium` and
+    `--max-collateral`, or `--max-cost`) or names a resting price; one whose `trigger()`
+    answers anything but `(True or False, "a line")`; and one that reads the clock's hour
+    or weekday, which the agent refuses under an interval timer (`duty.md` shows a
+    schedule by timestamps, and `traded_at`, which the program sets on a fill). It
+    prints `statusTemplate` and `params` as JSON text, the type `duty_create` declares,
+    and refuses a `--name` or `--spec` the shell ate a `$` figure from (`duty.md` puts
+    both in single quotes).
+    Checked against virtuals-agent's own `prepare()`: both wallets file with no refusal
+    and no warning. In evals a program copied from `duty.md` by hand was rewritten or cut
+    in about one duty in ten, and a main-wallet deposit was sized to one trade.
+  - **What the program does, for every duty:** whatever USDC lands in its own wallet (the
+    funding card, a later top-up) is deposited on the venue in a run that trades nothing;
+    it says it is ready once the money is there; on every run it checks its free USDC
+    covers the next trade and, when it does not, tells the owner once per balance and
+    again if it fires while short; it says when it fired and how the order ended
+    (`bevo.settled`, route `options`), retrying a not-filled order under a new key and
+    never resending an unclear one; it stops after `--times` trades.
+  - `tests/test_duty_program.py` runs the program against a fake duty runtime (set-up,
+    short and top-up, an unfunded wallet, a held-back trade, a missed order, a failing
+    quote, an unclear order); `tests/test_make_duty.py` covers the payload and refusals.
+  - **Its timer runs from the moment it is filed** until done (every 60 seconds for a
+    set time, every 300 for a price or a schedule), never a `startsAt` or an `at`: the
+    time, day or price is in `trigger()`, so the runs before it move the money onto the
+    venue. A 14:55 duty that only started at 14:55 deposited then.
+  - **Never filed in the turn it is asked**, even when the ask names the time, venue and
+    money and free USDC covers it: the first reply recommends the wallet and waits.
+  - **A new ask is a new duty, and a fast first reply.** In that turn Butler never opens,
+    checks, edits or fixes the owner's other duties, orders or cards, nor copies how an
+    earlier duty was filed; one that bears on the money gets one line. When the owner
+    named the money (a budget, the collateral, a size), the first reply comes before any
+    tool call after reading `duty.md`, and the quote waits for filing.
+  - **A wallet still empty after 30 minutes is said once**, with a push ("its wallet is
+    still empty, so it has not started"), and its status reads "Waiting for its funding
+    card": a funding card declined or left waiting no longer shows "Setting up" for good.
+  - **One note per trouble, with its real reason.** While its trigger holds the duty
+    tries again every five minutes and says each kind of trouble once: an order nobody
+    took; a trade the server held back, named as such (a Start card or an earlier card
+    still waiting, a limit used up), where it used to say "did not fill at its floor"; a
+    quote that failed three times running (a blip is only logged); an order the server
+    refused outright, with the server's own reason. A refused order is never counted as
+    a trade: before, one that left no ledger row read as "may have gone through" and the
+    duty stopped without trading. The program names the venue on every command itself,
+    so a Paradex rule that leaves `--venue` out still files on Paradex. Repeats go to its log
+    and its "retrying" status; a fill, or the trigger passing, clears them. Before, each
+    run could push the same note again.
+  - **By RFQ**, only when the owner asked for it, on Derive or Paradex, from either
+    wallet: `order()` adds `--order rfq` with the same bound. `rfq.md` now says makers
+    may not quote a small order at all, and to offer the order book for one.
+  - The first reply reads a price trigger's condition before it answers (the one read
+    allowed ahead of it, the helper's `spot`; unread, it asks rather than assume), and its worked example asks the set-aside question in the
+    required words. The main wallet is offered as "one approval for its limit", no longer
+    "approve each trade".
+  - An own-wallet duty's short note asks for at least $10, the venue's minimum deposit,
+    since its wallet moves nothing smaller onto the venue; a top-up is never under $10.
+  - On a short note, Butler asks the owner in chat whether to top up and by how much:
+    `bevo-wallet fund` (one card; the duty deposits it on its next run) for its own
+    wallet, a step 4 deposit for the main wallet.
+  - The refusals a duty can get (`OPTIONS_DUTY_OFF`, `OPTIONS_DUTY_NO_WALLET`,
+    `OPTIONS_DUTY_PAUSED`, `OPTIONS_DUTY_CARD_PENDING`, `pocket_empty`, `pocket_pending`),
+    and stopping: a delete is refused while its venue account holds money or a position.
+  - Limits: "never rank or recommend" is now "never rank or recommend a trade", since
+    the wallet recommendation is not one.
+  - Needs bevo-server with options duties (Virtual-Protocol/bevo-server#1724) and
+    `DUTY_WALLET_OPTIONS_ENABLED=true`; without them every duty trade is refused.
+
 ## 2.15.1
 
 - **A duty wallet's Derive row stays on the Platforms tab.** Files `options-account@6`. A duty
