@@ -38,6 +38,14 @@ I can quote it again for the order book, or ask the market makers for a price in
 (RFQ): they get 20 seconds to quote inside your limit, and if none does, nothing is
 bought. Which one?"
 
+## Asked for the RFQ price before filing
+
+The makers are asked only after the owner approves, so no quote before that is theirs.
+Asked for one ("get me an RFQ quote", "just show me the quotes"), quote as usual and say
+the figure is the order book's: "That is today's order-book price, about $2.47. The
+market makers' price comes after you approve, never above your $2.60 limit; if none
+quotes inside it, nothing is bought." Never call the book's price an RFQ quote.
+
 ## The command
 
 SKILL.md step 5's command, unchanged, with `--order rfq` added. Keep the same total bound

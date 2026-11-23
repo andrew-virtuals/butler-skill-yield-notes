@@ -84,6 +84,12 @@ and the line it crossed, and `waived`.
    comes back `tradeable: true` with `waive`; file with `--waive <waive>`. The card and
    the record name what was waived. A no files nothing.
 3. A waiver holds for that one quote. A new strike, expiry or size asks again.
+4. The re-quote before filing (step 5) can cross the `fees` line when the offer only
+   warned: the premium moved and Derive's base fee did not. Same strike, expiry and
+   size, and the offer they said yes to gave its fees warning: that yes covers it.
+   Quote again with `--waive fees`, file, and say the new share as you hand them the
+   card ("fees are now 32% of the premium"). Never ask a second time. A `spread`
+   safeguard, or any other change, asks again.
 
 ## The minimum, before an amount
 
