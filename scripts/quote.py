@@ -504,6 +504,24 @@ def settle(q, waived):
     return q
 
 
+RFQ_OFFER = ("I can also ask the market makers for a price instead of taking the order book "
+             "(RFQ): they get 20 seconds to quote inside your limit, and if none does, nothing "
+             "trades. Order book or RFQ?")
+
+
+def offer_rfq(q):
+    """Makers may beat a book that is wide or holds less than the size. They may not
+    quote the smallest order at all, and a quote the venue refuses has no bound to
+    quote inside, so neither gets the offer."""
+    size = q.get("size") or 0
+    if q.get("reasons") or size <= 0 or size == q.get("min_size"):
+        return q
+    said = q.get("warnings", []) + [sg["text"] for sg in q.get("safeguards", [])]
+    if any(" wide" in s or "is only" in s and "contracts" in s for s in said):
+        q["rfq_offer"] = RFQ_OFFER
+    return q
+
+
 def build_quote(product, underlying, collateral_usd, tenor="monthly",
                 otm_pct=10.0, target_delta=None, on=None, strike=None, waived=()):
     if product not in ("cash_secured_put", "covered_call"):
@@ -1031,6 +1049,10 @@ def safeguard_list(text):
 
 
 def run_quote(p, a):
+    return offer_rfq(build_asked_quote(p, a))
+
+
+def build_asked_quote(p, a):
     def need(*flags):
         missing = [f for f in flags if getattr(a, f) is None]
         if missing:

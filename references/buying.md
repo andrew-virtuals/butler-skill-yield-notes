@@ -93,6 +93,9 @@ The ask over Derive's own mark is what the buyer gives away crossing the spread.
 - over 20%: the `spread` safeguard holds the buy back until they waive it
   (`references/helper.md` § Safeguards).
 
+Either one, or a best ask that holds less than the size, puts `rfq_offer` on the quote:
+end the offer with it, as written (`references/helper.md`).
+
 ## A hedge
 
 A put on an asset they hold limits the loss on it below the strike, for a price.
@@ -124,7 +127,7 @@ needs a quote under 60 seconds old.
 
 If it does not fill, nobody bought at that floor; the price moved. Say exactly that,
 never "no liquidity", and re-quote before offering again, never re-filing the same
-floor. With `no live bid`, nobody is bidding for this option right now: holding it to
+floor. On Derive or Paradex, offer RFQ with that re-quote (`references/rfq.md`). With `no live bid`, nobody is bidding for this option right now: holding it to
 expiry costs nothing, and the lifecycle duty reports the outcome.
 
 A close sells only what they hold (`reduce_only` on the venue). Nothing is filed or

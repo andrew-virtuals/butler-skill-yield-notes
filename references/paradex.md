@@ -45,6 +45,14 @@ python3 ~/skills/options-trading/scripts/quote.py quote --venue paradex --side b
   memory.
 - Spreads outside ETH are often wide, so expect more `warnings` and safeguards there
   (`references/helper.md` § Safeguards).
+- **Listed is not priced.** A stock, index or commodity option often has no bid or ask at
+  all, at any strike or expiry: its quote says `no live ask` or `no live bid`. The helper
+  already reads the quotes shown only to retail orders, so the order book is empty for
+  Butler's orders too: say the reason as the quote gives it. Opening: it is the asset
+  that has no price, not the strike, so do not walk the chain. Run one more quote, at
+  another expiry, and no third: when both say it, say the asset has no price on Paradex
+  right now and stop. Never offer RFQ for it (`references/rfq.md`), and never point to
+  another venue for it unless that venue's list (`references/listing.md`) has the asset.
 
 ## The account
 

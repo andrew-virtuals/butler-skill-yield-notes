@@ -28,6 +28,38 @@
 - **A worked order is stopped with `STOP`, never by turning its duty off.** Only the running
   duty can cancel an order resting from its wallet: the server refuses a chat cancel with
   `--wallet`.
+- **Butler offers RFQ in three cases.** An owner who has never heard of RFQ cannot ask for
+  it. On Derive or Paradex, Butler now offers it beside the order book, in one line and
+  once per trade, when the order is bigger than the book's best price holds (the "is only
+  N contracts" warning), when the book's price is poor (a `spread` safeguard or a
+  wide-market warning), and when a book order did not fill. The owner still picks:
+  `--order rfq` is filed only on their word. A safeguard still needs its yes and
+  `--waive`. No offer for an order at the quote's `min_size`, and never for an empty book.
+  - `scripts/quote.py` decides the first two: such a quote carries `rfq_offer`, the line
+    for the owner, said as written at the end of the offer. Prose alone did not work: in
+    the live-model eval Butler built its offer from the quote's fields and left the line
+    out. New tests in `tests/test_quote_warnings.py`.
+  - New section "When Butler brings it up" in `references/rfq.md`; `rfq_offer` in
+    `references/helper.md`, `references/buying.md` and `references/selling.md`; SKILL.md's
+    "No fill" row offers RFQ with the re-quote.
+
+- **Listed is not priced, and an empty book is not a reason for RFQ.** References only.
+  Paradex's stock, index and commodity options often have no bid or ask at any strike or
+  expiry, so their quote says `no live ask` or `no live bid`. Measured on mainnet on
+  2026-11-20, before the US cash open: the helper's source already carries the quotes
+  shown only to retail orders, those options had none either, and a small RFQ on them
+  drew no maker quote while one on ETH drew many. So the quote's reason was true, and
+  nothing in the helper changes.
+  - `references/paradex.md`: a new point under The market says this, has Butler run
+    one more quote, at another expiry, and no third when opening, before saying the
+    asset has no price on Paradex right now, never offer RFQ for it, and never point to
+    another venue that does not list the asset.
+  - `references/listing.md`: a list with stocks, indices or commodities is said with one
+    line that listed is not always priced.
+  - `references/rfq.md`: "Never offered for an empty book". A `no live ask` or
+    `no live bid` quote never brings up RFQ, on either venue. On Paradex, an owner who
+    asks for RFQ on a stock, index or commodity option with no price hears that there is
+    no quote to take the bound from, so nothing can be filed. Derive's RFQ is as it was.
 
 ## 2.16.0
 

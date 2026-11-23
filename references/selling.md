@@ -121,6 +121,9 @@ The bid under Derive's own mark is the spread, and it is what a market maker kee
   (`references/helper.md` § Safeguards). A waived note still gets the bad case and the
   ownership question.
 
+Either one, or a best bid that holds less than the size, puts `rfq_offer` on the quote:
+end the offer with it, as written (`references/helper.md`).
+
 An owner who hears "16% a year" without hearing that the spread took part of the
 premium has been told half of it.
 

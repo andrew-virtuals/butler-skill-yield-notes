@@ -202,7 +202,7 @@ failed: re-read the account and wait. Look up `:home` with `--route trade`.
 | `no live bid` / `no live ask` | Opening: another strike, expiry or asset, or stop. Closing: nobody bids for theirs now; holding costs nothing. |
 | `collateral too small`, `budget too small` | Under the minimum. Give the reason's figures, work out no others, and stop unless they name another strike, expiry or amount. |
 | An `OPTIONS_*` refusal | Nothing filed: follow its hint; never raise a bound the owner agreed. |
-| No fill | Nobody took it at the agreed bound (never "no liquidity"); nothing moved. Re-quote, re-ask, never re-file the same bound. |
+| No fill | Nobody took the agreed bound (never "no liquidity"); nothing moved. Re-quote, re-ask, offer RFQ (`rfq.md`); never re-file it. |
 | Buy failed over `--max-cost` | Give the reason as written, then read `positions`: anything shown there was bought. Never buy again. |
 | Deposit refused, failed or partial | Give the reason as written; re-read the account before another deposit. Never move funds between chains to fix it. |
 | Withdraw or `:home` failed | Give the reason as written, and stop (`only $N is free`: the rest backs sold puts). |

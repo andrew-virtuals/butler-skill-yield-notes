@@ -47,6 +47,40 @@ class DeriveQuoteTest(unittest.TestCase):
         self.assertIn("the best bid is only 0.01 contracts and this note is 0.01538 - "
                       "it may fill part-way", q["warnings"])
 
+    def test_a_thin_or_wide_book_carries_the_rfq_offer(self):
+        self.chain(inst("BTC-20261225-65000-P", 65000, 0.01, 0.00001),
+                   ticker(73609, 999, 0.01, 1100, 2, 1034))
+        thin = self.q.offer_rfq(self.q.build_quote("cash_secured_put", "BTC", 1000, strike=65000))
+        self.assertEqual(thin["rfq_offer"], self.q.RFQ_OFFER)
+        self.chain(inst("ZEC-20261127-900-P", 900, 1, 0.1), ticker(975.1, 47.6, 42.1, 70, 5, 57.2))
+        wide = self.q.offer_rfq(self.q.build_quote("cash_secured_put", "ZEC", 1000, strike=900))
+        self.assertIn("rfq_offer", wide)
+        self.chain(inst("ZEC-20261204-800-P", 800, 1, 0.1), ticker(975, 72, 40, 110, 5, 100))
+        held = self.q.offer_rfq(self.q.build_quote("cash_secured_put", "ZEC", 1600, strike=800))
+        self.assertTrue(held["waivable"])
+        self.assertIn("rfq_offer", held)
+
+    def test_no_rfq_offer_for_a_clean_quote_the_smallest_order_or_a_refusal(self):
+        # Fees alone are not a reason to ask the makers.
+        self.chain(*NVDA_150)
+        fees = self.q.offer_rfq(self.q.build_quote("cash_secured_put", "NVDA", 296, strike=150))
+        self.assertTrue(fees["warnings"])
+        self.assertNotIn("rfq_offer", fees)
+        self.chain(inst("ETH-20261225-1500-P", 1500, 0.1, 0.01), ticker(1750, 40, 50, 41, 50, 40.5))
+        clean = self.q.offer_rfq(self.q.build_quote("cash_secured_put", "ETH", 3000, strike=1500))
+        self.assertEqual((clean["warnings"], clean["safeguards"]), ([], []))
+        self.assertNotIn("rfq_offer", clean)
+        # One contract of a wide market: the smallest order, which makers may not quote.
+        self.chain(inst("ZEC-20261127-900-P", 900, 1, 0.1), ticker(975.1, 47.6, 42.1, 70, 5, 57.2))
+        smallest = self.q.offer_rfq(self.q.build_quote("cash_secured_put", "ZEC", 900, strike=900))
+        self.assertEqual(smallest["size"], smallest["min_size"])
+        self.assertTrue(any("wide" in w for w in smallest["warnings"]))
+        self.assertNotIn("rfq_offer", smallest)
+        self.chain(inst("ZEC-20261127-900-P", 900, 1, 0.1), ticker(975.1, 0, 0, 70, 5, 57.2))
+        refused = self.q.offer_rfq(self.q.build_quote("cash_secured_put", "ZEC", 1000, strike=900))
+        self.assertTrue(refused["reasons"])
+        self.assertNotIn("rfq_offer", refused)
+
     def test_one_nvda_contract_warns_on_fees_and_leaves_a_small_spread_alone(self):
         # NVDA, 2026-11-16: 16% of the value is only $0.52 on one contract; fees are 20%.
         self.chain(*NVDA_150)

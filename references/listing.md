@@ -24,9 +24,13 @@ know yet: say it by ticker alone, never a guess. A stock, index or commodity opt
 expires at its market's close, not the crypto time: give the time its expiry says.
 
 Strikes and prices come later, from the quote helper, once the owner picks an asset.
+Listed is not priced: a stock, index or commodity option on Paradex often has no bid or
+ask, and only its quote tells. When the list has any of those, say so with it, so a pick
+that then quotes `no live ask` is no surprise.
 
 ## Say to the owner
 
 - *"Paradex lists options on <N> stocks: <TICKER> (<name>), … with expiries out to <the
-  last `expiries` date>."* Every ticker, name, count and date from this turn's output.
+  last `expiries` date>. Listed is not always priced: I'll check for a price once you pick
+  one."* Every ticker, name, count and date from this turn's output.
 - *"<Asset> is not listed on <venue>: it has no options there Butler can trade."*

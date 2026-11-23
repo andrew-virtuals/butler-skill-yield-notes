@@ -1,13 +1,42 @@
 # RFQ: asking the market makers
 
 `--order rfq` asks Derive's or Paradex's market makers for a price instead of taking the
-order book now. It is the owner's choice, never Butler's: use it only when they ask for it
-("RFQ", "request a quote", "ask the market makers", "block price"). Rysk always quotes, so
-it takes no `--order rfq`.
+order book now. It is the owner's choice, never Butler's: file it only on their word
+("RFQ", "request a quote", "ask the market makers", "block price", or their pick of it
+when Butler offers it below). Rysk always quotes, so it takes no `--order rfq`.
 
 Makers quote a size worth their while, and may not quote a small order at all: say so
 first for one, and offer the order book. A duty's order goes by RFQ the same way
 (`duty.md`).
+
+## When Butler brings it up
+
+An owner may not know RFQ exists. On Derive or Paradex, Butler offers it beside the order
+book, in one line and once per trade, in these three cases and no other:
+
+| When | How it shows |
+| --- | --- |
+| The order is bigger than the book's best price holds | the quote carries `rfq_offer` |
+| The book's price is poor (a wide market) | the quote carries `rfq_offer` |
+| A book order did not fill | SKILL.md § Failure handling, "No fill": with the re-quote |
+
+- **`rfq_offer` is said as written**, as the last line of the reply that offers the
+  trade, after the quote's warnings and safeguards. The helper decides when: never add
+  it to a quote that has none, and it has none for the smallest order (`min_size`).
+- **It is an offer, never a switch.** The owner picks the book or RFQ, and no answer
+  means the book.
+- **A safeguard still needs its yes.** Picking RFQ for a held trade is that yes: quote
+  again with `--waive`, and file with `--waive <waive>` and `--order rfq`.
+- **Never for an empty book.** A quote that says `no live ask` or `no live bid` is not a
+  reason to bring up RFQ: follow SKILL.md § Failure handling. On Paradex, when the owner
+  asks for RFQ on a stock, index or commodity option whose quote says that, there is no
+  quote to take the bound from, so nothing can be filed: say so, and never make up a
+  bound.
+
+After a no-fill, in their words: "Nobody took it at your $8 limit, so nothing was bought.
+I can quote it again for the order book, or ask the market makers for a price instead
+(RFQ): they get 20 seconds to quote inside your limit, and if none does, nothing is
+bought. Which one?"
 
 ## The command
 
