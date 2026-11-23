@@ -19,6 +19,9 @@
   step, and never passes the worst price the owner agreed. It ends with a receipt: the
   average, the saving against the book, and where each fill came from. Needs
   `DUTY_WALLET_OPTIONS_ENABLED` on the server.
+- **A worked order chooses on what the owner nets after fees.** A resting fill pays Derive's
+  maker fee and no $0.50 base fee, so on a small order the duty rests rather than take a
+  maker's quote or the book, unless it beats resting by more than the taker fee.
 - **A Derive quote carries the duty's settings.** `worked.params`, `worked.fund_usdc` and
   `worked.at_mark_saves_usd` on a put sale, a buy, a close and a buy-back, so nothing is
   worked out in the chat.

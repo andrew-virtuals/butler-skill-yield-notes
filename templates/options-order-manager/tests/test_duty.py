@@ -179,7 +179,7 @@ class Venue:
             return
         self.fill(side, size, price)
         self.ledger[key] = {"state": "executed", "response": {"outcome": {
-            "trade": {"size": size, "grossUsd": round(price * size, 2)}}}}
+            "trade": {"size": size, "grossUsd": round(price * size, 2), "feeUsd": round(fee, 6)}}}}
 
     def account(self):
         positions = []
@@ -353,7 +353,8 @@ class TheExample(unittest.TestCase):
     def test_it_asks_the_makers_for_half_the_gap_first_then_rests_at_the_mark_the_same_minute(self):
         first = self.fake.placed()[0]
         self.assertEqual((first[0], first[1][-2:]), (1, ["--order", "rfq"]))
-        self.assertAlmostEqual(per_contract(first[1]), (50.25 * 2 - 1.5) / 2, places=2)
+        # Half the after-fee gap: taking pays $0.75 a contract, a resting fill $0.31.
+        self.assertAlmostEqual(per_contract(first[1]), (50.47 * 2 - 1.5) / 2, places=2)
         rest = orders(self.fake, "rest")[0]
         self.assertEqual((rest[0], num(rest[1], "--min-price"), num(rest[1], "--size")), (1, 52.0, 2.0))
 
@@ -367,8 +368,9 @@ class TheExample(unittest.TestCase):
     def test_the_receipt_gives_the_average_against_filling_at_once(self):
         self.assertEqual(self.fake.venue.position, -2.0)
         self.assertIn("Sold 2 of 2 %s" % PUT, self.fake.finished)
-        self.assertIn("Average $51.62 each before fees, $4.62 each better than filling at once ($47.00), "
-                      "$9.25 in all. Filled: 1.5 by a maker's quote, 0.5 on its resting order.",
+        self.assertIn("Average $51.62 each before fees, $4.62 each better than filling at once ($47.00); "
+                      "about $9.35 better in all, fees included. Filled: 1.5 by a maker's quote, 0.5 on its "
+                      "resting order.",
                       self.fake.finished)
 
     def test_one_approval_and_no_card(self):
@@ -384,9 +386,15 @@ class Receipt(unittest.TestCase):
         fake = run(minutes(20), venue, {"INSTRUMENT": "ETH-20261204-1300-P", "ACTION": "buy", "SIZE": 0.1,
                                         "WORST_PRICE": 6.0, "FEE_USD": 0.56, "WORK_MINUTES": 20,
                                         "STEP_MINUTES": 5, "MIN_SIZE": 0.01, "FILL_NOW_PRICE": 6.0})
+        # On 0.1 contracts a maker's $5.60 costs more after fees than resting at the $5.50 mark,
+        # so it rests; nothing fills there, and the deadline takes the maker.
+        self.assertIsNone(fake.finished)
+        fake = run([at(m) for m in range(21, 25)], venue, {"INSTRUMENT": "ETH-20261204-1300-P", "ACTION": "buy",
+                   "SIZE": 0.1, "WORST_PRICE": 6.0, "FEE_USD": 0.56, "WORK_MINUTES": 20, "STEP_MINUTES": 5,
+                   "MIN_SIZE": 0.01, "FILL_NOW_PRICE": 6.0}, state=fake.state)
         self.assertIn("Bought 0.1 of 0.1 ETH-20261204-1300-P. Average about $5.60 each before fees, "
-                      "$0.40 each better than filling at once ($6.00), $0.04 in all. "
-                      "Filled: 0.1 by a maker's quote.", fake.finished)
+                      "$0.40 each better than filling at once ($6.00); about $0.05 better in all, fees "
+                      "included. Filled: 0.1 by a maker's quote.", fake.finished)
 
     def test_a_resting_fill_is_priced_at_its_own_limit(self):
         venue = Venue(hits=[(at(5), 2.0)])
@@ -404,11 +412,29 @@ class TheMakers(unittest.TestCase):
 
     # Live (2026-11-20): the maker's $5.65 was there from the start, and the old
     # ladder reached it at its third step.
-    def test_a_quote_that_saves_half_the_gap_is_taken_in_the_first_minute(self):
-        fake = run(minutes(3), self.venue(book=[(0, self.BOOK)], makers=[(0, 5.6)]), self.LIVE)
+    def test_a_quote_that_saves_half_the_gap_after_fees_is_taken_in_the_first_minute(self):
+        fake = run(minutes(3), Venue(makers=[(0, 50.6)]))
         self.assertEqual([m for m, _ in fake.placed()], [1])
-        self.assertIn("Average about $5.60 each before fees, $0.40 each better than filling at once ($6.00)",
-                      fake.finished)
+        self.assertIn("Average $50.60 each before fees", fake.finished)
+
+    # Live (2026-11-20/23): a 0.1 buy pays a $0.55 taker fee, and a resting fill about
+    # $0.02. A maker's $5.60 against the $5.50 mark costs $1.11 all in; resting at the mark, $0.57.
+    def test_a_small_order_rests_rather_than_pay_the_taker_fee(self):
+        fake = run(minutes(5), self.venue(book=[(0, self.BOOK)], makers=[(0, 5.6)]), self.LIVE)
+        self.assertIsNone(fake.finished)
+        self.assertEqual([(m, a[a.index("--order") + 1]) for m, a in fake.placed()], [(1, "rfq"), (1, "post-only")])
+        self.assertEqual(num(orders(fake, "rest")[0][1], "--max-price"), 5.5)
+
+    def test_a_book_inside_the_target_by_less_than_the_fee_gap_is_not_taken(self):
+        # Selling 2: the $52.20 bid beats the $52.00 target, but taking it nets $0.24 less than
+        # a resting fill at the target would. It rests a tick above the bid instead.
+        fake = run(minutes(3), Venue(book=[(0, book(bid=52.2, ask=54.0))]))
+        self.assertEqual(orders(fake, "take"), [])
+        self.assertEqual(num(orders(fake, "rest")[0][1], "--min-price"), 52.3)
+
+    def test_a_book_past_the_fee_gap_is_taken(self):
+        fake = run(minutes(3), Venue(book=[(0, book(bid=52.5, ask=54.0))]))
+        self.assertEqual([m for m, _ in orders(fake, "take")], [1])
 
     # Live (2026-11-23): a close's floor of $0.98 less $0.56 came out $0.43, not $0.42,
     # and refused a maker paying exactly the line.

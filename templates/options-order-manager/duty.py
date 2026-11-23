@@ -17,10 +17,14 @@ Every minute, the first of these that applies, and then the next while the minut
                       a resting reduce-only order)
     the target moved  cancel the resting order and place it again
 
-A maker is taken at once when the quote saves TAKE_SAVING of the gap between the book and
-the mark (half of it by default), and never at a price worse than the book's: the makers
-do not see the bound, so a looser one costs nothing, and a fill is at the maker's own
-price. A refusal names the best quote; the duty remembers it and asks again as soon as
+Every choice between the three is made on what the owner nets after fees. A resting order
+that fills pays Derive's maker fee, a share of the index and no base fee; an RFQ or the
+book pays the taker fee, $0.50 an order and more (FEE_USD). On a small order that gap is
+dollars a contract, so a maker's quote or the book is taken only when it beats resting at
+the target by more than the fees it costs. A maker is taken at once when the quote saves
+TAKE_SAVING of the gap, after fees, between taking the book and resting at the mark (half
+of it by default), and never at a price worse than the book's: the makers do not see the
+bound, so a looser one costs nothing, and a fill is at the maker's own price. A refusal names the best quote; the duty remembers it and asks again as soon as
 the mark has moved enough for it to fit.
 
 The target starts at the mark and moves toward the bid (selling) or the ask (buying)
@@ -41,7 +45,7 @@ It finishes with the receipt. What it bought or sold stays in its wallet's accou
 the owner's `options-lifecycle` duty watches it to expiry with every other option.
 
 Settings: INSTRUMENT, ACTION, SIZE, WORST_PRICE, FEE_USD, WORK_MINUTES, STEP_MINUTES,
-TAKE_SAVING, SIZE_STEP, MIN_SIZE, TICK_SIZE, FILL_NOW_PRICE, STOP.
+TAKE_SAVING, SIZE_STEP, MIN_SIZE, TICK_SIZE, MAKER_FEE_RATE, FILL_NOW_PRICE, STOP.
 """
 
 import bevo
@@ -69,6 +73,10 @@ TAKE_SAVING = float(PARAMS["TAKE_SAVING"]) if PARAMS.get("TAKE_SAVING") is not N
 SIZE_STEP = float(PARAMS.get("SIZE_STEP") or 0.01)
 MIN_SIZE = float(PARAMS.get("MIN_SIZE") or SIZE_STEP)
 TICK = float(PARAMS.get("TICK_SIZE") or 0.1)
+#: Derive's maker fee, a share of the index per contract (public/get_instrument
+#: maker_fee_rate). Measured on its public fills (2026-11-23): a 0.1 ETH maker fill paid
+#: about $0.017, and none paid the $0.50 base fee every taker pays.
+MAKER_FEE_RATE = float(PARAMS["MAKER_FEE_RATE"]) if PARAMS.get("MAKER_FEE_RATE") is not None else 0.0001
 FILL_NOW = float(PARAMS.get("FILL_NOW_PRICE") or WORST)
 STOP = PARAMS.get("STOP") is True or str(PARAMS.get("STOP") or "").strip().lower() == "true"
 
@@ -289,18 +297,29 @@ def book_price(market):
     return market["bid"] if side() == "sell" else market["ask"]
 
 
-def maker_price(market, price):
-    """The worst price per contract a maker is taken at now: the target, or the price that
-    saves TAKE_SAVING of the gap between the book and the mark when that is easier to meet;
-    never past WORST_PRICE, and never worse than the book, which can be had without asking."""
-    book, mark = book_price(market), market["mark"]
+def fee_edge(market, size):
+    """What taking costs over resting, per contract: the taker fee less the maker fee. 0 for
+    a close, which cannot rest, so taking is all it has."""
+    if ACTION == "close":
+        return 0.0
+    return max(fee(size) / size - MAKER_FEE_RATE * market["index"], 0.0)
+
+
+def maker_price(market, price, size):
+    """The worst price per contract a maker is taken at now, before fees: as good, after
+    fees, as resting at the target, or saving TAKE_SAVING of the after-fee gap between
+    taking the book and resting at the mark when that is easier to meet; never past
+    WORST_PRICE, and never worse than the book, which can be had without asking."""
+    book, mark, edge = book_price(market), market["mark"], fee_edge(market, size)
     if side() == "sell":
-        if book is not None and mark > book:
-            price = min(price, book + TAKE_SAVING * (mark - book))
-        return max(price, WORST, book or 0.0)
-    if book is not None and book > mark:
-        price = max(price, book - TAKE_SAVING * (book - mark))
-    return min(price, WORST, book if book is not None else WORST)
+        line = price + edge
+        if book is not None and mark + edge > book:
+            line = min(line, book + TAKE_SAVING * (mark + edge - book))
+        return max(line, WORST, book or 0.0)
+    line = price - edge
+    if book is not None and book > mark - edge:
+        line = max(line, book - TAKE_SAVING * (book - mark + edge))
+    return min(line, WORST, book if book is not None else WORST)
 
 
 def learn_quote(said, fly):
@@ -398,6 +417,7 @@ def settle(wait=0):
         if trade.get("grossUsd") is not None and size:
             S["taken_usd"] = float(S.get("taken_usd") or 0) + float(trade["grossUsd"])
             S["taken_size"] = float(S.get("taken_size") or 0) + float(size)
+            S["fees_usd"] = float(S.get("fees_usd") or 0) + float(trade.get("feeUsd") or fee(float(size)))
             if fly["op"] == "rfq":
                 S["maker_size"] = float(S.get("maker_size") or 0) + float(size)
         S.pop("quote", None)
@@ -537,6 +557,7 @@ def price_fills(account):
     if extra > 1e-9 and S.get("last_rest_price"):
         S["rested_usd"] = float(S.get("rested_usd") or 0) + extra * float(S["last_rest_price"])
         S["rested_size"] = float(S.get("rested_size") or 0) + extra
+        S["fees_usd"] = float(S.get("fees_usd") or 0) + extra * MAKER_FEE_RATE * float(S.get("index_now") or 0)
 
 
 def average(done):
@@ -572,9 +593,11 @@ def finish(account, why=""):
             line += " Average %s%s each before fees" % ("about " if rough else "", money(price))
             if FILL_NOW:
                 better = (price - FILL_NOW) if side() == "sell" else (FILL_NOW - price)
-                line += ", %s each %s than filling at once (%s), %s in all" % (
-                    money(abs(better)), "better" if better >= 0 else "worse", money(FILL_NOW),
-                    money(abs(better) * done))
+                line += ", %s each %s than filling at once (%s)" % (
+                    money(abs(better)), "better" if better >= 0 else "worse", money(FILL_NOW))
+                # Filling at once is one taker order for all of it; count the fees each way.
+                net = better * done + fee(done) - float(S.get("fees_usd") or 0)
+                line += "; about %s %s in all, fees included" % (money(abs(net)), "better" if net >= 0 else "worse")
             line += "." + filled_by()
         if why:
             line += " Stopped: %s." % why
@@ -593,8 +616,12 @@ def sweep(account, market):
     stage = int(S.get("sweep") or 0)
     S["sweep"] = stage + 1
     bevo.status("sweeping", filled=units(filled(account)), size=units(SIZE))
-    # A maker has to beat the book; what the book has is taken right after.
-    price = maker_price(market, WORST) if stage == 0 else WORST
+    # Nothing rests now, so a maker has only to beat the book; the book is taken right after.
+    book = book_price(market)
+    if stage == 0 and book is not None:
+        price = max(WORST, book) if side() == "sell" else min(WORST, book)
+    else:
+        price = WORST
     argv = taker_argv(price, left)
     if stage >= 2 or not argv:
         finish(account, "no one would %s at %s or better by the deadline" % (
@@ -633,8 +660,10 @@ def work(account, market, now):
     else:
         bevo.status("paused", filled=units(filled(account)), size=units(SIZE))
     book = book_price(market)
-    crosses = book is not None and (book >= price if side() == "sell" else book <= price)
-    line = maker_price(market, price)
+    edge = fee_edge(market, left)
+    # The book is taken only when it nets more than resting at the target would.
+    crosses = book is not None and (book >= price + edge if side() == "sell" else book <= price - edge)
+    line = maker_price(market, price, left)
     due = step > int(S.get("rfq_step", -1))
     again = now - float(S.get("rfq_at") or 0) >= RFQ_GAP and (crosses or quote_fits(market, line, left, now))
     if (due or again) and int(S.get("rfqs") or 0) < MAX_RFQS:
@@ -642,7 +671,7 @@ def work(account, market, now):
             cancel_resting()
             return
         S["rfq_step"], S["rfqs"], S["rfq_at"] = step, int(S.get("rfqs") or 0) + 1, now
-        argv = taker_argv(line, left)
+        argv = taker_argv(line, left) if line > 0 else None
         if argv:
             send("rfq", argv + ["--order", "rfq"], line, left, market["mark"])
         return
@@ -657,6 +686,14 @@ def work(account, market, now):
     if ACTION == "close" or not still:
         return
     rest_at = on_tick(price)
+    # A book inside the target, but not by enough to take: rest one tick off it instead,
+    # where a post-only order is allowed.
+    if book is not None and side() == "sell" and rest_at <= book:
+        rest_at = round(book + TICK, 8)
+    elif book is not None and side() == "buy" and rest_at >= book:
+        rest_at = round(book - TICK, 8)
+    if rest_at <= 0:
+        return
     if not resting:
         send("rest", resting_argv(rest_at, left), rest_at, left)
     elif abs(float(S.get("rest_price") or 0) - rest_at) > max(REPRICE_PCT * price, 1.5 * TICK):
@@ -705,6 +742,7 @@ def act():
         bevo.status("unreadable")
         return
     S["market_at"] = now
+    S["index_now"] = market["index"]
     work(account, market, now)
 
 

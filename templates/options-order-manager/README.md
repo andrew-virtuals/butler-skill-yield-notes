@@ -28,10 +28,11 @@ of these that applies, and the next while the minute lasts (3 commands at most):
 | nothing rests (not a close) | `--order post-only` at the target |
 | the target moved over 1% and 1.5 ticks | a cancel, then the order again |
 
-**A maker is taken** at the target, or at once when the quote saves `TAKE_SAVING` of the
-gap between the book and the mark; never at a price worse than the book's. Makers do not
-see the bound, and the fill is at their price. A refused RFQ names the best quote; the
-duty asks again, 3 minutes on or more, once the mark has moved enough for it to fit.
+**Every choice is made after fees.** A resting fill pays Derive's maker fee and no base
+fee; a maker or the book pays the taker fee (`FEE_USD`), so is taken only when it beats
+resting at the target by more. A maker is taken at once when it saves `TAKE_SAVING` of the
+after-fee gap to resting at the mark, never worse than the book. A refused RFQ names the
+best quote; the duty asks again once the mark makes it fit.
 
 At the deadline (`WORK_MINUTES` from the start, never later than an hour before expiry)
 it cancels, asks the makers to beat the book, takes the book at `WORST_PRICE`, and
@@ -68,6 +69,6 @@ It finishes there. What it holds is watched to expiry by `options-lifecycle@12`.
 | `WORK_MINUTES` | minutes, default `240` | how long to work it |
 | `STEP_MINUTES` | minutes, default `WORK_MINUTES / 8` (1 to 30) | how often it gives ground and asks the makers |
 | `TAKE_SAVING` | 0 to 1, default `0.5` | see above; `1` takes a maker only at the target |
-| `SIZE_STEP`, `MIN_SIZE`, `TICK_SIZE` | | Derive's steps, from the quote |
+| `SIZE_STEP`, `MIN_SIZE`, `TICK_SIZE`, `MAKER_FEE_RATE` | | Derive's, from the quote |
 | `FILL_NOW_PRICE` | default `WORST_PRICE` | the book's price at filing, for the receipt |
 | `STOP` | `true` | cancel what rests, send the receipt, finish |

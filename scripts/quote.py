@@ -483,7 +483,8 @@ def worked(action, name, inst, size, price, fee, mark, need_usd=0.0):
         "params": {"INSTRUMENT": name, "ACTION": action, "SIZE": size, "WORST_PRICE": price,
                    "FEE_USD": rnd(fee, 2), "SIZE_STEP": num(inst.get("amount_step")),
                    "MIN_SIZE": num(inst.get("minimum_amount")),
-                   "TICK_SIZE": num(inst.get("tick_size")) or 0.1},
+                   "TICK_SIZE": num(inst.get("tick_size")) or 0.1,
+                   "MAKER_FEE_RATE": num(inst.get("maker_fee_rate")) or 0.0001},
         "fund_usdc": fund,
         "at_mark_saves_usd": rnd(max(saves, 0.0), 2),
     }}

@@ -100,6 +100,12 @@
         "default": 0.1,
         "description": "Derive's price tick for this option (public/get_instrument tick_size): a resting order rests on it, and moves only by more than 1.5 ticks."
       },
+      "MAKER_FEE_RATE": {
+        "type": "number",
+        "minimum": 0,
+        "default": 0.0001,
+        "description": "Derive's maker fee for this option, a share of the index per contract (public/get_instrument maker_fee_rate). A resting fill pays it and no base fee; every choice between resting, asking the makers and taking the book is made on what the owner nets after fees."
+      },
       "FILL_NOW_PRICE": {
         "type": "number",
         "minimum": 0,

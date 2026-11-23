@@ -109,7 +109,8 @@ class PlatformFeeTest(unittest.TestCase):
                             "--size", "1", "--strike", "1900")
         self.assertEqual(buy["worked"], {
             "params": {"INSTRUMENT": ETH_CALL, "ACTION": "buy", "SIZE": 1.0, "WORST_PRICE": 50.0,
-                       "FEE_USD": 1.1, "SIZE_STEP": 0.01, "MIN_SIZE": 0.01, "TICK_SIZE": 0.1},
+                       "FEE_USD": 1.1, "SIZE_STEP": 0.01, "MIN_SIZE": 0.01, "TICK_SIZE": 0.1,
+                       "MAKER_FEE_RATE": 0.0001},
             "fund_usdc": 53, "at_mark_saves_usd": 1.0})
         back, _ = self.quote({"platformFeeRate": 0}, *CLOSE[1:])
         self.assertEqual((back["worked"]["params"]["ACTION"], back["worked"]["params"]["WORST_PRICE"],

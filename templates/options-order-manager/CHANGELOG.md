@@ -34,6 +34,15 @@
   the rail's cent-rounded gross cannot price a small fill exactly.
 - **What it holds is watched by `options-lifecycle@12`.** That duty now reads every
   Butler wallet's own options account, so this one finishes on its receipt.
+- **Every choice is made after fees.** A resting fill pays Derive's maker fee, about $0.02
+  on 0.1 ETH and no base fee (Derive's public fills, 2026-11-23); a maker's quote or the
+  book pays the taker fee, $0.55 there. So the RFQ's line and the test for taking the book
+  add that difference to the target: on a small order the duty rests rather than pay it,
+  and a book inside the target by less than it gets a resting order a tick off it instead.
+  The deadline still takes a maker or the book at `WORST_PRICE`, and a close, which cannot
+  rest, compares prices alone. `MAKER_FEE_RATE` comes from the quote. The receipt adds the
+  saving in all with fees counted each way. Placing, moving and cancelling an order cost
+  nothing (measured live: three placed and cancelled, USDC unchanged).
 - **Nothing is left resting.** Only the running duty can cancel an order resting from its
   wallet (the rail refuses a chat cancel with `--wallet`), so `STOP: true` ends an order
   early: it cancels what rests and sends the receipt. It no longer finishes with a
