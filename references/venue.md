@@ -41,14 +41,20 @@ bridge's cost below; a spread or a depth moves by the hour.
   The bridge fee comes out of the amount, and the credit lands a few minutes after the bridge (longer when it
   gathers). Ethereum USDC that covers it alone goes directly with `--from 1`, no
   bridge, credited shortly after it is mined.
-- The minimum deposit is $10; Derive gives a smaller one to its security module, so
-  Butler's server refuses it. A bridged deposit is priced first: if the bridge's
+- The minimum deposit is **$11**, on Derive and Paradex alike; Butler's server refuses
+  less. Derive gives a deposit that arrives under $10 to its security module, and the
+  extra dollar covers the bridge. A bridged deposit is priced first: if the bridge's
   guaranteed arrival (bounded at 1% slippage) is under $10, it is refused with nothing
   moved. The direct Base bridge costs about $0.10; a route from another chain costs
-  more. The card gives the bridge's fee and what arrives. Step 4's $11 floor clears
-  this from Base; when a costlier route is refused, its reason ends `deposit at least $N`:
-  file that amount once, and never try $10 or a figure of your own first. Paradex
-  refuses a deposit under $10 the same way.
+  more. The card gives the bridge's fee and what arrives. When a costlier route is
+  refused, its reason ends `deposit at least $N`: file that amount once, and never a
+  figure of your own first.
+- The wallet short of the deposit: the deposit is still at least $11, so the owner adds
+  the deposit less the wallet's stablecoins, rounded up. Ask that one figure once, file
+  nothing until it lands, then file the deposit and re-quote. A $4.12 shortfall with
+  $2.13 in the wallet: "This buy needs $4.12 more on Derive, but Derive's minimum deposit
+  is $11. Your wallet has $2.13, so send about $9 to it and tell me when it's there; I'll
+  deposit $11 and re-quote the buy."
 - A withdrawal pays to the owner's wallet on Ethereum once Derive's batch is proven, in
   the window its card gives, less a fee Derive does not state in advance. Bringing it to
   Base (the `:home` leg) is an ordinary `acp trade`, whose quote gives its own minimum

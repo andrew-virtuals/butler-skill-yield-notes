@@ -129,11 +129,11 @@ class OwnWallet(unittest.TestCase):
         _, _, commands = run(world, 8)
         self.assertEqual([c.split()[2] for c in commands], ["deposit", "open"])
 
-    def test_short_is_said_once_and_asks_at_least_ten(self):
+    def test_short_is_said_once_and_asks_at_least_the_minimum_deposit(self):
         world = {"free": None, "cash": 11, "px": 1480, "fates": ["executed", "executed"],
-                 "met": lambda w: w["tick"] in (4, 9, 12, 16), "script": {7: {"cash": 5}, 11: {"cash": 15}}}
-        notes, _, commands = run(world, 20, ALLOCATION_USD=10, NEED_USD=9.79, TIMES=2)
-        self.assertEqual(count(notes, "Top it up by $10 and it carries on"), 1)
+                 "met": lambda w: w["tick"] in (4, 9, 12, 16), "script": {7: {"cash": 10.5}, 11: {"cash": 15}}}
+        notes, _, commands = run(world, 20, ALLOCATION_USD=11, NEED_USD=9.79, TIMES=2)
+        self.assertEqual(count(notes, "Top it up by $11 and it carries on"), 1)
         self.assertEqual(count(notes, "so nothing traded. Top it up"), 1)
         self.assertEqual([c.split()[4] for c in commands if " deposit " in c], ["11", "15"])
         self.assertEqual(count(notes, "done,"), 2)

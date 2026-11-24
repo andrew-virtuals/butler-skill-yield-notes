@@ -30,8 +30,12 @@ PROGRAM = os.path.join(HERE, "duty_program.py")
 QUOTE_PY = os.path.join(HERE, "quote.py")
 RULE = re.compile(r"# >>> rule.*?# <<< rule\n", re.S)
 NAME_MAX = 38
-MIN_VENUE_DEPOSIT = 10
-MIN_CHAT_DEPOSIT = 6
+MIN_VENUE_DEPOSIT = 11
+
+
+def with_bridge(usd):
+    """What to send for `usd` to arrive: 2% for the bridge, at most $2, rounded up."""
+    return math.ceil(usd + min(usd * 0.02, 2))
 OWN_SETTINGS = ("NAME", "VENUE", "OWN_WALLET", "ALLOCATION_USD", "NEED_USD", "TIMES", "QUOTE_PY")
 STATUS = {
     "moving": "Moving ${amount} to {venue}",
@@ -159,7 +163,7 @@ def build(a):
     if not own and a.free < a.set_aside:
         gap = a.set_aside - a.free
         return {"deposit_first": {
-            "amount_usdc": max(MIN_CHAT_DEPOSIT, math.ceil(gap * 1.02)),
+            "amount_usdc": max(MIN_VENUE_DEPOSIT, with_bridge(gap)),
             "venue": a.venue,
             "why": "the owner set aside $%g and $%g is free on %s; deposit this (SKILL.md step 4), "
                    "ask them to approve its card, file nothing more this turn, and build again "
@@ -202,7 +206,7 @@ def build(a):
     }
     if own:
         payload["walletId"] = a.wallet_label
-        payload["fundUsdc"] = math.ceil(a.set_aside * 1.02)
+        payload["fundUsdc"] = with_bridge(a.set_aside)
         then = ("one funding card for $%d moves it to the duty's wallet; the duty deposits it on "
                 "%s itself and says when it is ready" % (payload["fundUsdc"], a.venue.title()))
     else:

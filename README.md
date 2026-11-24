@@ -6,7 +6,7 @@ selling cash-secured puts, buying calls and puts, and closing them on **Derive**
 people maintaining the repo. A butler receives `SKILL.md`, `references/**/*.md` and
 `scripts/**/*.py`; the registry also serves the duty templates under `templates/`.
 
-- **Version:** 2.17.2 (`SKILL.md`), with `options-lifecycle` 12, `options-put-delivery` 1,
+- **Version:** 2.17.3 (`SKILL.md`), with `options-lifecycle` 12, `options-put-delivery` 1,
   `options-account` 6 and `options-order-manager` 1.
   What changed in each release: `CHANGELOG.md`.
 - **Registry name:** `options-trading`, listed in the hub's `skills.json` from this repo.
@@ -114,7 +114,7 @@ These figures come from four live cases (BTC and ZEC on 2026-11-11, NVDA on
 
 ## Measurements
 
-Apart from Derive's $10 minimum deposit and the Base bridge's ~$0.10 (in
+Apart from the $11 minimum deposit and the Base bridge's ~$0.10 (in
 `references/venue.md`), nothing a butler reads states a venue figure: fees, minimums,
 sizes, times and which assets clear come from the quote, the account read, the card or
 its outcome, so they cannot go stale in the skill. What was measured, for the people tuning the warnings, is
@@ -133,7 +133,8 @@ Derive v3 mainnet, 7 October 2026 (selling) and 9 October 2026 (buying):
   $7.40 at the minimum, where the base fee was about 9% of the premium. Paradex: $20 of
   the underlying per order, a 40% price band around the mark, and 5 USDC or 0.001 ETH in
   the wallet to open an account.
-- **Funding:** Derive's minimum deposit $10 and the direct Base bridge's ~$0.10, both also
+- **Funding:** the $11 minimum deposit (Derive keeps one that arrives under $10; the
+  dollar over is for the bridge) and the direct Base bridge's ~$0.10, both also
   kept in `references/venue.md`, where the agent sizes a deposit; an Ethereum deposit credited about 2 minutes after it is mined. A withdrawal took 17
   minutes, less a fee capped at $1; the `:home` trade had a $2 minimum and a fee of
   max($1, 0.5%). Opening a new Derive subaccount cost nothing.

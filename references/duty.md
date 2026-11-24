@@ -111,14 +111,14 @@ write only the rule, then run it.
    - `duty_create`: pass that object to the `duty_create` tool exactly as printed. It
      names the saved program by `codePath`; never send `code`, never change a field.
      Then say its `say` line: one funding card (its own wallet: the amount set aside plus
-     2%, moved to the duty's wallet on Base, then deposited by the duty), or one Start
+     2%, at most $2, moved to the duty's wallet on Base, then deposited by the duty), or one Start
      card proposing the amount set aside as its limit (the main wallet). Never ask them
      for a limit in chat: they named it.
    - `deposit_first` (the main wallet, short on the venue): deposit that amount as
      SKILL.md step 4 does (`--venue` for Paradex), ask the owner to approve its card, and
      file nothing more in that turn. Once `acp options account` shows it free, build
      again with the new `--free`.
-   - `error: …`: nothing was built; fix what it names. Under $10 set aside, its own
+   - `error: …`: nothing was built; fix what it names. Under $11 set aside, its own
      wallet cannot deposit: recommend the main wallet.
 
 Nothing is filed to watch what it trades: SKILL.md step 9's `options-lifecycle` duty
@@ -224,7 +224,7 @@ duty tries again on its next trigger. Say first that makers may not quote a smal
 On a short note, in chat: say what it is short and ask if they want to top it up, and by
 how much. Nothing moves without their yes.
 
-- **Its own wallet:** `bevo-wallet fund --wallet "<label>" --amount <usd>`, at least $10
+- **Its own wallet:** `bevo-wallet fund --wallet "<label>" --amount <usd>`, at least $11
   (the venue's minimum deposit: less stays in the wallet and never reaches the venue), one
   card from the main wallet; the duty moves it to the venue on its next run.
 - **The main wallet:** deposit as SKILL.md step 4; raise the pocket only if they ask.

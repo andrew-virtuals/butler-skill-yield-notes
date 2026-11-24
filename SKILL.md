@@ -1,7 +1,7 @@
 ---
 name: options-trading
 description: Trade options on Derive, Paradex or Rysk - earn on idle USDC by selling cash-secured puts, buy a call or a put, close before expiry, and check or withdraw USDC and positions.
-version: 2.17.2
+version: 2.17.3
 metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","withdraw","withdraw my usdc","derive","my options","options account","options positions","free usdc","derive positions","my option positions","withdraw from derive","withdraw my free usdc","paradex","paradex options","paradex positions","rysk","rysk options","rysk positions","physically settled","hyperevm","limit order","resting order","at my price","or better","leave it on the book","cancel my order","options duty","automate options","options strategy","better price","work the order"],"requires":{"bins":["python3","bevo-read","acp","bevo-wallet"]}}}
 ---
 
@@ -22,6 +22,9 @@ Your owner wants Derive, Paradex or Rysk options:
 - **Look or withdraw** - "my free USDC in Derive" (`freeForNewPutsUsd`, not wallet
   cash), "my positions": steps 1 and 9, then stop. "Withdraw my free USDC": step 8, never an
   `acp trade` (`account.md`). Listing: `listing.md`.
+- **Deposit, no trade** - "deposit $20 into Derive", $11+: first command is step 4's for
+  their amount, before any read, reference or skill (the server checks). Then steps 1, 9.
+  Funding a trade: step 4 only.
 
 Not this skill: covered calls, spreads or leverage.
 
@@ -73,8 +76,7 @@ this chat. One missing: ask, and file nothing this turn.
    `account.md`. An unreadable account is not an empty one.
 
    **Then, every time a venue shows `exists: true`, call the `duty_list` tool and do
-   step 9 before you answer, whatever was asked.** Without it nobody tells the owner
-   when an option expires.
+   step 9 before you answer, whatever was asked.**
 
 2. [FIXED] Run the helper in place; never write, copy or edit a script, or trim its
    output. Missing: say so, and stop. Quote with the line for the intent
@@ -112,19 +114,19 @@ this chat. One missing: ask, and file nothing this turn.
      or lost); it frees `frees`. Ask the ceiling (`max_cost_usd`
      suggested). Waiting costs nothing: say so when `result_usd` is negative.
 
-4. [FIXED] With all four met, fund a sell or a buy only when `freeForNewPutsUsd` is below
-   `collateral.amount` (sell) or `max_cost_usd` (buy). Deposit the shortfall plus 2% for
-   the bridge, rounded up, and **never under $11**. Refused: file the `at least $N` it
-   names, once. Say what arrives from the card alone:
+4. [FIXED] With all four met, fund only when `freeForNewPutsUsd` is under
+   `collateral.amount` or `max_cost_usd`: the shortfall + 2% (≤$2), rounded up,
+   **never under $11**. Refused: file the `at least $N` it names, once. Wallet short:
+   **file no deposit**; ask once for it less wallet stablecoins (`venue.md`).
+   Say what arrives from the card alone:
 
    ```sh
    acp options deposit --amount <DEPOSIT_USDC> --idempotency-key <KEY>:deposit
    ```
 
-   It gathers stablecoins from **every chain**. `--from 1` only when `ethereum.usdc`
-   covers it alone. Never ask about gas or an address. Re-read the account until free USDC covers it, and do step 9; if
-   short, re-quote smaller and re-offer. Free USDC spans their Derive accounts
-   (`account.md`).
+   It gathers stablecoins from **every chain**. Never ask about
+   gas or an address. Re-read the account until free USDC covers it; if short, re-quote
+   smaller and re-offer.
 
 5. [FIXED] Run the quote again now, after their last answer. With all four met, file
    the command, with that quote's fields and the bound they agreed:
@@ -139,8 +141,7 @@ this chat. One missing: ask, and file nothing this turn.
    One bound per close. The reply is an approval card, not a fill: tell the owner to
    approve it in the app. At their price: `resting.md`; by RFQ: `rfq.md`.
 
-6. [FIXED] Wait for the outcome; never re-run the command for it. The server nudges
-   you when the card lands. Then:
+6. [FIXED] Wait for the outcome; never re-run the command for it. Then:
 
    ```sh
    bevo-read request <KEY>:<OP> --route options
@@ -215,4 +216,4 @@ failed: re-read the account and wait. Look up `:home` with `--route trade`.
 
 ## Say to the owner
 
-Worked sentences end each reference.
+In each reference.

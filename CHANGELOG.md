@@ -1,5 +1,40 @@
 # Changelog
 
+## 2.17.3
+
+- **One minimum deposit, $11, and a wallet short of it gets one figure.** Seen in QA: a
+  Derive buy $4.12 short with $2.13 in the wallet was answered "send roughly 5 USDC to
+  the wallet", too little for the minimum deposit, and only the second reply got to
+  "send about $9, then I deposit $11". Step 4 now says: a wallet
+  short of the deposit is asked once for the deposit less its stablecoins, never the
+  shortfall, with the worked sentence in `references/venue.md`. bevo-server now refuses a
+  deposit under $11 on Derive and Paradex (Derive keeps one that arrives under $10; the
+  dollar over covers the bridge and Derive's USDC price), so `venue.md`, `duty.md` and
+  the README say $11 where they said $10. `make_duty.py` and `duty_program.py` used $10,
+  and a main-wallet duty's first deposit $6, all refused by the server: both are $11 now.
+- **The bridge's 2% is capped at $2.** The Base bridge costs about $0.10 at any size, so
+  2% of $500 parked $10 idle on the venue. Step 4, the duty funding (`make_duty.py`) and
+  the order manager's `fund_usdc` add 2%, at most $2: $500 is sent as $502. bevo-server's
+  copy top-up uses the same rule.
+- **"Deposit $20 into Derive" is filed first, in about 8 seconds.** A plain deposit (no
+  trade) took 25 s median and 9 tool calls: the account and wallet reads, two references,
+  the duty check and the acp-cli skill, one model step after another. When to use now
+  sends it straight to step 4's command, before any read, reference or other skill (the
+  server checks the account), with steps 1 and 9 after; funding a trade stays in step 4,
+  which now says in bold to file no deposit while the wallet is short.
+  `options-deposit-speed` eval, deepseek-v4-1-flash, n=10 each, time from the ask to the
+  deposit reaching the server:
+
+  | case | 2.17.2 | 2.17.3 |
+  | --- | --- | --- |
+  | "deposit $20 into Derive" | 9/10, 25 s | 10/10, 7.7 s (6.2-11.7) |
+  | "deposit $10" (asks for $11, then files) | 0/10 | 10/10, 5 s after the ok |
+  | buy with the wallet at $2.13 (asks for ~$9) | 1/10 | 8/10 |
+
+  To stay under the body cap: step 4's "Free USDC spans their Derive accounts" (`account.md`
+  says it), its `--from 1` aside (`venue.md`), step 6's "the server nudges you", step 1's
+  reason after the bold duty rule, and "for the bridge", "(sell)", "(buy)" were cut.
+
 ## 2.17.2
 
 - **An ask that says "buy" is not the yes: nothing is filed before the owner answers the

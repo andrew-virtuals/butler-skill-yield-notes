@@ -31,7 +31,7 @@ yes, and a quote run after their last answer.
    | Field | Means |
    | --- | --- |
    | `worked.params` | the duty's settings, passed as they are. `WORST_PRICE` is the book's price per contract now: the bid selling, the ask buying |
-   | `worked.fund_usdc` | what the duty's wallet starts with: the collateral or the cost, plus the fee and 2% for the bridge, never under $12 |
+   | `worked.fund_usdc` | what the duty's wallet starts with: the collateral or the cost, plus the fee and 2% (at most $2) for the bridge, never under $12 |
    | `worked.at_mark_saves_usd` | the most working it could save: a fill at Derive's mark. Say "up to", never as a promise |
 
    No `worked`: the quote is not Derive's, or has no live price; it cannot be worked.

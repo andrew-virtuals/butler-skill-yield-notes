@@ -464,8 +464,8 @@ def check_fees(q, drag):
                              "keeps more of it" % pct(drag))
 
 
-#: The least an order manager's wallet is funded with: under $10 Derive takes no deposit,
-#: and the bridge's fee comes out of what is sent.
+#: The least an order manager's wallet is funded with: the server takes no deposit under
+#: $11, and the funding card's own bridge fee comes out of what is sent.
 WORKED_MIN_FUND_USD = 12
 
 
@@ -478,7 +478,7 @@ def worked(action, name, inst, size, price, fee, mark, need_usd=0.0):
         return {}
     selling = action == "open" or (action == "close" and need_usd < 0)
     saves = (mark - price if selling else price - mark) * size if mark > 0 else 0.0
-    fund = max(int(math.ceil(need_usd * 1.02)), WORKED_MIN_FUND_USD) if need_usd > 0 else 0
+    fund = max(int(math.ceil(need_usd + min(need_usd * 0.02, 2))), WORKED_MIN_FUND_USD) if need_usd > 0 else 0
     return {"worked": {
         "params": {"INSTRUMENT": name, "ACTION": action, "SIZE": size, "WORST_PRICE": price,
                    "FEE_USD": rnd(fee, 2), "SIZE_STEP": num(inst.get("amount_step")),
