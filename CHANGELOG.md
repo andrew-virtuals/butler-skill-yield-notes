@@ -30,11 +30,16 @@
   wind-down it then waits until nothing ties money to the venue (no position, no locked
   collateral, no fill or deposit still landing), withdraws everything free (a cent under
   the figure read, less again only after "only $N is free"), waits for that to reach its
-  wallet, sends everything back to the main wallet (`bevo-wallet withdraw`) and finishes,
-  saying what went home. Money that lands on the venue before the end is withdrawn too. A
-  refused withdrawal is said once and tried again; an unclear one is tried again after an
-  hour if the money is still there; a send home that went through despite an error is not
-  sent again.
+  wallet, sends everything back to the main wallet and finishes, saying what went home.
+  The send home reads its wallet's USDC on each chain (`bevo-wallet list --fresh`) and
+  files one `bevo-wallet withdraw --amount <that> --token usdc --chain-id <chain>` per
+  chain holding $1 or more: with no `--to` it pays the owner's own wallet, and from the
+  duty's own session it runs without a card (`withdraw --all` always asks one, and
+  finishing would withdraw it). Should the server file a card anyway, the duty says so
+  once and finishes only after the owner's approval has emptied its wallet. Money that
+  lands on the venue before the end is withdrawn too. A refused withdrawal is said once
+  and tried again; an unclear one is tried again after an hour if the money is still
+  there; a send home that went through despite an error is not sent again.
 - **Locked collateral is not "short".** A duty with a sold put open no longer tells the
   owner to top up: the collateral comes back when the put settles. It is short only when
   its trigger fires, or free and locked USDC together cannot pay for the next trade.
@@ -42,7 +47,8 @@
   late settlement, never on a main wallet), `STOP` and `"STOP": "false"`, a last fill or a
   deposit still landing, locked collateral, late settled cash, refused, unclear and
   shrinking withdrawals, cash already in its wallet, a send home that errs or goes through
-  anyway, a restart mid wind-down, and a weekly roll from funding to its second put across
+  anyway, a send per chain at the amount read, a card filed instead of a send, an unread
+  wallet, a restart mid wind-down, and a weekly roll from funding to its second put across
   a settlement (`tests/test_duty_program.py`); the preset's payload, refusals and weeks, and
   the strike rule with unread deltas (`tests/test_make_duty.py`). No new file: the repo stays
   within the hub's 50.

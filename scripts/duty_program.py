@@ -234,14 +234,57 @@ def wallet_cash():
         return None
 
 
-def wallet_home(key):
-    """Every dollar in its own wallet back to the owner's main wallet. True once sent."""
+def wallet_json(*args, timeout=170):
+    """A `bevo-wallet` command's JSON answer; None when it could not be read."""
     try:
-        run = subprocess.run(["bevo-wallet", "withdraw", "--wallet", LABEL, "--idempotency-key", key],
-                             capture_output=True, text=True, timeout=170, check=False)
-    except (OSError, subprocess.TimeoutExpired):
-        return False
-    return run.returncode == 0
+        run = subprocess.run(["bevo-wallet", *args], capture_output=True, text=True, timeout=timeout,
+                             check=False, env={**os.environ, "BUTLER_OUTPUT": "json"})
+        answer = json.loads(run.stdout or "null")
+    except (OSError, subprocess.TimeoutExpired, ValueError):
+        return None
+    return answer if isinstance(answer, dict) else None
+
+
+def wallet_usdc():
+    """Its own wallet's USDC on each chain, {chain id: amount}, read fresh by address (what a
+    Derive withdrawal lands in is on Ethereum); None when unread."""
+    answer = wallet_json("list", "--fresh", timeout=60)
+    for row in (answer or {}).get("wallets") or []:
+        if row.get("label") != LABEL or row.get("status") == "archived":
+            continue
+        if not isinstance(row.get("balances"), list):
+            return None
+        usdc = {}
+        for b in row["balances"]:
+            if str(b.get("symbol") or "").upper() != "USDC" or b.get("chainId") is None:
+                continue
+            if b.get("amount") is None:
+                return None
+            usdc[int(b["chainId"])] = usdc.get(int(b["chainId"]), 0.0) + float(b["amount"])
+        return usdc
+    return None
+
+
+def wallet_home(n):
+    """Its USDC back to the owner's main wallet: one `bevo-wallet withdraw --amount` per chain
+    holding $1 or more, read from the wallet first. No `--to` pays the owner's own wallet on that
+    chain, and from the duty's own session that runs without a card (`--all` always asks one).
+    ("sent", dollars), ("asked", dollars) when the server filed a card instead, or (None, 0)."""
+    usdc = wallet_usdc()
+    if usdc is None:
+        return None, 0
+    total, asked = 0.0, False
+    for chain, held in sorted(usdc.items()):
+        amount = math.floor(held * 100) / 100
+        if amount < 1:
+            continue
+        answer = wallet_json("withdraw", "--wallet", LABEL, "--amount", f"{amount:.2f}", "--token",
+                             "usdc", "--chain-id", str(chain),
+                             "--idempotency-key", bevo.key("home", bevo.SERVICE_ID, n, chain))
+        if not (answer or {}).get("ok"):
+            return None, 0
+        total, asked = total + amount, asked or bool(answer.get("asked"))
+    return ("asked" if asked else "sent"), total
 
 
 def depositing(free):
@@ -349,17 +392,25 @@ def finish(reason):
         bevo.done(f"{NAME}: {reason}. Nothing was left to send home. "
                   f"{S.get('done', 0)} trade(s) made.")
         return
-    if now < S.get("home_retry", 0):
+    if now < S.get("home_retry", 0) or S.get("home_asked"):
         bevo.status("home")
         return
     n = S.get("homes", 0)
     S["homes"] = n + 1
-    S.setdefault("home_cash", cash)
-    if wallet_home(bevo.key("home", bevo.SERVICE_ID, n)):
+    sent, total = wallet_home(n)
+    if sent:
+        S.setdefault("home_cash", total)
+    if sent == "sent":
         done_home(reason)
         return
-    after = wallet_cash()
-    if cash is not None and cash >= 2 and after is not None and after < 2:  # it went through
+    if sent == "asked":  # finishing now would withdraw that card: wait until the wallet is empty
+        S["home_asked"] = True
+        say("home_card", f"{NAME}: its money is ready to go back to your main wallet. Approve the "
+            f"card to send it.", f"{NAME}: approve to send its money home")
+        bevo.status("home")
+        return
+    left = wallet_usdc()  # a fresh read: a send that errored may still have gone through
+    if cash is not None and cash >= 2 and left is not None and all(v < 1 for v in left.values()):
         done_home(reason)
         return
     S["home_retry"] = now + 1800

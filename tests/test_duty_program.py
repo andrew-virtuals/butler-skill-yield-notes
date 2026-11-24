@@ -90,21 +90,46 @@ def run(world, ticks, rule=None, keep=False, **settings):
 
     bevo.done, bevo.ticks = done, ticker
 
+    def usdc():
+        """Its wallet's USDC by chain: world["usdc"] when a test splits it, else all on Ethereum."""
+        return world["usdc"] if "usdc" in world else {1: world["cash"]}
+
+    def send_home(chain, amount):
+        held = usdc()
+        held[chain] = round(held[chain] - amount, 6)
+        world["cash"] = sum(held.values()) if "usdc" in world else held[1]
+        world.setdefault("sent", []).append((chain, amount))
+
     def fake_run(argv, **kwargs):
         if argv[0] == sys.executable:  # quote(): the helper
             world["quotes"].append(" ".join(argv[2:]))
             return types.SimpleNamespace(stdout=json.dumps(world["quote"]), stderr="", returncode=0)
+        if argv[:2] == ["bevo-wallet", "list"]:  # a read: not one of the commands it files
+            assert kwargs["env"]["BUTLER_OUTPUT"] == "json"
+            rows = [{"chainId": c, "symbol": "USDC", "amount": "%.6f" % v} for c, v in usdc().items()]
+            rows.append({"chainId": 1, "symbol": "ETH", "amount": "0.01"})
+            answer = {"wallets": [{"label": "other", "balances": []},
+                                  {"label": "eth-puts", "status": "active",
+                                   "balances": None if world.get("wallet_unread") else rows}]}
+            return types.SimpleNamespace(stdout=json.dumps(answer), stderr="", returncode=0)
         commands.append(" ".join(argv))
         world["cmd_ticks"].append(world["tick"])
         out, code = "{}", 0
         if argv[0] == "bevo-wallet":
+            assert kwargs["env"]["BUTLER_OUTPUT"] == "json"
+            chain, amount = int(argv[argv.index("--chain-id") + 1]), float(argv[argv.index("--amount") + 1])
             if world.get("home_fails", 0) > 0:
                 world["home_fails"] -= 1
                 if world.get("sent_anyway"):  # it went through, but answered with an error
-                    world["sent_home"], world["cash"] = world["cash"], 0
-                return types.SimpleNamespace(stdout="", stderr="no", returncode=1)
-            world["sent_home"], world["cash"] = world["cash"], 0
-            return types.SimpleNamespace(stdout="{}", stderr="", returncode=0)
+                    send_home(chain, amount)
+                answer = {"status": "unknown_outcome", "ok": False, "error": "unreachable"}
+                return types.SimpleNamespace(stdout=json.dumps(answer), stderr="", returncode=1)
+            if world.get("home_card"):
+                answer = {"status": "manual_signing_required", "ok": True, "asked": True}
+                return types.SimpleNamespace(stdout=json.dumps(answer), stderr="", returncode=0)
+            send_home(chain, amount)
+            answer = {"status": "executed", "ok": True, "asked": False, "executed": True}
+            return types.SimpleNamespace(stdout=json.dumps(answer), stderr="", returncode=0)
         if argv[2] == "deposit":
             amount = float(argv[4])
             world["cash"] -= amount
@@ -281,7 +306,9 @@ PUT = {"instrument": "ETH-20261204-1500-P", "size": -3.33}
 HOME = {"WITHDRAW_ON_FINISH": True, "WALLET_LABEL": "eth-puts", "TIMES": 5}
 FUNDED = {"deposits": 1, "deposit_at": 0, "free_before": 0}  # its own wallet, deposited long ago
 CHECK = "Checking its balance after a settlement"
-SEND = "bevo-wallet withdraw --wallet eth-puts --idempotency-key home:svc:"
+def send(amount, n, chain=1):
+    return ("bevo-wallet withdraw --wallet eth-puts --amount %s --token usdc --chain-id %d "
+            "--idempotency-key home:svc:%d:%d" % (amount, chain, n, chain))
 
 
 def kinds(commands):
@@ -299,7 +326,7 @@ class Finishing(unittest.TestCase):
         notes, statuses, commands = run(world, 8, END_AT=1e9 + 3 * TICK, **HOME)
         self.assertEqual(kinds(commands), ["open", "withdraw", "bevo-wallet"])
         self.assertIn("withdraw --amount 249.99 --idempotency-key withdraw:svc:0", commands[1])
-        self.assertEqual(commands[2], SEND + "0")
+        self.assertEqual(commands[2], send("247.49", 0))
         self.assertEqual(count(notes, "it reached its end date, so it makes no new trades"), 1)
         self.assertIn("$247.49 went back to your main wallet. 1 trade(s) made.", notes[-2])
         self.assertEqual(notes[-1], "DONE")
@@ -464,7 +491,7 @@ class Finishing(unittest.TestCase):
         world = {"free": 300, "cash": 0, "px": 1480, "met": lambda w: False, "fates": ["executed"],
                  "home_fails": 1, "sent_anyway": True}
         notes, _, commands = run(world, 14, STOP=True, **HOME)
-        self.assertEqual([c for c in commands if c.startswith("bevo-wallet")], [SEND + "0"])
+        self.assertEqual([c for c in commands if c.startswith("bevo-wallet")], [send("296.99", 0)])
         self.assertEqual(count(notes, "did not go through"), 0)
         self.assertEqual(notes[-1], "DONE")
 
@@ -472,7 +499,8 @@ class Finishing(unittest.TestCase):
         world = {"free": 300, "cash": 0, "px": 1480, "met": lambda w: False, "fates": ["executed"],
                  "home_fails": 1}
         notes, _, commands = run(world, 14, STOP=True, **HOME)
-        self.assertEqual([c for c in commands if c.startswith("bevo-wallet")], [SEND + "0", SEND + "1"])
+        self.assertEqual([c for c in commands if c.startswith("bevo-wallet")],
+                         [send("296.99", 0), send("296.99", 1)])
         self.assertEqual(count(notes, "did not go through"), 1)
         self.assertEqual(notes[-1], "DONE")
 
@@ -484,6 +512,37 @@ class Finishing(unittest.TestCase):
         self.assertEqual(kinds(commands), ["bevo-wallet"])
         self.assertEqual(count(notes, "so it makes no new trades"), 0)  # said before the restart
         self.assertEqual(notes[-1], "DONE")
+
+    def test_each_chain_is_sent_home_with_the_amount_read_from_the_wallet(self):
+        # Its Base change from the deposit and the Ethereum withdrawal, each its own send; dust stays.
+        world = {"free": 300, "cash": 40.0, "usdc": {8453: 40.0, 1: 0.0, 42161: 0.4},
+                 "px": 1480, "met": lambda w: False, "fates": ["executed"],
+                 "script": {2: {"usdc": {8453: 40.0, 1: 296.991234, 42161: 0.4}, "cash": 336.991234}}}
+        notes, _, commands = run(world, 8, STOP=True, **HOME)
+        self.assertEqual([c for c in commands if c.startswith("bevo-wallet")],
+                         [send("296.99", 0), send("40.00", 0, 8453)])
+        self.assertEqual(world["sent"], [(1, 296.99), (8453, 40.0)])
+        self.assertIn("$336.99 went back to your main wallet", notes[-2])
+        self.assertEqual(notes[-1], "DONE")
+
+    def test_a_card_instead_of_a_send_is_left_for_the_owner(self):
+        # Finishing withdraws a card still waiting, so it finishes only once the wallet is empty.
+        world = {"free": 300, "cash": 0, "px": 1480, "met": lambda w: False, "fates": ["executed"],
+                 "home_card": True, "script": {9: {"cash": 0.5}}}
+        notes, statuses, commands = run(world, 12, STOP=True, **HOME)
+        self.assertEqual([c for c in commands if c.startswith("bevo-wallet")], [send("296.99", 0)])
+        self.assertEqual(count(notes, "Approve the card to send it"), 1)
+        self.assertEqual(count(notes, "did not go through"), 0)
+        self.assertIn("$296.99 went back to your main wallet", notes[-2])
+        self.assertEqual(notes[-1], "DONE")
+
+    def test_an_unread_wallet_sends_nothing(self):
+        world = {"free": 300, "cash": 0, "px": 1480, "met": lambda w: False, "fates": ["executed"],
+                 "wallet_unread": True}
+        notes, _, commands = run(world, 6, STOP=True, **HOME)
+        self.assertEqual([c for c in commands if c.startswith("bevo-wallet")], [])
+        self.assertEqual(count(notes, "did not go through"), 1)
+        self.assertNotEqual(notes[-1], "DONE")
 
     def test_nothing_to_send_home_finishes_quietly(self):
         world = {"free": 0, "cash": 0, "px": 1480, "met": lambda w: False}

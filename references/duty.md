@@ -254,10 +254,12 @@ A duty built with `--withdraw-on-finish` (auto-roll always is) stops itself clea
 makes no new trade and waits until nothing ties money to the venue (no position, no
 locked collateral, no fill or deposit still landing). Then it withdraws everything free
 (a cent under the figure read, less again only after "only $N is free"), waits for that
-to reach its wallet (24 hours at most), sends everything back to the main wallet
-(`bevo-wallet withdraw`) and finishes, saying what went home. Money that lands on the
-venue before then is withdrawn too. Never turn it off or delete it to stop it: its money
-would stay in its wallet.
+to reach its wallet (24 hours at most), reads its wallet's USDC on each chain and sends
+each back to the main wallet (`bevo-wallet withdraw --amount`, no card), and finishes,
+saying what went home. Money that lands on the venue before then is withdrawn too. If the
+server files a card for that send instead, the duty says so once and finishes when the
+owner's approval has emptied its wallet. Never turn it off or delete it to stop it: its
+money would stay in its wallet.
 
 Without it, deleting a duty is refused (409 `duty_venue_not_empty`) while its own
 wallet's venue account holds money or a position. Have the duty cancel its resting
