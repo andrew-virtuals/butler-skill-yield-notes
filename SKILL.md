@@ -1,13 +1,13 @@
 ---
 name: options-trading
 description: Trade options on Derive, Paradex or Rysk - earn on idle USDC by selling cash-secured puts, buy a call or a put, close before expiry, and check or withdraw USDC and positions.
-version: 2.17.1
+version: 2.17.2
 metadata: {"butler":{"moneyMoving":true,"keywords":["yield","earn on my usdc","make my money work","idle cash","options income","cash secured put","sell options","sell a put","premium","get paid to wait","buy the dip","yield note","options","buy a call","buy a put","call option","put option","hedge","protect my eth","upside","bet on eth","close my option","sell my option back","buy back my put","close my note","exit my put","get my collateral back","withdraw","withdraw my usdc","derive","my options","options account","options positions","free usdc","derive positions","my option positions","withdraw from derive","withdraw my free usdc","paradex","paradex options","paradex positions","rysk","rysk options","rysk positions","physically settled","hyperevm","limit order","resting order","at my price","or better","leave it on the book","cancel my order","options duty","automate options","options strategy","better price","work the order"],"requires":{"bins":["python3","bevo-read","acp","bevo-wallet"]}}}
 ---
 
 ## When to use
 
-Your owner wants, on Derive, Paradex or Rysk options:
+Your owner wants Derive, Paradex or Rysk options:
 
 - **Earn** - "earn on my USDC", "get paid to buy the dip": **sell** one cash-secured
   put, fully collateralised in USDC. They keep the premium and may end up buying the
@@ -18,7 +18,6 @@ Your owner wants, on Derive, Paradex or Rysk options:
   **bought**; "get out of my put", "free my collateral" **buys back** a note they
   **sold**.
 - **At their price** - "or better", "cancel my order": `resting.md`.
-- **Later** - on a condition, time or schedule: a duty.
 - **A better price, given time** - "work the order": `order-manager.md`.
 - **Look or withdraw** - "my free USDC in Derive" (`freeForNewPutsUsd`, not wallet
   cash), "my positions": steps 1 and 9, then stop. "Withdraw my free USDC": step 8, never an
@@ -56,7 +55,8 @@ this chat. One missing: ask, and file nothing this turn.
 2. **They hold it.** A close is at most `positions`' size. Asked for more ("sell 5",
    0.16 held): say what they hold and ask. Never shrink it quietly.
 3. **They said yes to the number.** The loss, the ownership, or the floor or ceiling,
-   with its dollar figure, after the quote. Never your default.
+   with its dollar figure, after the quote. Never your default. "Buy it" in the ask
+   is not that yes: offer, and file nothing until they answer.
 4. **The helper's quote is fresh:** run after their last answer (step 5).
 
 ## Procedure
@@ -95,8 +95,7 @@ this chat. One missing: ask, and file nothing this turn.
    positive is `--side close`; negative, `--side buyback` with the size positive and
    `--premium-received` the position's `costUsd` scaled
    to it. `reasons`: a venue limit, give them as written. `waivable: true`: a
-   safeguard (`helper.md` § Safeguards). A strike or
-   day they named: `buying.md`.
+   safeguard (`helper.md`). A strike or day they named: `buying.md`.
 
 3. [ADAPT] Offer it using **only** quote fields, its `warnings` said as written and
    never a reason to withhold it; never compute a number:

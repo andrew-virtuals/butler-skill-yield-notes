@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.17.2
+
+- **An ask that says "buy" is not the yes: nothing is filed before the owner answers the
+  offer.** Seen in live-model evals: "buy the minimum size of the ETH $1,550 put expiring
+  4 Dec on Derive" named everything, and Butler quoted and filed `acp options buy` in the
+  same turn, skipping the first-time questions and "you can lose the whole $X - yes?".
+  "Never file without all four" rule 3 now says a "buy it" in the ask is not that yes:
+  offer, and file nothing until they answer. One-turn asks on three phrasings, 90 trials
+  each: 2.17.1 filed early 4 times, this version 0. The fees, spread and RFQ flows were
+  re-run with no change. To stay under the body cap, the "Later" bullet in When to use
+  (Before you start 1 says it) and two words elsewhere were cut.
+
 ## 2.17.1
 
 - **A fee warning the owner already said yes to is not asked again at filing.** Seen in
