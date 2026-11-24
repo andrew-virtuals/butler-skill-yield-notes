@@ -101,6 +101,31 @@ Arbitrum instead (`references/paradex.md`); the rest of this section is Derive's
   USDC stays in their Ethereum wallet; say so. The trade also has its own fee
   (`references/venue.md`); if it refuses an amount, give the reason as written.
 
+## A duty's own wallet
+
+A duty that trades from a wallet of its own (an order manager, an own-wallet duty) keeps
+its money in that wallet's Derive or Paradex account, apart from the main one. "Bring my
+duty's money home" is two cards, never `:home`, and works whether the duty runs or not:
+
+1. **Read it:** `bevo-read get '/options/account?venue=derive&walletId=<LABEL>'`
+   (`acp options account` reads the main wallet only). Free is `freeForNewPutsUsd`.
+2. **Still running:** stop it first (`STOP` for an order manager, else pause it), or its
+   code may deposit what lands straight back.
+3. **An order resting:** `acp options cancel --order <id> --wallet <LABEL>`, a card. Money
+   backing an open position stays until it is closed or settles.
+4. **Withdraw:** `acp options withdraw --amount <free> --wallet <LABEL> --idempotency-key
+   <KEY>:withdraw`, a card. In that duty's own chat, leave out `--wallet`: it is that
+   duty's. It lands in **the duty's wallet** on Ethereum (Paradex: Arbitrum), not the
+   owner's, less Derive's fee: about $1 a withdrawal, whatever the size. Say so first.
+5. **Home, once it has landed** (about 10 to 30 minutes): `bevo-wallet withdraw --wallet
+   <LABEL> --all`, a card, into the main wallet. `holds nothing to withdraw` means it has
+   not landed yet: wait and try again, never call it done.
+6. `duty_delete`, if they asked for it, only now: it is refused while the account holds
+   money, an order or a position.
+
+A duty built with `--withdraw-on-finish` does all of this itself on `STOP`
+(`references/duty.md` § Stopping it).
+
 ## Say to the owner
 
 Check: "On Derive you have $1.62 free USDC. Bought 0.16 ETH of the $2,700 call expiring 23
@@ -111,6 +136,10 @@ Buying it back would free it now."
 
 Moved first: "To buy the SOL call, $45 moved from your main Derive account into a new SOL
 account. Bought 0.5 SOL-20261106-116-C for $5.63."
+
+A duty's wallet: "Taking $<amount> out of Derive into the order's own wallet first: Derive
+keeps about $1 of it, and it lands in 10 to 30 minutes. Then a second card sends it to
+your main wallet."
 
 Withdraw: "Withdrawing $<amount> from Derive: it reaches your wallet on Ethereum in <the
 card's window>, less Derive's fee, which it does not say in advance and can be most of a

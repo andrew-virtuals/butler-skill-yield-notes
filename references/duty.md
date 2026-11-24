@@ -262,10 +262,10 @@ owner's approval has emptied its wallet. Never turn it off or delete it to stop 
 money would stay in its wallet.
 
 Without it, deleting a duty is refused (409 `duty_venue_not_empty`) while its own
-wallet's venue account holds money or a position. Have the duty cancel its resting
-orders, close or let settle what it holds, and withdraw (`duty_update` its code with that
-step if it has none), then delete. A withdrawal lands in the duty's wallet on Ethereum
-(Derive) or Arbitrum (Paradex), less the venue's fee.
+wallet's venue account holds money or a position. Never edit its code to withdraw (a
+finished duty must not be edited): bring it home from chat, running or not, as
+`account.md` § A duty's own wallet says, then delete it if they asked. A withdrawal lands
+in the duty's wallet on Ethereum (Derive) or Arbitrum (Paradex), less the venue's fee.
 
 ## Auto-roll
 

@@ -40,6 +40,17 @@
   lands on the venue before the end is withdrawn too. A refused withdrawal is said once
   and tried again; an unclear one is tried again after an hour if the money is still
   there; a send home that went through despite an error is not sent again.
+- **A duty's money comes home from chat, whether the duty runs or not.** `account.md` has a
+  new "A duty's own wallet" section: read its account with `bevo-read get
+  '/options/account?venue=derive&walletId=<LABEL>'`, stop it if it still runs, cancel what
+  rests (`acp options cancel --order <id> --wallet <LABEL>`, a card), withdraw into the
+  duty's wallet (`acp options withdraw --wallet <LABEL>`, a card; `--wallet` left out in
+  that duty's own chat), then, once it has landed, `bevo-wallet withdraw --wallet <LABEL>
+  --all` into the main wallet, a second card; never `:home`. Derive keeps about $1 a
+  withdrawal, said first. `order-manager.md` no longer says a cancel with `--wallet` is
+  refused, or reads the account with `acp options account --wallet`, and `duty.md` no
+  longer edits a duty's code to withdraw: both point to the new section. "Holds nothing to
+  withdraw" right after a venue withdrawal means not landed yet: wait.
 - **Locked collateral is not "short".** A duty with a sold put open no longer tells the
   owner to top up: the collateral comes back when the put settles. It is short only when
   its trigger fires, or free and locked USDC together cannot pay for the next trade.
