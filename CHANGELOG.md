@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.17.3
+## 2.18.1
 
 - **One minimum deposit, $11, and a wallet short of it gets one figure.** Seen in QA: a
   Derive buy $4.12 short with $2.13 in the wallet was answered "send roughly 5 USDC to
@@ -25,7 +25,7 @@
   `options-deposit-speed` eval, deepseek-v4-1-flash, n=10 each, time from the ask to the
   deposit reaching the server:
 
-  | case | 2.17.2 | 2.17.3 |
+  | case | 2.17.2 | 2.17.3 text |
   | --- | --- | --- |
   | "deposit $20 into Derive" | 9/10, 25 s | 10/10, 7.7 s (6.2-11.7) |
   | "deposit $10" (asks for $11, then files) | 0/10 | 10/10, 5 s after the ok |
@@ -34,6 +34,74 @@
   To stay under the body cap: step 4's "Free USDC spans their Derive accounts" (`account.md`
   says it), its `--from 1` aside (`venue.md`), step 6's "the server nudges you", step 1's
   reason after the bold duty rule, and "for the bridge", "(sell)", "(buy)" were cut.
+
+## 2.18.0
+
+- **Auto-roll: a put every week, from the duty's own wallet.** `make_duty.py --preset
+  auto-roll` builds it with a rule the script holds (`AUTO_ROLL`), so none is written in
+  chat. Once nothing is open and the last put has settled (no collateral locked, 20 minutes
+  past its expiry) it sells this week's put: the strike nearest spot at least 8% under it
+  with a delta of 0.15 or less and a bid, the expiry nearest 9 days (a Friday), sized to all
+  its free USDC, at the quote's bound. Cash only: it never buys the asset. It needs
+  `--end-at` and `--max-loss`, runs on Derive every 300 seconds, and sells a put a week to
+  its end date when `--times` is left out. `duty.md` has a new "Auto-roll" section: the
+  first reply fixes its own wallet and Derive, the second quotes the first put with the same
+  rule and makes the short offer (the trade and its yield, what a fall below the strike
+  costs in cash, the weekly target, stop anytime). `SKILL.md` Limits and `selling.md` allow
+  rolling only through an auto-roll duty the owner set up.
+- **`quote.py quote --max-delta`**, with `--otm-pct`, on a sell: the strike nearest spot at
+  least that far out of the money whose delta is at most that, with a bid. A strike whose
+  delta is unread or not a number is skipped, never read as 0; none fits, it is refused
+  saying so. Replayed on Derive's trades of 18 Sep to 16 Nov 2026 (ETH down 22%), weekly ETH
+  puts by `--otm-pct 8 --max-delta 0.15` netted +1.4% a year where puts 5% out of the money
+  lost 44%.
+- **A duty can end itself and bring its money home** (every duty, not only auto-roll):
+  `--end-at YYYY-MM-DD` and, on its own wallet, `--max-loss <USD>` and
+  `--withdraw-on-finish` (`END_AT`, `MAX_LOSS_USD`, `WITHDRAW_ON_FINISH`, `WALLET_LABEL`).
+  It makes no new trade from its end date, after `--times` trades, on `"STOP": true` in its
+  params (a real yes: `"false"` or `"0"` never stops it), or once the loss limit is reached:
+  counted from what it deposited, with nothing open, and still short six hours later
+  (settled cash that lands late is not a loss), trading nothing while it checks. With the
+  wind-down it then waits until nothing ties money to the venue (no position, no locked
+  collateral, no fill or deposit still landing), withdraws everything free (a cent under
+  the figure read, less again only after "only $N is free"), waits for that to reach its
+  wallet, sends everything back to the main wallet and finishes, saying what went home.
+  The send home reads its wallet's USDC on each chain (`bevo-wallet list --fresh`) and
+  files one `bevo-wallet withdraw --amount <that> --token usdc --chain-id <chain>` per
+  chain holding $1 or more: with no `--to` it pays the owner's own wallet, and from the
+  duty's own session it runs without a card (`withdraw --all` always asks one, and
+  finishing would withdraw it). Should the server file a card anyway, the duty says so
+  once and finishes only after the owner's approval has emptied its wallet. Money that
+  lands on the venue before the end is withdrawn too. A refused withdrawal is said once
+  and tried again; an unclear one is tried again after an hour if the money is still
+  there; a send home that went through despite an error is not sent again.
+- **A duty's money comes home from chat, whether the duty runs or not.** `account.md` has a
+  new "A duty's own wallet" section: read its account with `bevo-read get
+  '/options/account?venue=derive&walletId=<LABEL>'`, stop it if it still runs, cancel what
+  rests (`acp options cancel --order <id> --wallet <LABEL>`, a card), withdraw into the
+  duty's wallet (`acp options withdraw --wallet <LABEL>`, a card; `--wallet` left out in
+  that duty's own chat), then, once it has landed, `bevo-wallet withdraw --wallet <LABEL>
+  --all` into the main wallet, a second card; never `:home`. Derive keeps about $1 a
+  withdrawal, said first. `order-manager.md` no longer says a cancel with `--wallet` is
+  refused, or reads the account with `acp options account --wallet`, and `duty.md` no
+  longer edits a duty's code to withdraw: both point to the new section. "Holds nothing to
+  withdraw" right after a venue withdrawal means not landed yet: wait. Both withdraw
+  commands sit in `SKILL.md` step 8, beside the main wallet's.
+- **`SKILL.md` makes room.** Step 2's five quote lines moved to `helper.md` § The lines
+  (step 2 says to read it first), and step 9's list of old duties to delete moved to
+  `account.md` § Old duties: the body drops from 11,999 to 11,599 characters of 12,000.
+- **Locked collateral is not "short".** A duty with a sold put open no longer tells the
+  owner to top up: the collateral comes back when the put settles. It is short only when
+  its trigger fires, or free and locked USDC together cannot pay for the next trade.
+- Tests: the end date, the loss limit (after six hours, from what it deposited, not on a
+  late settlement, never on a main wallet), `STOP` and `"STOP": "false"`, a last fill or a
+  deposit still landing, locked collateral, late settled cash, refused, unclear and
+  shrinking withdrawals, cash already in its wallet, a send home that errs or goes through
+  anyway, a send per chain at the amount read, a card filed instead of a send, an unread
+  wallet, a restart mid wind-down, and a weekly roll from funding to its second put across
+  a settlement (`tests/test_duty_program.py`); the preset's payload, refusals and weeks, and
+  the strike rule with unread deltas (`tests/test_make_duty.py`). No new file: the repo stays
+  within the hub's 50.
 
 ## 2.17.2
 

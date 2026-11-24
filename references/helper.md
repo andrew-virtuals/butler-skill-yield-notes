@@ -6,6 +6,20 @@ secret, read-only: it screens and quotes against Derive v3's public API, or Para
 with `--venue paradex`, and nothing else. Selling, buying, closing, funding and withdrawing are
 `acp options` commands in `SKILL.md`, never this file.
 
+## The lines
+
+`SKILL.md` step 2 quotes with one of these, the one for the intent:
+
+```sh
+python3 ~/skills/options-trading/scripts/quote.py screen --collateral <USD>
+python3 ~/skills/options-trading/scripts/quote.py quote --product cash_secured_put --underlying <ASSET> --collateral <USD> [--expiry <DAY>] [--strike <N>]
+python3 ~/skills/options-trading/scripts/quote.py quote --side buy --product <PRODUCT> --underlying <ASSET> --budget <USD> [--expiry <DAY>] [--strike <N>]
+python3 ~/skills/options-trading/scripts/quote.py quote --side close --instrument <INSTRUMENT> --size <SIZE>
+python3 ~/skills/options-trading/scripts/quote.py quote --side buyback --instrument <INSTRUMENT> --size <SIZE> --premium-received <USD>
+```
+
+Filled in:
+
 ```sh
 python3 ~/skills/options-trading/scripts/quote.py screen --tenor monthly --collateral 5000
 python3 ~/skills/options-trading/scripts/quote.py quote --product cash_secured_put --underlying ETH --collateral 5000 --tenor monthly --otm-pct 10
@@ -139,7 +153,9 @@ included; `--size` asks for an exact number of contracts instead (a hedge sized 
 what they hold). `--otm-pct` defaults to 5 for a buy: the strike nearest spot moved 5%
 up for a call, down for a put. `--delta 0.30` picks by delta instead. `--strike 2100`
 takes exactly the strike the owner named (sell quotes too); an expiry that does not list
-it is refused with the strikes it does.
+it is refused with the strikes it does. On a sell, `--otm-pct 8 --max-delta 0.15` is
+auto-roll's rule (`duty.md`): the strike nearest spot at least 8% out of the money whose
+delta is 0.15 or less and that has a bid; none fits, it is refused saying so.
 
 | Field | Means |
 | --- | --- |

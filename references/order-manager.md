@@ -63,24 +63,23 @@ yes, and a quote run after their last answer.
 
 ## Stopping it
 
-**Never turn it off to stop it.** Only the running duty can cancel an order resting
-from its wallet; the chat cannot, and `acp options cancel` with `--wallet` is refused.
-Turned off while an order rests, that order stays on Derive and can still fill at its
-price until the option expires.
+**Never turn it off to stop it.** Turned off while an order rests, that order stays on
+Derive and can still fill at its price until the option expires.
 
 "Cancel it", "stop working it": `duty_update` its params with `"STOP": true` added,
 every other setting unchanged. Within a minute it cancels what rests and sends the
-receipt for what had filled. Found turned off: `duty_status` on, then the same update;
-if only the owner can resume it, ask them to, and say why.
+receipt for what had filled. Found turned off with an order still resting: cancel it from
+chat, `acp options cancel --order <id> --wallet <LABEL>`, a card (`--wallet` left out in
+the duty's own chat).
 
 ## Afterwards
 
-- **Look:** `acp options account --venue derive --wallet <LABEL>`.
+- **Look:** `bevo-read get '/options/account?venue=derive&walletId=<LABEL>'`.
 - **Close what it holds:** quote the close (step 2); to work it, `duty_update` the same
   duty with that quote's `worked.params` (a new order; a close is worked by the makers
   and the book only). To close now: step 5's `acp options close … --wallet <LABEL>`, a card.
-- **Bring the money home:** `acp options withdraw --amount <USDC> --wallet <LABEL>`, as
-  step 8. `duty_delete` is refused while that account holds money, an order or a position.
+- **Bring the money home:** `account.md` § A duty's own wallet: out of Derive into this
+  wallet, then into the main wallet, a card each. `duty_delete` is refused until then.
 - At expiry Derive settles in cash into that same account; the lifecycle duty gives
   the heads-up and the outcome, naming this wallet.
 
