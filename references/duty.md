@@ -104,6 +104,11 @@ write only the rule, then run it.
      when its money reaches the venue.
    - `--param KEY=VALUE`: each of the rule's figures, read from `P` in the rule, never
      written into it.
+   - When they gave one: `--end-at YYYY-MM-DD` (no new trade from that day). Its own
+     wallet only: `--max-loss <USD>` (no new trade once that much of what it deposited is
+     gone, counted with nothing open and still gone six hours later, trading nothing while
+     it checks) and `--withdraw-on-finish`, so at the end it sends everything back to the
+     main wallet itself.
    - **The main wallet:** `--wallet main --free <freeForNewPutsUsd>` from this turn's
      `acp options account`, and no `--wallet-label`; `--card-each-trade` only when they
      asked for a card on every trade.
@@ -244,11 +249,78 @@ how much. Nothing moves without their yes.
 
 ## Stopping it
 
-Deleting a duty is refused (409 `duty_venue_not_empty`) while its own wallet's venue
-account holds money or a position. Have the duty cancel its resting orders, close or let
-settle what it holds, and withdraw (`duty_update` its code with that step if it has
-none), then delete. A withdrawal lands in the duty's wallet on Ethereum (Derive) or
-Arbitrum (Paradex), less the venue's fee.
+A duty built with `--withdraw-on-finish` (auto-roll always is) stops itself cleanly:
+`duty_update` its params with `"STOP": true` added, every other setting unchanged. It
+makes no new trade and waits until nothing ties money to the venue (no position, no
+locked collateral, no fill or deposit still landing). Then it withdraws everything free
+(a cent under the figure read, less again only after "only $N is free"), waits for that
+to reach its wallet (24 hours at most), reads its wallet's USDC on each chain and sends
+each back to the main wallet (`bevo-wallet withdraw --amount`, no card), and finishes,
+saying what went home. Money that lands on the venue before then is withdrawn too. If the
+server files a card for that send instead, the duty says so once and finishes when the
+owner's approval has emptied its wallet. Never turn it off or delete it to stop it: its
+money would stay in its wallet.
+
+Without it, deleting a duty is refused (409 `duty_venue_not_empty`) while its own
+wallet's venue account holds money or a position. Never edit its code to withdraw (a
+finished duty must not be edited): bring it home from chat, running or not, as
+`account.md` § A duty's own wallet says, then delete it if they asked. A withdrawal lands
+in the duty's wallet on Ethereum (Derive) or Arbitrum (Paradex), less the venue's fee.
+
+## Auto-roll
+
+A put sold every week from its own wallet, the next one as soon as the last settles, until
+an end date, a loss limit or the owner says stop: "auto-roll", "sell a put every week",
+"keep rolling my puts". Cash only: below the strike they pay the difference in cash, and it
+never buys the asset. Its rule is built in (`--preset auto-roll`); write no `rule.py`.
+
+1. **First reply**, as above, with two answers fixed: **its own wallet** (auto-roll runs
+   from its own wallet only, so the main wallet is not offered) and **Derive**. Ask how
+   much to set aside; one put needs at least `min_collateral_usd` from
+   `quote.py minimum --underlying <ASSET> --tenor weekly`.
+2. **Second reply, once the wallet and amount are confirmed:** quote the first put with
+   the duty's own rule, then make the offer, each line its own paragraph:
+
+   ```sh
+   python3 ~/skills/options-trading/scripts/quote.py quote --product cash_secured_put --underlying <ASSET> --collateral <SET_ASIDE> --tenor weekly --otm-pct 8 --max-delta 0.15
+   ```
+
+   > Best first trade for your $5,000: sell the ETH $1,500 put, expiring 4 Dec. Estimated yield: 33% a year.
+   >
+   > If ETH ends below $1,500, you pay the difference in cash. At $1,400, that's about $333, less the $51 premium you keep.
+   >
+   > After that, I'll roll it weekly with what's left, targeting about 30% a year, until 23 Feb or if losses pass $500.
+   >
+   > You can stop me anytime.
+   >
+   > Start?
+
+   Strike, expiry and yield are the quote's (`apr_pct`); the premium kept is
+   `net_premium_usd`; the cash example is (strike minus a price about 7% under it) x
+   `size`. The target is `apr_pct` rounded down to a 5: an estimate the rule never
+   chases by selling nearer the price. End date and loss limit are theirs; unnamed,
+   offer 13 weeks and 10% of the amount set aside. Say the bad case if they ask what a
+   crash costs: `bad_case`.
+3. **On yes:** `bevo-wallet create --chain ethereum --label <name>`, then build it and do
+   what it prints (Filing it, step 4: one funding card, the amount set aside plus 2%):
+
+   ```sh
+   python3 ~/skills/options-trading/scripts/make_duty.py --name 'Weekly ETH puts' --spec '<THEIR ASK>' \
+     --preset auto-roll --wallet own --wallet-label <name> --set-aside <USD> --need <min_collateral_usd> \
+     --end-at <YYYY-MM-DD> --max-loss <USD> --param UNDERLYING=ETH
+   ```
+
+   `--end-at` and `--max-loss` are required; it sells a put a week to the end date (and
+   one more), so no `--times`. Derive only, every 300 seconds: no `--venue` or `--every`.
+
+What it does every five minutes: once nothing is open and the last put has settled (no
+collateral locked, 20 minutes past its 08:00 UTC expiry), or none was sold yet, it quotes
+this week's put by the same rule (the strike nearest spot at least 8% under it with a delta
+of 0.15 or less and a bid; the expiry nearest 9 days out, a Friday), sized to all its free
+USDC, and sells it at the quote's bound. While a put is open its locked collateral is not
+short. `options-lifecycle` gives each put's heads-up and outcome. At the end date, the loss
+limit or `STOP` it finishes as Stopping it says. Change `MIN_BELOW_PCT` or `MAX_DELTA`
+only when the owner asks.
 
 ## Say to the owner
 

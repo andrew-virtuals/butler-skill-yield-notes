@@ -193,7 +193,8 @@ here yet: v1 offers puts only, Derive settles in cash, and a call needs the asse
 inside the Derive account. The next note is another put. Offer it as a choice, not a
 sequence: an owner who has just taken a loss may want to stop.
 
-Never auto-roll without a fresh yes.
+Never roll without a fresh yes, but through an auto-roll duty the owner set up for it
+(`duty.md`, Auto-roll).
 
 ## Sizes
 
