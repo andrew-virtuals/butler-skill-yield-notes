@@ -82,6 +82,12 @@ Derive deposit lands. An older `derive-account` duty is replaced by it (step 9).
 never writes a row itself: no `bevo-platforms set`, and no watcher of its own. A row catches up within about 10 minutes of a deposit, trade, withdrawal or settlement.
 A row behind this turn's read is that delay, not a discrepancy: answer from the read.
 
+## Old duties
+
+Step 9's account and lifecycle duties replaced older ones. `duty_delete` only these: a
+`derive-account`, every `options-lifecycle@11` or older (one per option), and a second
+`options-lifecycle@12`. Nothing else, and never an `options-put-delivery`.
+
 ## A withdrawal
 
 "Withdraw my free USDC" means out of Derive, to the owner's wallet. It is `acp options
@@ -113,13 +119,13 @@ duty's money home" is two cards, never `:home`, and works whether the duty runs 
    code may deposit what lands straight back.
 3. **An order resting:** `acp options cancel --order <id> --wallet <LABEL>`, a card. Money
    backing an open position stays until it is closed or settles.
-4. **Withdraw:** `acp options withdraw --amount <free> --wallet <LABEL> --idempotency-key
-   <KEY>:withdraw`, a card. In that duty's own chat, leave out `--wallet`: it is that
-   duty's. It lands in **the duty's wallet** on Ethereum (Paradex: Arbitrum), not the
-   owner's, less Derive's fee: about $1 a withdrawal, whatever the size. Say so first.
-5. **Home, once it has landed** (about 10 to 30 minutes): `bevo-wallet withdraw --wallet
-   <LABEL> --all`, a card, into the main wallet. `holds nothing to withdraw` means it has
-   not landed yet: wait and try again, never call it done.
+4. **Withdraw:** step 8's `--wallet` line, a card, at most its free USDC. In that duty's
+   own chat, leave out `--wallet`: it is that duty's. It lands in **the duty's wallet** on
+   Ethereum (Paradex: Arbitrum), not the owner's, less Derive's fee: about $1 a
+   withdrawal, whatever the size. Say so first.
+5. **Home, once it has landed** (about 10 to 30 minutes): step 8's `bevo-wallet withdraw`
+   line, a card, into the main wallet. `holds nothing to withdraw` means it has not
+   landed yet: wait and try again, never call it done.
 6. `duty_delete`, if they asked for it, only now: it is refused while the account holds
    money, an order or a position.
 

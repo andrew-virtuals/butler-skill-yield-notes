@@ -50,7 +50,11 @@
   withdrawal, said first. `order-manager.md` no longer says a cancel with `--wallet` is
   refused, or reads the account with `acp options account --wallet`, and `duty.md` no
   longer edits a duty's code to withdraw: both point to the new section. "Holds nothing to
-  withdraw" right after a venue withdrawal means not landed yet: wait.
+  withdraw" right after a venue withdrawal means not landed yet: wait. Both withdraw
+  commands sit in `SKILL.md` step 8, beside the main wallet's.
+- **`SKILL.md` makes room.** Step 2's five quote lines moved to `helper.md` § The lines
+  (step 2 says to read it first), and step 9's list of old duties to delete moved to
+  `account.md` § Old duties: the body drops from 11,999 to 11,599 characters of 12,000.
 - **Locked collateral is not "short".** A duty with a sold put open no longer tells the
   owner to top up: the collateral comes back when the put settles. It is short only when
   its trigger fires, or free and locked USDC together cannot pay for the next trade.

@@ -77,16 +77,8 @@ this chat. One missing: ask, and file nothing this turn.
    when an option expires.
 
 2. [FIXED] Run the helper in place; never write, copy or edit a script, or trim its
-   output. Missing: say so, and stop. Quote with the line for the intent
-   (`helper.md`); the strike is a rule or theirs:
-
-   ```sh
-   python3 ~/skills/options-trading/scripts/quote.py screen --collateral <USD>
-   python3 ~/skills/options-trading/scripts/quote.py quote --product cash_secured_put --underlying <ASSET> --collateral <USD> [--expiry <DAY>] [--strike <N>]
-   python3 ~/skills/options-trading/scripts/quote.py quote --side buy --product <PRODUCT> --underlying <ASSET> --budget <USD> [--expiry <DAY>] [--strike <N>]
-   python3 ~/skills/options-trading/scripts/quote.py quote --side close --instrument <INSTRUMENT> --size <SIZE>
-   python3 ~/skills/options-trading/scripts/quote.py quote --side buyback --instrument <INSTRUMENT> --size <SIZE> --premium-received <USD>
-   ```
+   output. Missing: say so, and stop. Quote with the line for the intent, from
+   `helper.md` § The lines (read it first); the strike is a rule or theirs.
 
    Selling: the asset they named, or screen (never an APR menu) and ask. **No amount
    from them:** each venue's `minimum` (`which-venue.md`), then ask it; no quote,
@@ -166,6 +158,14 @@ this chat. One missing: ask, and file nothing this turn.
    acp trade --token-in usdc --chain-in 1 --amount-in <USDC_ARRIVED> --token-out usdc --chain-out 8453 --idempotency-key <KEY>:home
    ```
 
+   A duty's own wallet (`account.md` § A duty's own wallet), never `:home`: the first
+   into its wallet (no `--wallet` in that duty's chat), the second once it has landed:
+
+   ```sh
+   acp options withdraw --amount <USDC> --wallet <LABEL> --idempotency-key <KEY>:withdraw
+   bevo-wallet withdraw --wallet <LABEL> --all --idempotency-key <KEY>:home
+   ```
+
 9. [FIXED] Whenever step 1 shows an account on any venue, unasked, in that same turn
    before you answer: `duty_list`, then `duty_show` each for its `recipe`. Go by
    `recipe` alone, never a title. The owner needs exactly one of each:
@@ -178,9 +178,7 @@ this chat. One missing: ask, and file nothing this turn.
    - Missing, or the list is empty: file it now. Neither takes `params`; one covers
      every option.
    - An older `options-account` or a fork: `duty_update` to this recipe.
-   - `duty_delete` only these: `derive-account`, every `options-lifecycle@11` or older
-     (one per option), and a second `options-lifecycle@12`. Nothing else, and never an
-     `options-put-delivery`.
+   - An older duty of these two, or a second one: `account.md` § Old duties.
 
    `options-account` alone writes Platforms rows; never `bevo-platforms set`.
 

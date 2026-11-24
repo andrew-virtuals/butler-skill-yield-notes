@@ -6,6 +6,20 @@ secret, read-only: it screens and quotes against Derive v3's public API, or Para
 with `--venue paradex`, and nothing else. Selling, buying, closing, funding and withdrawing are
 `acp options` commands in `SKILL.md`, never this file.
 
+## The lines
+
+`SKILL.md` step 2 quotes with one of these, the one for the intent:
+
+```sh
+python3 ~/skills/options-trading/scripts/quote.py screen --collateral <USD>
+python3 ~/skills/options-trading/scripts/quote.py quote --product cash_secured_put --underlying <ASSET> --collateral <USD> [--expiry <DAY>] [--strike <N>]
+python3 ~/skills/options-trading/scripts/quote.py quote --side buy --product <PRODUCT> --underlying <ASSET> --budget <USD> [--expiry <DAY>] [--strike <N>]
+python3 ~/skills/options-trading/scripts/quote.py quote --side close --instrument <INSTRUMENT> --size <SIZE>
+python3 ~/skills/options-trading/scripts/quote.py quote --side buyback --instrument <INSTRUMENT> --size <SIZE> --premium-received <USD>
+```
+
+Filled in:
+
 ```sh
 python3 ~/skills/options-trading/scripts/quote.py screen --tenor monthly --collateral 5000
 python3 ~/skills/options-trading/scripts/quote.py quote --product cash_secured_put --underlying ETH --collateral 5000 --tenor monthly --otm-pct 10
