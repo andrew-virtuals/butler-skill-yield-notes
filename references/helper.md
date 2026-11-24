@@ -139,7 +139,9 @@ included; `--size` asks for an exact number of contracts instead (a hedge sized 
 what they hold). `--otm-pct` defaults to 5 for a buy: the strike nearest spot moved 5%
 up for a call, down for a put. `--delta 0.30` picks by delta instead. `--strike 2100`
 takes exactly the strike the owner named (sell quotes too); an expiry that does not list
-it is refused with the strikes it does.
+it is refused with the strikes it does. On a sell, `--otm-pct 8 --max-delta 0.15` is
+auto-roll's rule (`duty.md`): the strike nearest spot at least 8% out of the money whose
+delta is 0.15 or less and that has a bid; none fits, it is refused saying so.
 
 | Field | Means |
 | --- | --- |

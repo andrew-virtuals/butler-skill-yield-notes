@@ -523,7 +523,7 @@ def offer_rfq(q):
 
 
 def build_quote(product, underlying, collateral_usd, tenor="monthly",
-                otm_pct=10.0, target_delta=None, on=None, strike=None, waived=()):
+                otm_pct=10.0, target_delta=None, on=None, strike=None, waived=(), max_delta=None):
     if product not in ("cash_secured_put", "covered_call"):
         raise VenueError("unknown product %r" % product)
     opt_type = "P" if product == "cash_secured_put" else "C"
@@ -533,7 +533,7 @@ def build_quote(product, underlying, collateral_usd, tenor="monthly",
     expiry, chain, tickers = load_chain(underlying, opt_type, tenor, now, on)
     spot = num(tickers[chain[0]["instrument_name"]].get("I"))
 
-    inst = strike_for(chain, tickers, opt_type, spot, otm_pct, target_delta, strike)
+    inst = strike_for(chain, tickers, opt_type, spot, otm_pct, target_delta, strike, max_delta)
 
     t = tickers[inst["instrument_name"]]
     op = t.get("option_pricing") or {}
@@ -662,10 +662,32 @@ def build_minimum(underlying, tenor="monthly", otm_pct=10.0, on=None, strike=Non
     return out
 
 
-def strike_for(chain, tickers, opt_type, spot, otm_pct, target_delta, strike=None):
+def strike_for(chain, tickers, opt_type, spot, otm_pct, target_delta, strike=None, max_delta=None):
     """The strike the owner named, exactly, or the strike rule, applied: nearest
     the target delta, or nearest spot moved otm_pct out of the money (down for a
-    put, up for a call)."""
+    put, up for a call). With max_delta (auto-roll's rule): the strike nearest spot
+    that is at least otm_pct out of the money, has a delta no bigger than max_delta
+    and a bid; none fits, a VenueError says so."""
+    if max_delta is not None and strike is None and target_delta is None:
+        sign = -1 if opt_type == "P" else 1
+        edge = spot * (1 + sign * otm_pct / 100.0)
+
+        def fits(i):
+            t = tickers.get(i["instrument_name"]) or {}
+            try:  # an unread delta is no delta: never read as 0, which would pass any cap
+                d = float((t.get("option_pricing") or {}).get("d"))
+            except (TypeError, ValueError):
+                return False
+            k = num(i["option_details"]["strike"])
+            return (k <= edge if opt_type == "P" else k >= edge) and math.isfinite(d) \
+                and abs(d) <= max_delta and num(t.get("b")) > 0
+        ok = [i for i in chain if fits(i)]
+        if not ok:
+            raise VenueError("%s lists no strike for that expiry at least %s%% out of the money "
+                             "with a delta of %s or less and a bid" % (V["name"], plain(otm_pct),
+                                                                       plain(max_delta)))
+        near = max if opt_type == "P" else min
+        return near(ok, key=lambda i: num(i["option_details"]["strike"]))
     if strike is not None:
         hit = [i for i in chain if num(i["option_details"]["strike"]) == strike]
         if not hit:
@@ -1090,8 +1112,10 @@ def build_asked_quote(p, a):
     if a.product not in ("cash_secured_put", "covered_call"):
         p.error("quote --side sell takes --product cash_secured_put or covered_call")
     otm = 10.0 if a.otm_pct is None else a.otm_pct
+    if a.max_delta is not None and (a.delta is not None or a.strike is not None):
+        p.error("--max-delta goes with --otm-pct, never with --delta or --strike")
     return build_quote(a.product, a.underlying, a.collateral, a.tenor, otm, a.delta, a.expiry, a.strike,
-                       a.waive)
+                       a.waive, a.max_delta)
 
 
 def main():
@@ -1125,6 +1149,9 @@ def main():
     rule.add_argument("--delta", type=float, default=None)
     rule.add_argument("--strike", type=float, default=None,
                       help="the strike the owner named, exactly; refused if the expiry does not list it")
+    q.add_argument("--max-delta", type=float, default=None,
+                   help="sell, with --otm-pct: the strike nearest spot at least that far out of the "
+                        "money whose delta is at most this, with a bid (auto-roll, duty.md)")
 
     m = sub.add_parser("minimum", help="the smallest cash-secured put, before the owner names an amount")
     m.add_argument("--underlying", required=True)
